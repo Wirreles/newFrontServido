@@ -299,7 +299,7 @@ export default function ProductDetailPage() {
       if (currentUser) {
         const favoriteQuery = query(
           collection(db, "favorites"),
-          where("userId", "==", currentUser.uid),
+          where("userId", "==", currentUser.firebaseUser.uid),
           where("productId", "==", productId),
           limit(1),
         )
@@ -372,7 +372,7 @@ export default function ProductDetailPage() {
       } else {
         const firstImage = productMedia.find((m) => m.type === "image")
         const docRef = await addDoc(collection(db, "favorites"), {
-          userId: currentUser.uid,
+          userId: currentUser.firebaseUser.uid,
           productId: product.id,
           name: product.name,
           price: product.price,
@@ -415,8 +415,8 @@ export default function ProductDetailPage() {
     try {
       const reviewData = {
         productId: product.id,
-        userId: currentUser.uid,
-        userName: currentUser.displayName || currentUser.email || "Usuario Anónimo",
+        userId: currentUser.firebaseUser.uid,
+        userName: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email || "Usuario Anónimo",
         rating: reviewRating,
         comment: reviewComment,
         createdAt: serverTimestamp(),
@@ -435,7 +435,7 @@ export default function ProductDetailPage() {
   }
 
   const averageRating = reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0
-  const hasUserReviewed = currentUser ? reviews.some((r) => r.userId === currentUser.uid) : false
+  const hasUserReviewed = currentUser ? reviews.some((r) => r.userId === currentUser.firebaseUser.uid) : false
 
   const handleSubmitQuestion = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -459,8 +459,8 @@ export default function ProductDetailPage() {
     try {
       const questionData = {
         productId: product.id,
-        userId: currentUser.uid,
-        userName: currentUser.displayName || currentUser.email || "Usuario Anónimo",
+        userId: currentUser.firebaseUser.uid,
+        userName: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email || "Usuario Anónimo",
         question: newQuestion,
         createdAt: serverTimestamp(),
       }
@@ -481,7 +481,7 @@ export default function ProductDetailPage() {
       setQuestionError("Debes iniciar sesión para responder.")
       return
     }
-    if (!product || currentUser.uid !== product.sellerId) {
+    if (!product || currentUser.firebaseUser.uid !== product.sellerId) {
       setQuestionError("Solo el vendedor puede responder preguntas.")
       return
     }
@@ -497,7 +497,7 @@ export default function ProductDetailPage() {
       const questionRef = doc(db, "questions", questionId)
       await updateDoc(questionRef, {
         answer: answerText,
-        answeredBy: currentUser.displayName || currentUser.email || "Vendedor",
+        answeredBy: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email || "Vendedor",
         answeredAt: serverTimestamp(),
       })
 
@@ -507,7 +507,7 @@ export default function ProductDetailPage() {
             ? {
                 ...q,
                 answer: answerText,
-                answeredBy: currentUser.displayName || currentUser.email || "Vendedor",
+                answeredBy: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email || "Vendedor",
                 answeredAt: new Date(),
               }
             : q,
@@ -539,7 +539,7 @@ export default function ProductDetailPage() {
     const existingChatQuery = query(
       collection(db, "chats"),
       where("productId", "==", product.id),
-      where("buyerId", "==", currentUser.uid),
+      where("buyerId", "==", currentUser.firebaseUser.uid),
       where("sellerId", "==", seller.id),
       limit(1),
     )
@@ -553,9 +553,9 @@ export default function ProductDetailPage() {
         const firstImage = productMedia.find((m) => m.type === "image")
         const newChatData = {
           productId: product.id,
-          buyerId: currentUser.uid,
+          buyerId: currentUser.firebaseUser.uid,
           sellerId: seller.id,
-          buyerName: currentUser.displayName || currentUser.email?.split("@")[0] || "Comprador",
+          buyerName: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email?.split("@")?.[0] || "Comprador",
           sellerName: seller.name || seller.email?.split("@")[0] || "Vendedor",
           productName: product.name,
           productImageUrl: firstImage?.url || product.imageUrl || null,
@@ -566,8 +566,8 @@ export default function ProductDetailPage() {
         const docRef = await addDoc(collection(db, "chats"), newChatData)
 
         await addDoc(collection(db, "chats", docRef.id, "messages"), {
-          senderId: currentUser.uid,
-          senderName: currentUser.displayName || currentUser.email?.split("@")[0] || "Comprador",
+          senderId: currentUser.firebaseUser.uid,
+          senderName: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email?.split("@")?.[0] || "Comprador",
           text: "¡Hola! Me interesa este producto.",
           timestamp: serverTimestamp(),
         })
@@ -849,7 +849,7 @@ export default function ProductDetailPage() {
                         <p className="text-sm text-gray-600">Vendedor verificado</p>
                       </div>
                     </div>
-                    {currentUser?.uid !== seller.id && (
+                    {currentUser?.firebaseUser.uid !== seller.id && (
                       <Button
                         onClick={handleContactSeller}
                         variant="outline"
@@ -1015,7 +1015,7 @@ export default function ProductDetailPage() {
               </Alert>
             )}
 
-            {currentUser && currentUser.uid !== product.sellerId && (
+            {currentUser && currentUser.firebaseUser.uid !== product.sellerId && (
               <form onSubmit={handleSubmitQuestion} className="mb-8 p-4 border rounded-lg bg-gray-50">
                 <h3 className="text-lg font-medium mb-3">Hacer una pregunta</h3>
                 <div className="mb-4">
@@ -1075,7 +1075,7 @@ export default function ProductDetailPage() {
                         </div>
                         <p className="text-gray-700 leading-relaxed">{question.answer}</p>
                       </div>
-                    ) : currentUser && currentUser.uid === product.sellerId ? (
+                    ) : currentUser && currentUser.firebaseUser.uid === product.sellerId ? (
                       <div className="ml-4">
                         {answeringQuestionId === question.id ? (
                           <div className="p-3 bg-gray-50 rounded-lg">

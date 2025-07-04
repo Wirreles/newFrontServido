@@ -307,14 +307,14 @@ export function Header() {
                       >
                         <Avatar className="h-6 w-6">
                           <AvatarImage
-                            src={currentUser.photoURL || undefined}
-                            alt={currentUser.displayName || "User"}
+                            src={currentUser.firebaseUser.photoURL || undefined}
+                            alt={currentUser.firebaseUser.displayName || "User"}
                           />
                           <AvatarFallback>
                             <User className="h-4 w-4" />
                           </AvatarFallback>
                         </Avatar>
-                        <span>{currentUser.displayName || currentUser.email?.split("@")[0]}</span>
+                        <span>{currentUser.firebaseUser.displayName || currentUser.firebaseUser.email?.split("@")[0]}</span>
                         <ChevronDown className="h-3 w-3" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -391,14 +391,14 @@ export function Header() {
                   ) : currentUser ? (
                     <div className="mb-4 flex items-center gap-3">
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={currentUser.photoURL || undefined} alt={currentUser.displayName || "User"} />
+                        <AvatarImage src={currentUser.firebaseUser.photoURL || undefined} alt={currentUser.firebaseUser.displayName || "User"} />
                         <AvatarFallback>
                           <User className="h-6 w-6" />
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-semibold text-lg break-words">{currentUser.displayName || currentUser.email}</p>
-                        <p className="text-xs text-muted-foreground break-words">{currentUser.email}</p>
+                        <p className="font-semibold text-lg break-words">{currentUser.firebaseUser.displayName || currentUser.firebaseUser.email}</p>
+                        <p className="text-xs text-muted-foreground break-words">{currentUser.firebaseUser.email}</p>
                         {currentUser.role === "admin" && (
                           <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                             <ShieldCheck className="h-3 w-3 mr-1" /> Admin

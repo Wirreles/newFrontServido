@@ -201,7 +201,7 @@ export default function SellerDashboardPage() {
 
   useEffect(() => {
     if (currentUser) {
-      setProfileImagePreviewUrl(currentUser.photoURL || null)
+      setProfileImagePreviewUrl(currentUser.firebaseUser.photoURL || null)
     }
   }, [currentUser])
 
@@ -219,7 +219,7 @@ export default function SellerDashboardPage() {
   
     const checkConnectionStatus = async () => {
       try {
-        const response = await ApiService.getConnectionStatus(currentUser.uid)
+        const response = await ApiService.getConnectionStatus(currentUser.firebaseUser.uid)
         if (response.error) {
           throw new Error(response.error)
         }
@@ -328,7 +328,7 @@ export default function SellerDashboardPage() {
     }
 
     if (currentUser) {
-      fetchSellerData(currentUser.uid)
+      fetchSellerData(currentUser.firebaseUser.uid)
       fetchCategoriesAndBrands()
     }
   }, [currentUser, authLoading, router])
@@ -438,7 +438,7 @@ export default function SellerDashboardPage() {
         })
       }
 
-      await fetchSellerData(currentUser.uid) // Refresh product list
+      await fetchSellerData(currentUser.firebaseUser.uid) // Refresh product list
       setIsCouponModalOpen(false)
       toast({
         title: "Éxito",
@@ -468,7 +468,7 @@ export default function SellerDashboardPage() {
         updatedAt: serverTimestamp(),
       })
 
-      await fetchSellerData(currentUser.uid) // Refresh product list
+      await fetchSellerData(currentUser.firebaseUser.uid) // Refresh product list
       toast({
         title: "Éxito",
         description: "Cupón eliminado del producto correctamente.",
@@ -571,7 +571,7 @@ export default function SellerDashboardPage() {
     setUploadingMedia(true)
 
     const isVideo = file.type.startsWith("video/")
-    const filePath = `products/${currentUser.uid}/${Date.now()}-${file.name}`
+    const filePath = `products/${currentUser.firebaseUser.uid}/${Date.now()}-${file.name}`
     const storageRef = ref(storage, filePath)
 
     try {
@@ -750,7 +750,7 @@ export default function SellerDashboardPage() {
         media: newMedia,
         isService: productIsService,
         stock: !productIsService && productStock ? Number.parseInt(productStock) : undefined,
-        sellerId: currentUser.uid,
+        sellerId: currentUser.firebaseUser.uid,
         updatedAt: serverTimestamp(),
       }
 
@@ -794,7 +794,7 @@ export default function SellerDashboardPage() {
   const uploadProfileImageToStorage = async (file: File): Promise<{ downloadURL: string; filePath: string }> => {
     if (!currentUser) throw new Error("Usuario no autenticado.")
     setUploadingProfileImage(true)
-    const filePath = `users/${currentUser.uid}/profile/${Date.now()}-${file.name}`
+    const filePath = `users/${currentUser.firebaseUser.uid}/profile/${Date.now()}-${file.name}`
     const storageRef = ref(storage, filePath)
     try {
       await uploadBytes(storageRef, file)
@@ -830,13 +830,13 @@ export default function SellerDashboardPage() {
     setSuccessMessage(null)
 
     try {
-      if (currentUser.photoPath) {
-        await deleteProfileImageFromStorage(currentUser.photoPath)
+      if (currentUser.firebaseUser.photoPath) {
+        await deleteProfileImageFromStorage(currentUser.firebaseUser.photoPath)
       }
 
       const { downloadURL, filePath } = await uploadProfileImageToStorage(profileImageFile)
 
-      const userRef = doc(db, "users", currentUser.uid)
+      const userRef = doc(db, "users", currentUser.firebaseUser.uid)
       await updateDoc(userRef, {
         photoURL: downloadURL,
         photoPath: filePath,
@@ -860,7 +860,7 @@ export default function SellerDashboardPage() {
       setError("No hay usuario autenticado.")
       return
     }
-    if (!currentUser.photoPath) {
+    if (!currentUser.firebaseUser.photoPath) {
       setError("No hay imagen de perfil para eliminar.")
       return
     }
@@ -870,9 +870,9 @@ export default function SellerDashboardPage() {
     setSuccessMessage(null)
 
     try {
-      await deleteProfileImageFromStorage(currentUser.photoPath) // currentUser.photoPath ya está validado como string aquí
+      await deleteProfileImageFromStorage(currentUser.firebaseUser.photoPath) // currentUser.photoPath ya está validado como string aquí
 
-      const userRef = doc(db, "users", currentUser.uid)
+      const userRef = doc(db, "users", currentUser.firebaseUser.uid)
       await updateDoc(userRef, {
         photoURL: null,
         photoPath: null,
@@ -897,7 +897,7 @@ export default function SellerDashboardPage() {
 
     try {
       setIsDisconnecting(true)
-      const response = await ApiService.disconnectAccount(currentUser.uid)
+      const response = await ApiService.disconnectAccount(currentUser.firebaseUser.uid)
 
       if (response.error) {
         throw new Error(response.error)
@@ -959,7 +959,7 @@ export default function SellerDashboardPage() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          userId: currentUser.uid,
+          userId: currentUser.firebaseUser.uid,
           planType: 'BASICO',
         }),
       });
@@ -1194,7 +1194,7 @@ export default function SellerDashboardPage() {
             </SheetContent>
           </Sheet>
           <h1 className="font-semibold text-sm sm:text-lg md:text-xl text-gray-800 flex-1 text-left truncate">
-            Panel - {currentUser?.displayName || "Vendedor"}
+            Panel - {currentUser?.firebaseUser?.displayName || "Vendedor"}
           </h1>
         </header>
 
@@ -1848,8 +1848,8 @@ export default function SellerDashboardPage() {
                 <CardDescription>Comunícate con tus clientes y resuelve sus dudas.</CardDescription>
               </CardHeader>
               <CardContent>
-                {currentUser?.uid && <ChatList userId={currentUser.uid} role="seller" />}
-                {!currentUser?.uid && <p className="text-center text-gray-500">Inicia sesión para ver tus chats.</p>}
+                {currentUser?.firebaseUser.uid && <ChatList userId={currentUser.firebaseUser.uid} role="seller" />}
+                {!currentUser?.firebaseUser.uid && <p className="text-center text-gray-500">Inicia sesión para ver tus chats.</p>}
               </CardContent>
             </Card>
           )}
@@ -1876,7 +1876,7 @@ export default function SellerDashboardPage() {
                 <div className="flex items-center gap-4">
                   <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-gray-200">
                     <Image
-                      src={profileImagePreviewUrl || currentUser?.photoURL || "/placeholder-user.jpg"}
+                      src={profileImagePreviewUrl || currentUser?.firebaseUser.photoURL || "/placeholder-user.jpg"}
                       alt="Foto de perfil"
                       layout="fill"
                       objectFit="cover"
@@ -1902,7 +1902,7 @@ export default function SellerDashboardPage() {
                     >
                       {uploadingProfileImage ? "Subiendo..." : "Guardar Imagen de Perfil"}
                     </Button>
-                    {currentUser?.photoURL && (
+                    {currentUser?.firebaseUser.photoURL && (
                       <Button
                         onClick={handleRemoveCurrentProfileImage}
                         variant="outline"
