@@ -51,6 +51,8 @@ export function ConnectMercadoPagoButton() {
       const data = await response.json();
       console.log("[ConnectMercadoPagoButton] Data recibida:", data);
       if (!data.authUrl) throw new Error("No se recibió la URL de autorización");
+      // Guardar flag para refrescar al volver
+      localStorage.setItem("mp_connecting", "1");
       window.location.href = data.authUrl;
     } catch (error) {
       console.log("[ConnectMercadoPagoButton] Error en handleConnect:", error);

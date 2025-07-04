@@ -289,6 +289,14 @@ export default function SellerDashboardPage() {
     }
   }, [activeTab, refreshUserProfile]);
 
+  useEffect(() => {
+    if (typeof window !== "undefined" && localStorage.getItem("mp_connecting")) {
+      refreshUserProfile().then(() => {
+        localStorage.removeItem("mp_connecting");
+      });
+    }
+  }, [refreshUserProfile]);
+
   const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
@@ -907,6 +915,11 @@ export default function SellerDashboardPage() {
         isConnected: false,
         lastChecked: new Date().toISOString()
       })
+      // Guardar flag para refrescar al volver
+      if (typeof window !== "undefined") {
+        localStorage.setItem("mp_disconnected", "1");
+      }
+      await refreshUserProfile();
       toast({
         title: "Éxito",
         description: "Tu cuenta de MercadoPago ha sido desconectada exitosamente"
@@ -978,6 +991,14 @@ export default function SellerDashboardPage() {
       setSubscribing(false);
     }
   };
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && localStorage.getItem("mp_disconnected")) {
+      refreshUserProfile().then(() => {
+        localStorage.removeItem("mp_disconnected");
+      });
+    }
+  }, [refreshUserProfile]);
 
   if (authLoading || (!currentUser && !authLoading)) {
     return (
@@ -1219,34 +1240,34 @@ export default function SellerDashboardPage() {
           {activeTab !== "addService" && (
           <Card className="p-6 mb-8">
             <h2 className="text-2xl font-semibold mb-4">Cuenta de MercadoPago</h2>
-              {connectionStatus?.isConnected ? (
-                <div className="flex flex-col gap-2">
-                  <div className="bg-green-100 text-green-800 p-3 rounded flex items-center gap-2">
-                    <span className="font-semibold">✅ Cuenta conectada correctamente.</span>
-                    <span className="text-xs">Ya puedes recibir pagos y vender productos.</span>
-                  </div>
-                  <Button
-                    variant="destructive"
-                    disabled={isDisconnecting}
-                    onClick={() => {
-                      if (window.confirm('¿Seguro que quieres desconectar tu cuenta de MercadoPago? No podrás vender productos hasta volver a conectar tu cuenta.')) {
-                        handleDisconnect();
-                      }
-                    }}
-                    className="w-full mt-2"
-                  >
-                    {isDisconnecting ? 'Desconectando...' : 'Desconectar cuenta de MercadoPago'}
-                  </Button>
-                  <div className="text-xs text-orange-700 mt-1">
-                    <AlertTriangle className="inline w-4 h-4 mr-1 align-text-bottom" />
-                    Si desconectas tu cuenta, no podrás vender productos ni recibir pagos hasta volver a conectar.
-                  </div>
+            {currentUser?.mercadopagoConnected ? (
+              <div className="flex flex-col gap-2">
+                <div className="bg-green-100 text-green-800 p-3 rounded flex items-center gap-2">
+                  <span className="font-semibold">✅ Cuenta conectada correctamente.</span>
+                  <span className="text-xs">Ya puedes recibir pagos y vender productos.</span>
+                </div>
+                <Button
+                  variant="destructive"
+                  disabled={isDisconnecting}
+                  onClick={() => {
+                    if (window.confirm('¿Seguro que quieres desconectar tu cuenta de MercadoPago? No podrás vender productos hasta volver a conectar tu cuenta.')) {
+                      handleDisconnect();
+                    }
+                  }}
+                  className="w-full mt-2"
+                >
+                  {isDisconnecting ? 'Desconectando...' : 'Desconectar cuenta de MercadoPago'}
+                </Button>
+                <div className="text-xs text-orange-700 mt-1">
+                  <AlertTriangle className="inline w-4 h-4 mr-1 align-text-bottom" />
+                  Si desconectas tu cuenta, no podrás vender productos ni recibir pagos hasta volver a conectar.
+                </div>
               </div>
             ) : (
-                <div className="flex flex-col gap-2">
-                  <div className="bg-yellow-100 text-yellow-800 p-3 rounded flex items-center gap-2">
-                    <span className="font-semibold">⚠️ Debes conectar tu cuenta de MercadoPago para vender productos y recibir pagos.</span>
-                  </div>
+              <div className="flex flex-col gap-2">
+                <div className="bg-yellow-100 text-yellow-800 p-3 rounded flex items-center gap-2">
+                  <span className="font-semibold">⚠️ Debes conectar tu cuenta de MercadoPago para vender productos y recibir pagos.</span>
+                </div>
                 <ConnectMercadoPagoButton />
               </div>
             )}
@@ -1398,302 +1419,109 @@ export default function SellerDashboardPage() {
           {activeTab === "addProduct" && (
             <Card>
               <CardHeader>
-                <CardTitle>{isEditing ? "Editar" : "Añadir Nuevo"} Producto</CardTitle>
-                <CardDescription>
-                  Completa los detalles para {isEditing ? "actualizar" : "agregar"} un ítem.
-                </CardDescription>
+                <CardTitle>Añadir Nuevo Producto</CardTitle>
+                <CardDescription>Completa los detalles para agregar un ítem.</CardDescription>
               </CardHeader>
               <CardContent>
-                {connectionStatus?.isConnected !== true && (
-                  <div className="mb-6">
-                    <Alert className="bg-yellow-50 border-yellow-200 mb-4">
-                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                      <AlertTitle className="text-yellow-800">Conexión requerida</AlertTitle>
-                      <AlertDescription className="text-yellow-700">
-                        Debes conectar tu cuenta de MercadoPago para poder crear y publicar productos en la plataforma.
-                      </AlertDescription>
-                    </Alert>
+                {!currentUser?.mercadopagoConnected && (
+                  <Alert variant="warning" className="mb-4">
+                    <AlertTriangle className="h-5 w-5" />
+                    <AlertTitle>Conexión requerida</AlertTitle>
+                    <AlertDescription>
+                      Debes conectar tu cuenta de MercadoPago para poder crear y publicar productos en la plataforma.
+                    </AlertDescription>
                     <ConnectMercadoPagoButton />
-                  </div>
+                  </Alert>
                 )}
-                <form onSubmit={handleSubmitProduct} className="space-y-6">
-                  <fieldset disabled={!Boolean(connectionStatus?.isConnected)} style={{ opacity: !Boolean(connectionStatus?.isConnected) ? 0.5 : 1 }}>
-                  {/* Media Upload Section */}
-                  <div>
-                    <Label htmlFor="productMedia" className="text-base">
-                      Imágenes y Videos del Producto
-                    </Label>
-                    <div className="mt-2 space-y-4">
-                      {/* Validation Requirements */}
-                      <Alert className="bg-blue-50 border-blue-200">
-                        <AlertTriangle className="h-4 w-4 text-blue-600" />
-                        <AlertTitle className="text-blue-800">Requisitos importantes:</AlertTitle>
-                        <AlertDescription className="text-blue-700">
-                          <ul className="list-disc list-inside space-y-1 mt-2">
-                            <li>
-                              <strong>Imágenes:</strong> Deben tener fondo blanco obligatoriamente
-                            </li>
-                            <li>
-                              <strong>Videos:</strong> Máximo 60 segundos y 50MB de tamaño
-                            </li>
-                            <li>Formatos soportados: JPG, PNG, WebP para imágenes | MP4, WebM para videos</li>
-                          </ul>
-                        </AlertDescription>
-                      </Alert>
-
-                      {/* Validation Errors */}
-                      {mediaValidationErrors.length > 0 && (
-                        <Alert variant="destructive">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertTitle>Errores de validación:</AlertTitle>
-                          <AlertDescription>
-                            <ul className="list-disc list-inside space-y-1 mt-2">
-                              {mediaValidationErrors.map((error, index) => (
-                                <li key={index}>{error}</li>
-                              ))}
-                            </ul>
-                          </AlertDescription>
-                        </Alert>
-                      )}
-
-                      {/* Drag and Drop Area */}
-                      <div
-                        className={`flex flex-col items-center gap-4 p-6 border-2 border-dashed rounded-lg transition-colors
-                          ${isDraggingOver ? "border-orange-500 bg-orange-50" : "border-gray-300 hover:border-orange-400"}
-                          ${validatingImages ? "opacity-50" : ""}`}
-                        onDragEnter={handleDragEnter}
-                        onDragLeave={handleDragLeave}
-                        onDragOver={handleDragOver}
-                        onDrop={handleDrop}
-                      >
-                        <div className="text-center">
-                          <div className="flex justify-center gap-4 mb-4">
-                            <ImageIconLucide className="h-12 w-12 text-gray-400" />
-                            <Video className="h-12 w-12 text-gray-400" />
-                          </div>
-                          <p className="text-lg font-medium text-gray-700 mb-2">
-                            {isDraggingOver ? "¡Suelta los archivos aquí!" : "Arrastra imágenes y videos aquí"}
-                          </p>
-                          <p className="text-sm text-gray-500 mb-4">o haz clic para seleccionar archivos</p>
-                        </div>
-
-                        <Input
-                          id="productMedia"
-                          type="file"
-                          accept="image/*,video/*"
-                          multiple
-                          onChange={handleMediaChange}
-                          className="block w-full max-w-xs text-sm text-slate-500
-                            file:mr-4 file:py-2 file:px-4
-                            file:rounded-md file:border-0
-                            file:text-sm file:font-semibold
-                            file:bg-orange-100 file:text-orange-700
-                            hover:file:bg-orange-200
-                            cursor-pointer"
-                          disabled={validatingImages}
-                        />
-
-                        {validatingImages && (
-                          <div className="flex items-center gap-2 text-orange-600">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span className="text-sm">Validando archivos...</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Current Media Preview (for editing) */}
-                      {currentProductMedia.length > 0 && (
-                        <div>
-                          <Label className="text-sm font-medium text-gray-700 mb-2 block">Media actual:</Label>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                            {currentProductMedia.map((media, index) => (
-                              <div key={index} className="relative group">
-                                <div className="aspect-square relative bg-gray-100 rounded-lg overflow-hidden">
-                                  {media.type === "image" ? (
-                                    <Image
-                                      src={media.url || "/placeholder.svg"}
-                                      alt={`Media ${index + 1}`}
-                                      layout="fill"
-                                      objectFit="cover"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                                      <div className="text-center">
-                                        <Video className="h-8 w-8 text-gray-600 mx-auto mb-2" />
-                                        <span className="text-xs text-gray-600">Video</span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="destructive"
-                                  size="icon"
-                                  className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={() => handleRemoveCurrentMedia(index)}
-                                >
-                                  <XCircle className="h-4 w-4" />
-                                </Button>
-                                <Badge variant="secondary" className="absolute bottom-2 left-2 text-xs">
-                                  {media.type}
-                                </Badge>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* New Media Preview */}
-                      {mediaPreviewUrls.length > 0 && (
-                        <div>
-                          <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                            Nuevos archivos seleccionados:
-                          </Label>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                            {mediaPreviewUrls.map((url, index) => (
-                              <div key={index} className="relative group">
-                                <div className="aspect-square relative bg-gray-100 rounded-lg overflow-hidden">
-                                  {mediaFiles[index].type.startsWith("image/") ? (
-                                    <Image
-                                      src={url || "/placeholder.svg"}
-                                      alt={`Preview ${index + 1}`}
-                                      layout="fill"
-                                      objectFit="cover"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                                      <div className="text-center">
-                                        <Video className="h-8 w-8 text-gray-600 mx-auto mb-2" />
-                                        <span className="text-xs text-gray-600">Video</span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="destructive"
-                                  size="icon"
-                                  className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={() => handleRemoveMedia(index)}
-                                >
-                                  <XCircle className="h-4 w-4" />
-                                </Button>
-                                <Badge variant="secondary" className="absolute bottom-2 left-2 text-xs">
-                                  {mediaFiles[index].type.startsWith("image/") ? "imagen" : "video"}
-                                </Badge>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {uploadingMedia && (
-                        <div className="flex items-center gap-2 text-orange-600">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="text-sm">Subiendo archivos...</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Rest of the form - keeping existing fields */}
-                  <div>
-                    <Label htmlFor="productName" className="text-base">
-                      Nombre
-                    </Label>
-                    <Input
-                      id="productName"
-                      value={productName}
-                      onChange={(e) => setProductName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="productDescription" className="text-base">
-                      Descripción
-                    </Label>
-                    <Textarea
-                      id="productDescription"
-                      value={productDescription}
-                      onChange={(e) => setProductDescription(e.target.value)}
-                      rows={4}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <fieldset disabled={!currentUser?.mercadopagoConnected} style={{ opacity: !currentUser?.mercadopagoConnected ? 0.5 : 1 }}>
+                  <form onSubmit={handleSubmitProduct} className="space-y-6">
                     <div>
-                      <Label htmlFor="productPrice" className="text-base">
-                        Precio ($)
+                      <Label htmlFor="productName" className="text-base">
+                        Nombre
                       </Label>
                       <Input
-                        id="productPrice"
-                        type="number"
-                        step="0.01"
-                        value={productPrice}
-                        onChange={(e) => setProductPrice(e.target.value)}
+                        id="productName"
+                        value={productName}
+                        onChange={(e) => setProductName(e.target.value)}
                         required
                       />
                     </div>
-                    {!productIsService && (
+                    <div>
+                      <Label htmlFor="productDescription" className="text-base">
+                        Descripción
+                      </Label>
+                      <Textarea
+                        id="productDescription"
+                        value={productDescription}
+                        onChange={(e) => setProductDescription(e.target.value)}
+                        rows={4}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="productStock" className="text-base">
-                          Stock (Unidades)
+                        <Label htmlFor="productPrice" className="text-base">
+                          Precio ($)
                         </Label>
                         <Input
-                          id="productStock"
+                          id="productPrice"
                           type="number"
-                          value={productStock}
-                          onChange={(e) => setProductStock(e.target.value)}
+                          step="0.01"
+                          value={productPrice}
+                          onChange={(e) => setProductPrice(e.target.value)}
+                          required
                         />
                       </div>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="productCategory" className="text-base">
-                        Categoría
-                      </Label>
-                      <Select value={productCategory} onValueChange={setProductCategory} required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona una categoría" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories.map((cat) => (
-                            <SelectItem key={cat.id} value={cat.id}>
-                              {cat.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {!productIsService && (
+                        <div>
+                          <Label htmlFor="productStock" className="text-base">
+                            Stock (Unidades)
+                          </Label>
+                          <Input
+                            id="productStock"
+                            type="number"
+                            value={productStock}
+                            onChange={(e) => setProductStock(e.target.value)}
+                          />
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <Label htmlFor="productBrand" className="text-base">
-                        Marca (Opcional)
-                      </Label>
-                      <Select value={productBrand} onValueChange={setProductBrand}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona una marca" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {brands.map((brand) => (
-                            <SelectItem key={brand.id} value={brand.id}>
-                              {brand.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="productCategory" className="text-base">
+                          Categoría
+                        </Label>
+                        <Select value={productCategory} onValueChange={setProductCategory} required>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona una categoría" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="productBrand" className="text-base">
+                          Marca (Opcional)
+                        </Label>
+                        <Select value={productBrand} onValueChange={setProductBrand}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona una marca" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {brands.map((brand) => (
+                              <SelectItem key={brand.id} value={brand.id}>
+                                {brand.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
-                    {/* <div className="flex items-center space-x-2 pt-2">
-                    <Checkbox
-                      id="productIsService"
-                      checked={productIsService}
-                      onCheckedChange={(checked) => setProductIsService(checked as boolean)}
-                    />
-                    <Label htmlFor="productIsService" className="text-base">
-                      ¿Es un servicio? (No requiere stock)
-                    </Label>
-                    </div> */}
-                  <div className="flex gap-2 pt-4">
+                    <div className="flex gap-2 pt-4">
                       <Button type="submit" disabled={submittingProduct || (!isEditing)}>
                       {submittingProduct ? (
                         <>
