@@ -22,8 +22,9 @@ export function ConnectMercadoPagoButton() {
         console.log("[ConnectMercadoPagoButton] No hay usuario autenticado");
         throw new Error("Debes iniciar sesión para conectar tu cuenta de MercadoPago.")
       }
-      // Obtener el token de Firebase del usuario autenticado
-      const tokenFirebase = await currentUser.getIdToken()
+      // Obtener el token de Firebase del usuario 
+      console.log("[ConnectMercadoPagoButton] currentUser:", currentUser);
+      const tokenFirebase = await currentUser?.firebaseUser.getIdToken()
       console.log("[ConnectMercadoPagoButton] Token Firebase:", tokenFirebase);
       if (!tokenFirebase) {
         throw new Error("No se pudo obtener el token de autenticación.")

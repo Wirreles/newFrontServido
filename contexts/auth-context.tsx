@@ -7,12 +7,13 @@ import { doc, getDoc } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 import { useRouter } from "next/navigation"
 
-interface UserProfile extends FirebaseUser {
+interface UserProfile {
+  firebaseUser: FirebaseUser
   role?: "user" | "seller" | "admin"
-  isSubscribed?: boolean // Added for subscription status
-  productUploadLimit?: number // Added for product upload limit
-  photoURL?: string // Added for profile picture URL
-  photoPath?: string // Added for profile picture storage path
+  isSubscribed?: boolean
+  productUploadLimit?: number
+  photoURL?: string
+  photoPath?: string
 }
 
 interface AuthContextType {
@@ -21,7 +22,7 @@ interface AuthContextType {
   handleLogout: () => Promise<void>
   getDashboardLink: () => string
   getVenderLink: () => string
-  refreshUserProfile: () => Promise<void> // Added refreshUserProfile
+  refreshUserProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -40,22 +41,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data()
         setCurrentUser({
-          ...user,
+          firebaseUser: user,
           role: userData.role,
           isSubscribed: userData.isSubscribed || false,
           productUploadLimit: userData.productUploadLimit || 0,
-          photoURL: userData.photoURL || user.photoURL || undefined, // Prioritize Firestore, then Auth, then undefined
+          photoURL: userData.photoURL || user.photoURL || undefined,
           photoPath: userData.photoPath || undefined,
-        } as UserProfile)
+        })
       } else {
         setCurrentUser({
-          ...user,
+          firebaseUser: user,
           role: "user",
           isSubscribed: false,
           productUploadLimit: 0,
           photoURL: user.photoURL || undefined,
           photoPath: undefined,
-        } as UserProfile)
+        })
       }
     } else {
       setCurrentUser(null)
@@ -65,28 +66,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Initial fetch of user profile data
         const userDocRef = doc(db, "users", user.uid)
         const userDocSnap = await getDoc(userDocRef)
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data()
           setCurrentUser({
-            ...user,
+            firebaseUser: user,
             role: userData.role,
-            isSubscribed: userData.isSubscribed || false, // Default to false
-            productUploadLimit: userData.productUploadLimit || 0, // Default to 0
-            photoURL: userData.photoURL || user.photoURL || undefined, // Prioritize Firestore, then Auth, then undefined
+            isSubscribed: userData.isSubscribed || false,
+            productUploadLimit: userData.productUploadLimit || 0,
+            photoURL: userData.photoURL || user.photoURL || undefined,
             photoPath: userData.photoPath || undefined,
-          } as UserProfile)
+          })
         } else {
           setCurrentUser({
-            ...user,
+            firebaseUser: user,
             role: "user",
             isSubscribed: false,
             productUploadLimit: 0,
             photoURL: user.photoURL || undefined,
             photoPath: undefined,
-          } as UserProfile)
+          })
         }
       } else {
         setCurrentUser(null)
@@ -102,13 +102,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       router.push("/login")
     } catch (error) {
       console.error("Error signing out:", error)
-      // Optionally, set an error state here
     }
   }, [router])
 
   const getDashboardLink = useCallback(() => {
     if (!currentUser) return "/login"
-
     switch (currentUser.role) {
       case "admin":
         return "/admin"
@@ -133,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         handleLogout,
         getDashboardLink,
         getVenderLink,
-        refreshUserProfile, // Provide refreshUserProfile
+        refreshUserProfile,
       }}
     >
       {children}
