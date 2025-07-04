@@ -3,9 +3,10 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { CartProvider } from "@/contexts/cart-context"
-import { AuthProvider } from "@/contexts/auth-context" // Import AuthProvider
-import { Header } from "@/components/layout/header" // Import Header
-import { TabBar } from "@/components/layout/tab-bar" // Import TabBar
+import { AuthProvider } from "@/contexts/auth-context"
+import { Header } from "@/components/layout/header"
+import { TabBar } from "@/components/layout/tab-bar"
+import { NProgressProvider } from "@/components/providers/nprogress-provider";
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -19,13 +20,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es">
       <body className={`${inter.className} flex flex-col min-h-screen`}>
-        <AuthProvider>
-          <CartProvider>
-            <Header /> {/* Global Header */}
-            <main className="flex-1 pb-16">{children}</main> {/* Add padding-bottom for tab bar */}
-            <TabBar /> {/* Global Tab Bar */}
-          </CartProvider>
-        </AuthProvider>
+        <NProgressProvider>
+          <AuthProvider>
+            <CartProvider>
+              <Header /> {/* Global Header */}
+              <main className="flex-1 pb-16">{children}</main> {/* Add padding-bottom for tab bar */}
+              <TabBar /> {/* Global Tab Bar */}
+            </CartProvider>
+          </AuthProvider>
+        </NProgressProvider>
       </body>
     </html>
   )
