@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -62,6 +62,9 @@ export function Header() {
   const [isSearching, setIsSearching] = useState(false)
   const [showSearchResults, setShowSearchResults] = useState(false)
 
+  // Estado para almacenar todos los productos
+  const [allProducts, setAllProducts] = useState<SearchProduct[] | null>(null)
+
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -118,64 +121,50 @@ export function Header() {
     fetchCategories()
   }, [])
 
-  // Función de búsqueda
+  // Nueva función para traer todos los productos una sola vez
+  const fetchAllProducts = useCallback(async () => {
+    try {
+      const productsSnapshot = await getDocs(collection(db, "products"));
+      const products: SearchProduct[] = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as SearchProduct);
+      setAllProducts(products);
+    } catch (error) {
+      console.error("Error fetching all products for search:", error);
+      setAllProducts([]);
+    }
+  }, [])
+
+  // Modificar handleSearch para filtrar en frontend
   const handleSearch = async (term: string) => {
-    if (term.trim().length < 2) {
+    const trimmed = term.trim();
+    if (trimmed.length < 1) {
       setSearchResults([])
       setShowSearchResults(false)
       return
     }
-
     setIsSearching(true)
     setShowSearchResults(true)
 
-    try {
-      // Búsqueda por nombre del producto (case insensitive)
-      const productsQuery = query(
-        collection(db, "products"),
-        where("name", ">=", term.toLowerCase()),
-        where("name", "<=", term.toLowerCase() + "\uf8ff"),
-        limit(8)
-      )
-      
-      const productsSnapshot = await getDocs(productsQuery)
-      const products = productsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as SearchProduct[]
-
-      // Si no hay resultados exactos, buscar por palabras clave
-      if (products.length === 0) {
-        const keywordsQuery = query(
-          collection(db, "products"),
-          where("keywords", "array-contains", term.toLowerCase()),
-          limit(8)
-        )
-        const keywordsSnapshot = await getDocs(keywordsQuery)
-        const keywordsProducts = keywordsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as SearchProduct[]
-        
-        setSearchResults(keywordsProducts)
-      } else {
-        setSearchResults(products)
-      }
-    } catch (error) {
-      console.error("Error searching products:", error)
-      setSearchResults([])
-    } finally {
-      setIsSearching(false)
+    // Si no se han traído todos los productos, traerlos
+    if (!allProducts) {
+      await fetchAllProducts();
     }
+    // Filtrar en frontend
+    const lowerTerm = trimmed.toLowerCase();
+    const filtered = (allProducts || []).filter(product => {
+      const name = product.name?.toLowerCase() || "";
+      const keywords = Array.isArray((product as any).keywords) ? (product as any).keywords.map((k: string) => k.toLowerCase()) : [];
+      return name.includes(lowerTerm) || keywords.some((k: string) => k.includes(lowerTerm));
+    });
+    setSearchResults(filtered.slice(0, 20));
+    setIsSearching(false);
   }
 
-  // Manejar cambio en el input de búsqueda
+  // Cambiar handleSearchChange para permitir búsqueda desde 1 carácter
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     setSearchTerm(value)
-    
-    if (value.trim().length >= 2) {
-      handleSearch(value.toLowerCase())
+    if (value.trim().length >= 1) {
+      handleSearch(value)
     } else {
       setSearchResults([])
       setShowSearchResults(false)
@@ -218,9 +207,16 @@ export function Header() {
       <header className="sticky top-0 z-50 w-full bg-navbar text-navbar-foreground shadow-md">
         <div className="container mx-auto flex h-16 items-center justify-between px-2 md:px-6">
           <Link href="/" className="flex items-center gap-2 text-xl font-bold">
-            <Image src="/images/logo.png" alt="Servido Logo" width={120} height={40} className="brightness-0 invert" />
+            <Image
+              src="/images/logo.png"
+              alt="Servido Logo"
+              width={340}
+              height={120}
+              className="md:w-[340px] md:h-[120px] w-[260px] h-[90px]"
+              style={{ objectFit: "contain", filter: "grayscale(1) brightness(1000%)" }}
+            />
           </Link>
-          <div className="flex-1 max-w-xl mx-2 sm:mx-4 search-container">
+          <div className="flex-1 max-w-xl mx-0 md:mx-2 search-container">
             <form onSubmit={handleSearchSubmit} className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
               <Input
@@ -229,7 +225,7 @@ export function Header() {
                 value={searchTerm}
                 onChange={handleSearchChange}
                 onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
-                className="w-full pl-10 pr-10 py-2 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                className="w-full pl-9 pr-9 py-2 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-400 md:px-10"
               />
               {searchTerm && (
                 <Button
@@ -253,29 +249,26 @@ export function Header() {
                     </div>
                   ) : searchResults.length > 0 ? (
                     <div className="py-2">
-                      {searchResults.map((product) => (
+                      {searchResults.map((product, index) => (
                         <Link
                           key={product.id}
                           href={`/product/${product.id}`}
                           onClick={() => setShowSearchResults(false)}
-                          className="flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors"
+                          className="flex items-center gap-2 p-3 hover:bg-gray-100 transition-colors border-b last:border-b-0 border-gray-100"
                         >
                           {product.imageUrl && (
-                            <div className="w-12 h-12 relative rounded-md overflow-hidden flex-shrink-0">
+                            <div className="w-10 h-10 relative rounded-sm overflow-hidden flex-shrink-0">
                               <Image
                                 src={product.imageUrl}
                                 alt={product.name}
-                                layout="fill"
-                                objectFit="cover"
+                                fill
+                                className="object-contain"
                               />
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{product.name}</p>
-                            <p className="text-sm text-gray-500">${product.price.toFixed(2)}</p>
-                            {product.category && (
-                              <p className="text-xs text-gray-400">{product.category}</p>
-                            )}
+                            <p className="font-medium text-sm break-words line-clamp-2 text-black">{product.name}</p>
+                            <p className="text-xs text-purple-600 font-semibold">${product.price.toFixed(2)}</p>
                           </div>
                         </Link>
                       ))}
@@ -404,8 +397,8 @@ export function Header() {
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-semibold text-lg">{currentUser.displayName || currentUser.email}</p>
-                        <p className="text-xs text-muted-foreground">{currentUser.email}</p>
+                        <p className="font-semibold text-lg break-words">{currentUser.displayName || currentUser.email}</p>
+                        <p className="text-xs text-muted-foreground break-words">{currentUser.email}</p>
                         {currentUser.role === "admin" && (
                           <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                             <ShieldCheck className="h-3 w-3 mr-1" /> Admin
@@ -455,7 +448,7 @@ export function Header() {
                             <Link
                               key={category.id}
                               href={`/category/${category.id}`}
-                              className="hover:text-primary text-sm"
+                              className="hover:text-primary text-sm break-words"
                             >
                               {category.name}
                             </Link>
@@ -463,11 +456,11 @@ export function Header() {
                         </div>
                       )}
                     </div>
-                    <Link href="#" className="hover:text-primary py-1">
-                      Ofertas
+                    <Link href="/notifications" className="hover:text-primary py-1">
+                      Notificaciones
                     </Link>
                     <Link href="#" className="hover:text-primary py-1">
-                      Historial
+                      Mi cuenta
                     </Link>
                     <Link href={getVenderLink()} className="hover:text-primary py-1 flex items-center">
                       <Store className="h-4 w-4 mr-2 text-orange-500" /> Vender
@@ -549,17 +542,20 @@ export function Header() {
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
-            <Link href="#" className="hover:opacity-80">
-              Ofertas
+            <Link href="/notifications" className="hover:opacity-80">
+              Notificaciones
             </Link>
             <Link href="#" className="hover:opacity-80">
               Historial
             </Link>
             <Link href="#" className="hover:opacity-80">
-              Supermercado
+              Carrito de compras
             </Link>
-            <Link href="#" className="hover:opacity-80">
-              Moda
+            <Link href="/terminos-y-condiciones" className="hover:opacity-80">
+              Términos y condiciones
+            </Link>
+            <Link href="/politicas-de-privacidad" className="hover:opacity-80">
+              Políticas de privacidad
             </Link>
             <Link href={getVenderLink()} className="hover:opacity-80">
               Vender

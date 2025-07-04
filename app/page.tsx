@@ -215,40 +215,39 @@ export default function HomePage() {
       {/* Sliding Categories - Circular Style */}
       <section className="py-8">
         <div className="container mx-auto px-4 md:px-6">
-          <h2 className="text-2xl font-semibold mb-6">Categorías Populares</h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-semibold">Categorías</h2>
+            <Link href="/products" className="text-blue-600 hover:underline text-sm font-medium">
+              Mostrar todas las categorías
+            </Link>
+          </div>
           {loadingData && categories.length === 0 ? (
-            <p>Cargando categorías...</p>
+            <p className="text-gray-500">Cargando categorías...</p>
           ) : categories.length === 0 ? (
-            <p>No hay categorías disponibles.</p>
+            <p className="text-gray-500">No hay categorías disponibles.</p>
           ) : (
-            <Carousel opts={{ align: "start", dragFree: true }} className="w-full">
-              <CarouselContent className="-ml-2 md:-ml-4">
-                {categories.map((category) => (
-                  <CarouselItem
-                    key={category.id}
-                    className="pl-2 md:pl-4 basis-1/4 sm:basis-1/5 md:basis-1/6 lg:basis-1/8"
-                  >
-                    <Link href={`/category/${category.id}`} className="block text-center">
-                      <div className="flex flex-col items-center">
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border-2 border-purple-200 hover:border-purple-500 transition-all">
-                          <Image
-                            src={
-                              category.imageUrl ||
-                              `/placeholder.svg?height=80&width=80&query=${category.iconQuery || category.name + " icon"}`
-                            }
-                            alt={category.name}
-                            width={80}
-                            height={80}
-                            className="object-contain p-2"
-                          />
-                        </div>
-                        <span className="text-xs font-medium mt-2">{category.name}</span>
-                      </div>
-                    </Link>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-            </Carousel>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {categories.map((category) => (
+                <Link
+                  key={category.id}
+                  href={`/category/${category.id}`}
+                  className="flex flex-col items-center p-4 bg-white rounded-lg shadow hover:shadow-lg transition-shadow duration-200 ease-in-out"
+                >
+                  <div className="relative w-20 h-20 mb-2">
+                    <Image
+                      src={
+                        category.imageUrl ||
+                        `/placeholder.svg?height=80&width=80&query=${category.iconQuery || category.name + " icon"}`
+                      }
+                      alt={category.name}
+                      fill
+                      className="object-contain"
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-center">{category.name}</span>
+                </Link>
+              ))}
+            </div>
           )}
         </div>
       </section>
@@ -525,22 +524,22 @@ export default function HomePage() {
               </div>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <Link href="#" className="hover:text-blue-400">
+                  <Link href="/acerca-de-nosotros" className="hover:text-blue-400">
                     Acerca de Nosotros
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-blue-400">
+                  <Link href="/trabaja-con-nosotros" className="hover:text-blue-400">
                     Trabaja con Nosotros
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-blue-400">
+                  <Link href="/terminos-y-condiciones" className="hover:text-blue-400">
                     Términos y Condiciones
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-blue-400">
+                  <Link href="/politicas-de-privacidad" className="hover:text-blue-400">
                     Políticas de Privacidad
                   </Link>
                 </li>
