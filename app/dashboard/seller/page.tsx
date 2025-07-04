@@ -838,8 +838,8 @@ export default function SellerDashboardPage() {
     setSuccessMessage(null)
 
     try {
-      if (currentUser.firebaseUser.photoPath) {
-        await deleteProfileImageFromStorage(currentUser.firebaseUser.photoPath)
+      if (currentUser.photoPath) {
+        await deleteProfileImageFromStorage(currentUser.photoPath)
       }
 
       const { downloadURL, filePath } = await uploadProfileImageToStorage(profileImageFile)
@@ -868,7 +868,7 @@ export default function SellerDashboardPage() {
       setError("No hay usuario autenticado.")
       return
     }
-    if (!currentUser.firebaseUser.photoPath) {
+    if (!currentUser.photoPath) {
       setError("No hay imagen de perfil para eliminar.")
       return
     }
@@ -878,7 +878,7 @@ export default function SellerDashboardPage() {
     setSuccessMessage(null)
 
     try {
-      await deleteProfileImageFromStorage(currentUser.firebaseUser.photoPath) // currentUser.photoPath ya está validado como string aquí
+      await deleteProfileImageFromStorage(currentUser.photoPath) // currentUser.photoPath ya está validado como string aquí
 
       const userRef = doc(db, "users", currentUser.firebaseUser.uid)
       await updateDoc(userRef, {
@@ -1424,7 +1424,7 @@ export default function SellerDashboardPage() {
               </CardHeader>
               <CardContent>
                 {!currentUser?.mercadopagoConnected && (
-                  <Alert variant="warning" className="mb-4">
+                  <Alert variant="default" className="mb-4">
                     <AlertTriangle className="h-5 w-5" />
                     <AlertTitle>Conexión requerida</AlertTitle>
                     <AlertDescription>
@@ -1538,8 +1538,8 @@ export default function SellerDashboardPage() {
                       Cancelar
                     </Button>
                   </div>
-                  </fieldset>
                 </form>
+                  </fieldset>
               </CardContent>
             </Card>
           )}
@@ -1743,11 +1743,11 @@ export default function SellerDashboardPage() {
                 </div>
                 <div>
                   <Label htmlFor="displayName" className="text-base">Nombre de Vendedor</Label>
-                  <Input id="displayName" value={currentUser?.displayName || ""} disabled className="mt-1" />
+                  <Input id="displayName" value={currentUser?.firebaseUser.displayName || ""} disabled className="mt-1" />
                 </div>
                 <div>
                   <Label htmlFor="email" className="text-base">Email</Label>
-                  <Input id="email" value={currentUser?.email || ""} disabled className="mt-1" />
+                  <Input id="email" value={currentUser?.firebaseUser.email || ""} disabled className="mt-1" />
                 </div>
                 {currentUser?.isSubscribed === false && (
                   <Alert variant="destructive">
@@ -1848,101 +1848,92 @@ export default function SellerDashboardPage() {
                       </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                      {selectedCouponId && (
-                        <p className="text-sm text-gray-700">
-                          Cupón seleccionado:{" "}
-                          <span className="font-semibold">
-                            {availableCoupons.find((c) => c.id === selectedCouponId)?.name || "N/A"}
-                          </span>
-                        </p>
+                      <Label className="text-base">Productos</Label>
+                      {myProducts.length === 0 ? (
+                        <p className="text-gray-500">No tienes productos para asociar.</p>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-60 overflow-y-auto pr-2">
+                          {myProducts.map((product) => (
+                            <div key={product.id} className="flex items-center space-x-2 border p-3 rounded-md">
+                              <Checkbox
+                                id={`product-${product.id}`}
+                                checked={selectedProductIds.includes(product.id)}
+                                onCheckedChange={(checked) =>
+                                  handleProductSelection(product.id, checked === true)}
+                              />
+                              <label
+                                htmlFor={`product-${product.id}`}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                              >
+                                {product.name} - ${product.price.toFixed(2)}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
                       )}
-                      <div className="space-y-4">
-                        <Label className="text-base">Productos</Label>
-                        {myProducts.length === 0 ? (
-                          <p className="text-gray-500">No tienes productos para asociar.</p>
-                        ) : (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-60 overflow-y-auto pr-2">
-                            {myProducts.map((product) => (
-                              <div key={product.id} className="flex items-center space-x-2 border p-3 rounded-md">
-                                <Checkbox
-                                  id={`product-${product.id}`}
-                                  checked={selectedProductIds.includes(product.id)}
-                                  onCheckedChange={(checked) =>
-                                    handleProductSelection(product.id, checked === true)}
-                                />
-                                <label
-                                  htmlFor={`product-${product.id}`}
-                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                >
-                                  {product.name} - ${product.price.toFixed(2)}
-                                </label>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                    </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="startDate">Fecha de Inicio</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant={"outline"}
-                                className={`w-full justify-start text-left font-normal ${!couponApplyStartDate && "text-muted-foreground"}
-                                `}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {couponApplyStartDate ? format(couponApplyStartDate, "PPP") : <span className="text-gray-500">Selecciona una fecha</span>}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                mode="single"
-                                selected={couponApplyStartDate}
-                                onSelect={setCouponApplyStartDate}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="endDate">Fecha de Fin</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant={"outline"}
-                                className={`w-full justify-start text-left font-normal ${!couponApplyEndDate && "text-muted-foreground"}`}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {couponApplyEndDate ? format(couponApplyEndDate, "PPP") : <span className="text-gray-500">Selecciona una fecha</span>}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                mode="single"
-                                selected={couponApplyEndDate}
-                                onSelect={setCouponApplyEndDate}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="startDate">Fecha de Inicio</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant={"outline"}
+                              className={`w-full justify-start text-left font-normal ${!couponApplyStartDate && "text-muted-foreground"}
+                              `}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {couponApplyStartDate ? format(couponApplyStartDate, "PPP") : <span className="text-gray-500">Selecciona una fecha</span>}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={couponApplyStartDate}
+                              onSelect={setCouponApplyStartDate}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="endDate">Fecha de Fin</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant={"outline"}
+                              className={`w-full justify-start text-left font-normal ${!couponApplyEndDate && "text-muted-foreground"}`}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {couponApplyEndDate ? format(couponApplyEndDate, "PPP") : <span className="text-gray-500">Selecciona una fecha</span>}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={couponApplyEndDate}
+                              onSelect={setCouponApplyEndDate}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </div>
-                    <DialogFooter>
-                      <Button
-                        onClick={associateCouponToProducts}
-                        disabled={associatingCoupon || selectedProductIds.length === 0 || !couponApplyStartDate || !couponApplyEndDate}
-                      >
-                        {associatingCoupon ? "Asociando..." : "Confirmar Asociación"}
-                      </Button>
-                      <Button variant="outline" onClick={() => setIsCouponModalOpen(false)}>
-                        Cancelar
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                 
+                  <DialogFooter>
+                    <Button
+                      onClick={associateCouponToProducts}
+                      disabled={associatingCoupon || selectedProductIds.length === 0 || !couponApplyStartDate || !couponApplyEndDate}
+                    >
+                      {associatingCoupon ? "Asociando..." : "Confirmar Asociación"}
+                    </Button>
+                    <Button variant="outline" onClick={() => setIsCouponModalOpen(false)}>
+                      Cancelar
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
                 <h3 className="text-lg font-semibold mt-8">Mis Productos con Cupones</h3>
                 {myProducts.filter(p => p.couponId).length === 0 ? (
