@@ -1537,6 +1537,7 @@ export default function SellerDashboardPage() {
                     <Button type="button" variant="ghost" onClick={resetForm} disabled={submittingProduct}>
                       Cancelar
                     </Button>
+                    </div>
                   </fieldset>
                 </form>
               </CardContent>
