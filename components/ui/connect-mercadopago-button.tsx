@@ -38,7 +38,8 @@ export function ConnectMercadoPagoButton() {
       // Llama al endpoint del backend real
       const response = await fetch(`${backendUrl}/api/mercadopago/oauth-url`, {
         headers: {
-          'Authorization': `Bearer ${tokenFirebase}`
+          'Authorization': `Bearer ${tokenFirebase}`,
+          'ngrok-skip-browser-warning': 'true'
         }
       });
       console.log("[ConnectMercadoPagoButton] Respuesta del backend:", response);
