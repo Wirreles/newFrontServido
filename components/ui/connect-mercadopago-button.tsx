@@ -11,21 +11,28 @@ export function ConnectMercadoPagoButton() {
   const { toast } = useToast()
   const { currentUser } = useAuth()
 
+  // Log para ver si el componente se monta
+  console.log("[ConnectMercadoPagoButton] Componente montado");
+
   const handleConnect = async () => {
+    console.log("[ConnectMercadoPagoButton] Click en el botón");
     setIsLoading(true)
     try {
       if (!currentUser) {
+        console.log("[ConnectMercadoPagoButton] No hay usuario autenticado");
         throw new Error("Debes iniciar sesión para conectar tu cuenta de MercadoPago.")
       }
       // Obtener el token de Firebase del usuario autenticado
       const tokenFirebase = await currentUser.getIdToken()
+      console.log("[ConnectMercadoPagoButton] Token Firebase:", tokenFirebase);
       if (!tokenFirebase) {
         throw new Error("No se pudo obtener el token de autenticación.")
       }
       // Usa la variable de entorno estándar
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL
+      console.log("[ConnectMercadoPagoButton] BACKEND URL:", backendUrl);
       if (!backendUrl) {
-        throw new Error("No se encontró la URL del backend en las variables de entorno (NEXT_PUBLIC_API_URL).")
+        throw new Error("No se encontró la URL del backend en las variables de entorno (NEXT_PUBLIC_BACKEND_URL).")
       }
       // Llama al endpoint del backend real
       const response = await fetch(`${backendUrl}/api/mercadopago/oauth-url`, {
@@ -33,14 +40,18 @@ export function ConnectMercadoPagoButton() {
           'Authorization': `Bearer ${tokenFirebase}`
         }
       });
+      console.log("[ConnectMercadoPagoButton] Respuesta del backend:", response);
       if (!response.ok) {
         const errorText = await response.text();
+        console.log("[ConnectMercadoPagoButton] Error del backend:", errorText);
         throw new Error(`Error del backend: ${errorText}`);
       }
       const data = await response.json();
+      console.log("[ConnectMercadoPagoButton] Data recibida:", data);
       if (!data.authUrl) throw new Error("No se recibió la URL de autorización");
       window.location.href = data.authUrl;
     } catch (error) {
+      console.log("[ConnectMercadoPagoButton] Error en handleConnect:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "No se pudo iniciar la conexión con MercadoPago",
