@@ -1433,8 +1433,8 @@ export default function SellerDashboardPage() {
                     <ConnectMercadoPagoButton />
                   </Alert>
                 )}
-                <fieldset disabled={!currentUser?.mercadopagoConnected} style={{ opacity: !currentUser?.mercadopagoConnected ? 0.5 : 1 }}>
-                  <form onSubmit={handleSubmitProduct} className="space-y-6">
+                <form onSubmit={handleSubmitProduct} className="space-y-6">
+                  <fieldset disabled={!currentUser?.mercadopagoConnected} style={{ opacity: !currentUser?.mercadopagoConnected ? 0.5 : 1 }}>
                     <div>
                       <Label htmlFor="productName" className="text-base">
                         Nombre
@@ -1537,9 +1537,8 @@ export default function SellerDashboardPage() {
                     <Button type="button" variant="ghost" onClick={resetForm} disabled={submittingProduct}>
                       Cancelar
                     </Button>
-                  </div>
-                </form>
                   </fieldset>
+                </form>
               </CardContent>
             </Card>
           )}
