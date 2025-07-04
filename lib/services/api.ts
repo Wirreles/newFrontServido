@@ -32,7 +32,7 @@ export class ApiService {
 
       // Si la ruta requiere autenticación, obtener el token de Firebase
       if (authRequired && auth?.currentUser) {
-        const token = await auth.currentUser.getIdToken();
+        const token = await auth.currentUser.getIdToken(true);
         headers['Authorization'] = `Bearer ${token}`;
       }
 

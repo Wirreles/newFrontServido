@@ -24,7 +24,7 @@ export function ConnectMercadoPagoButton() {
       }
       // Obtener el token de Firebase del usuario 
       console.log("[ConnectMercadoPagoButton] currentUser:", currentUser);
-      const tokenFirebase = await currentUser?.firebaseUser.getIdToken()
+      const tokenFirebase = await currentUser?.firebaseUser.getIdToken(true)
       console.log("[ConnectMercadoPagoButton] Token Firebase:", tokenFirebase);
       if (!tokenFirebase) {
         throw new Error("No se pudo obtener el token de autenticación.")
