@@ -28,6 +28,11 @@ export class ApiService {
       let headers: Record<string, string> = {
         'Content-Type': 'application/json',
         ...extraHeaders,
+      };
+      
+      // Agregar el header de ngrok si aplica
+      if (this.baseUrl?.includes('ngrok')) {
+        headers['ngrok-skip-browser-warning'] = 'true';
       }
 
       // Si la ruta requiere autenticación, obtener el token de Firebase
