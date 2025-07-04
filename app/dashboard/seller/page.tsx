@@ -1435,6 +1435,109 @@ export default function SellerDashboardPage() {
                 )}
                 <form onSubmit={handleSubmitProduct} className="space-y-6">
                   <fieldset disabled={!currentUser?.mercadopagoConnected} style={{ opacity: !currentUser?.mercadopagoConnected ? 0.5 : 1 }}>
+                    {/* Media Upload Section */}
+<div>
+  <Label htmlFor="productMedia" className="text-base">
+    Imágenes y Videos del Producto
+  </Label>
+  <div className="mt-2 space-y-4">
+    {/* Validation Requirements */}
+    <Alert className="bg-blue-50 border-blue-200">
+      <AlertTriangle className="h-4 w-4 text-blue-600" />
+      <AlertTitle className="text-blue-800">Requisitos importantes:</AlertTitle>
+      <AlertDescription className="text-blue-700">
+        <ul className="list-disc list-inside space-y-1 mt-2">
+          <li><strong>Imágenes:</strong> Deben tener fondo blanco obligatoriamente</li>
+          <li><strong>Videos:</strong> Máximo 60 segundos y 50MB de tamaño</li>
+          <li>Formatos soportados: JPG, PNG, WebP para imágenes | MP4, WebM para videos</li>
+        </ul>
+      </AlertDescription>
+    </Alert>
+
+    {/* Validation Errors */}
+    {mediaValidationErrors.length > 0 && (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Errores de validación:</AlertTitle>
+        <AlertDescription>
+          <ul className="list-disc list-inside space-y-1 mt-2">
+            {mediaValidationErrors.map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </AlertDescription>
+      </Alert>
+    )}
+
+    {/* Input File */}
+    <Input
+      id="productMedia"
+      type="file"
+      accept="image/*,video/*"
+      multiple
+      onChange={handleMediaChange}
+      className="block w-full max-w-xs text-sm text-slate-500
+        file:mr-4 file:py-2 file:px-4
+        file:rounded-md file:border-0
+        file:text-sm file:font-semibold
+        file:bg-orange-100 file:text-orange-700
+        hover:file:bg-orange-200
+        cursor-pointer"
+      disabled={validatingImages}
+    />
+
+    {/* Preview */}
+    {mediaPreviewUrls.length > 0 && (
+      <div>
+        <Label className="text-sm font-medium text-gray-700 mb-2 block">Nuevos archivos seleccionados:</Label>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {mediaPreviewUrls.map((url, index) => (
+            <div key={index} className="relative group">
+              <div className="aspect-square relative bg-gray-100 rounded-lg overflow-hidden">
+                {mediaFiles[index].type.startsWith("image/") ? (
+                  <Image
+                    src={url || "/placeholder.svg"}
+                    alt={`Preview ${index + 1}`}
+                    layout="fill"
+                    objectFit="cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                    <div className="text-center">
+                      <Video className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+                      <span className="text-xs text-gray-600">Video</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon"
+                className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => handleRemoveMedia(index)}
+              >
+                <XCircle className="h-4 w-4" />
+              </Button>
+              <Badge variant="secondary" className="absolute bottom-2 left-2 text-xs">
+                {mediaFiles[index].type.startsWith("image/") ? "imagen" : "video"}
+              </Badge>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {/* Loading States */}
+    {validatingImages && (
+      <div className="flex items-center gap-2 text-orange-600">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span className="text-sm">Validando archivos...</span>
+      </div>
+    )}
+  </div>
+</div>
+
                     <div>
                       <Label htmlFor="productName" className="text-base">
                         Nombre
@@ -1582,6 +1685,184 @@ export default function SellerDashboardPage() {
                   className="space-y-6 relative"
                 >
                   <fieldset disabled={!!currentUser && !currentUser.isSubscribed} style={{ opacity: !!currentUser && !currentUser.isSubscribed ? 0.5 : 1 }}>
+                    {/* Media Upload Section */}
+                  <div>
+                    <Label htmlFor="serviceMedia" className="text-base">
+                      Imágenes y Videos del Servicio
+                    </Label>
+                    <div className="mt-2 space-y-4">
+                      {/* Validation Requirements */}
+                      <Alert className="bg-blue-50 border-blue-200">
+                        <AlertTriangle className="h-4 w-4 text-blue-600" />
+                        <AlertTitle className="text-blue-800">Requisitos importantes:</AlertTitle>
+                        <AlertDescription className="text-blue-700">
+                          <ul className="list-disc list-inside space-y-1 mt-2">
+                            <li>
+                              <strong>Imágenes:</strong> Deben tener fondo blanco obligatoriamente
+                            </li>
+                            <li>
+                              <strong>Videos:</strong> Máximo 60 segundos y 50MB de tamaño
+                            </li>
+                            <li>Formatos soportados: JPG, PNG, WebP para imágenes | MP4, WebM para videos</li>
+                          </ul>
+                        </AlertDescription>
+                      </Alert>
+
+                      {/* Validation Errors */}
+                      {mediaValidationErrors.length > 0 && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertTitle>Errores de validación:</AlertTitle>
+                          <AlertDescription>
+                            <ul className="list-disc list-inside space-y-1 mt-2">
+                              {mediaValidationErrors.map((error, index) => (
+                                <li key={index}>{error}</li>
+                              ))}
+                            </ul>
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      {/* Drag and Drop Area */}
+                      <div
+                        className={`flex flex-col items-center gap-4 p-6 border-2 border-dashed rounded-lg transition-colors
+                          ${isDraggingOver ? "border-orange-500 bg-orange-50" : "border-gray-300 hover:border-orange-400"}
+                          ${validatingImages ? "opacity-50" : ""}`}
+                        onDragEnter={handleDragEnter}
+                        onDragLeave={handleDragLeave}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
+                      >
+                        <div className="text-center">
+                          <div className="flex justify-center gap-4 mb-4">
+                            <ImageIconLucide className="h-12 w-12 text-gray-400" />
+                            <Video className="h-12 w-12 text-gray-400" />
+                          </div>
+                          <p className="text-lg font-medium text-gray-700 mb-2">
+                            {isDraggingOver ? "¡Suelta los archivos aquí!" : "Arrastra imágenes y videos aquí"}
+                          </p>
+                          <p className="text-sm text-gray-500 mb-4">o haz clic para seleccionar archivos</p>
+                        </div>
+
+                        <Input
+                          id="serviceMedia"
+                          type="file"
+                          accept="image/*,video/*"
+                          multiple
+                          onChange={handleMediaChange}
+                          className="block w-full max-w-xs text-sm text-slate-500
+                            file:mr-4 file:py-2 file:px-4
+                            file:rounded-md file:border-0
+                            file:text-sm file:font-semibold
+                            file:bg-orange-100 file:text-orange-700
+                            hover:file:bg-orange-200
+                            cursor-pointer"
+                          disabled={validatingImages}
+                        />
+
+                        {validatingImages && (
+                          <div className="flex items-center gap-2 text-orange-600">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Validando archivos...</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Current Media Preview */}
+                      {currentProductMedia.length > 0 && (
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700 mb-2 block">Media actual:</Label>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                            {currentProductMedia.map((media, index) => (
+                              <div key={index} className="relative group">
+                                <div className="aspect-square relative bg-gray-100 rounded-lg overflow-hidden">
+                                  {media.type === "image" ? (
+                                    <Image
+                                      src={media.url || "/placeholder.svg"}
+                                      alt={`Media ${index + 1}`}
+                                      layout="fill"
+                                      objectFit="cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                                      <div className="text-center">
+                                        <Video className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+                                        <span className="text-xs text-gray-600">Video</span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon"
+                                  className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => handleRemoveCurrentMedia(index)}
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </Button>
+                                <Badge variant="secondary" className="absolute bottom-2 left-2 text-xs">
+                                  {media.type}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* New Media Preview */}
+                      {mediaPreviewUrls.length > 0 && (
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                            Nuevos archivos seleccionados:
+                          </Label>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                            {mediaPreviewUrls.map((url, index) => (
+                              <div key={index} className="relative group">
+                                <div className="aspect-square relative bg-gray-100 rounded-lg overflow-hidden">
+                                  {mediaFiles[index].type.startsWith("image/") ? (
+                                    <Image
+                                      src={url || "/placeholder.svg"}
+                                      alt={`Preview ${index + 1}`}
+                                      layout="fill"
+                                      objectFit="cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                                      <div className="text-center">
+                                        <Video className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+                                        <span className="text-xs text-gray-600">Video</span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon"
+                                  className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => handleRemoveMedia(index)}
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </Button>
+                                <Badge variant="secondary" className="absolute bottom-2 left-2 text-xs">
+                                  {mediaFiles[index].type.startsWith("image/") ? "imagen" : "video"}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {uploadingMedia && (
+                        <div className="flex items-center gap-2 text-orange-600">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm">Subiendo archivos...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                     <div>
                       <Label htmlFor="serviceName" className="text-base">
                         Nombre del Servicio
