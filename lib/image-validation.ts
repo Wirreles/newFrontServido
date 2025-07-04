@@ -17,7 +17,7 @@ export const hasWhiteBackground = (imageFile: File): Promise<boolean> => {
         return
       }
 
-      // Sample pixels from the edges to check background
+      // Sample pixels from the edges to check background1
       const samplePoints = [
         // Top edge
         { x: 0, y: 0 },
