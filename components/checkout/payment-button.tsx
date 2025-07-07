@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
+import { useAuth } from "@/contexts/auth-context"
 import type { PaymentItem } from "@/types/payments"
 import { ApiService } from "@/lib/services/api"
 
@@ -16,15 +17,26 @@ interface PaymentButtonProps {
 export function PaymentButton({ items, sellerId, className = "" }: PaymentButtonProps) {
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
+  const { currentUser } = useAuth()
 
   const handlePayment = async () => {
+    if (!currentUser) {
+      toast({
+        title: "Error",
+        description: "Debes iniciar sesión para realizar una compra",
+        variant: "destructive"
+      })
+      return
+    }
+
     try {
       setLoading(true)
 
       const response = await ApiService.createPayment({
         productId: items[0].id,
         quantity: items[0].quantity,
-        vendedorId: sellerId
+        vendedorId: sellerId,
+        buyerId: currentUser.firebaseUser.uid
       })
 
       if (response.error) {

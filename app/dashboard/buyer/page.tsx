@@ -28,7 +28,7 @@ import Image from "next/image"
 
 import { useState, useEffect, type ChangeEvent } from "react"
 import { db, storage } from "@/lib/firebase"
-import { doc, collection, query, where, getDocs, deleteDoc, orderBy, updateDoc } from "firebase/firestore"
+import { doc, collection, query, where, getDocs, deleteDoc, orderBy, updateDoc, getDoc } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"
 import { updateProfile, getAuth } from "firebase/auth" // Import updateProfile
 import { Loader2 } from "lucide-react"
@@ -37,13 +37,25 @@ import { useAuth } from "@/contexts/auth-context"
 import { ChatList } from "@/components/chat-list"
 import { Input } from "@/components/ui/input" // Import Input
 
-interface UserProfile {
-  uid: string
-  displayName?: string | null
-  email?: string | null
-  role?: "user" | "seller" | "admin"
-  photoURL?: string // Added for profile picture URL
-  photoPath?: string // Added for profile picture storage path
+
+
+interface Purchase {
+  id: string
+  paymentId: string
+  productId: string
+  vendedorId: string
+  buyerId: string
+  amount: number
+  status: "approved" | "pending" | "rejected" | "cancelled"
+  type: string
+  createdAt: any
+  // Datos del producto (obtenidos mediante join)
+  productName?: string
+  productDescription?: string
+  productImageUrl?: string
+  productIsService?: boolean
+  // Datos del vendedor (obtenidos mediante join)
+  vendorName?: string
 }
 
 interface Order {
@@ -79,6 +91,7 @@ export default function BuyerDashboardPage() {
 
   const [activeTab, setActiveTab] = useState("dashboard")
   const [orders, setOrders] = useState<Order[]>([])
+  const [purchases, setPurchases] = useState<Purchase[]>([])
   const [favorites, setFavorites] = useState<FavoriteProduct[]>([])
 
   const [loadingData, setLoadingData] = useState(true)
@@ -102,7 +115,8 @@ export default function BuyerDashboardPage() {
       return
     }
     if (currentUser) {
-      fetchBuyerData(currentUser.uid)
+      console.log("Current user UID:", currentUser.firebaseUser.uid)
+      fetchBuyerData(currentUser.firebaseUser.uid)
       // Set initial profile image preview if available
       if (currentUser.photoURL) {
         setProfileImagePreviewUrl(currentUser.photoURL)
@@ -114,61 +128,152 @@ export default function BuyerDashboardPage() {
     setLoadingData(true)
     setError(null)
     try {
-      // Simulamos datos de órdenes ya que aún no tenemos esta colección
-      // En una implementación real, obtendríamos estos datos de Firestore
-      setOrders([
-        {
-          id: "order1",
-          products: [
-            {
-              id: "prod1",
-              name: "Smartphone XYZ",
-              price: 299.99,
-              quantity: 1,
-              imageUrl: "/placeholder.svg?height=50&width=50",
-            },
-          ],
-          total: 299.99,
-          status: "delivered",
-          createdAt: new Date(2023, 5, 15),
-          address: "Calle Principal 123, Ciudad",
-        },
-        {
-          id: "order2",
-          products: [
-            {
-              id: "prod2",
-              name: "Auriculares Bluetooth",
-              price: 49.99,
-              quantity: 1,
-              imageUrl: "/placeholder.svg?height=50&width=50",
-            },
-            {
-              id: "prod3",
-              name: "Cargador USB-C",
-              price: 19.99,
-              quantity: 2,
-              imageUrl: "/placeholder.svg?height=50&width=50",
-            },
-          ],
-          total: 89.97,
-          status: "shipped",
-          createdAt: new Date(2023, 6, 20),
-          address: "Avenida Central 456, Ciudad",
-        },
-      ] as Order[])
+      // Obtener las compras del usuario desde Firestore
+      // Primero intentar sin orderBy para ver si es un problema de índices
+      const purchasesQuery = query(
+        collection(db, "purchases"),
+        where("buyerId", "==", userId)
+      )
+      const purchaseSnapshot = await getDocs(purchasesQuery)
+      const purchases = purchaseSnapshot.docs.map((doc) => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      }) as Purchase)
+
+      // Ordenar manualmente por fecha de creación
+      purchases.sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : 
+                     a.createdAt?.seconds ? new Date(a.createdAt.seconds * 1000) : 
+                     new Date(a.createdAt)
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : 
+                     b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000) : 
+                     new Date(b.createdAt)
+        return dateB.getTime() - dateA.getTime() // Orden descendente (más reciente primero)
+      })
+
+      console.log("Purchases found:", purchases.length)
+      console.log("Purchase data:", purchases)
+      console.log("User ID searching for:", userId)
+
+      // Si no hay compras, establecer arrays vacíos
+      if (purchases.length === 0) {
+        setOrders([])
+        setPurchases([])
+        console.log("No purchases found for user:", userId)
+        
+        // Aún obtener favoritos
+        const favoritesQuery = query(
+          collection(db, "favorites"),
+          where("userId", "==", userId)
+        )
+        const favoriteSnapshot = await getDocs(favoritesQuery)
+        const favoritesData = favoriteSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as FavoriteProduct)
+        
+        // Ordenar favoritos por fecha de agregado (más reciente primero)
+        favoritesData.sort((a, b) => {
+          const dateA = a.addedAt?.toDate ? a.addedAt.toDate() : 
+                       a.addedAt?.seconds ? new Date(a.addedAt.seconds * 1000) : 
+                       new Date(a.addedAt)
+          const dateB = b.addedAt?.toDate ? b.addedAt.toDate() : 
+                       b.addedAt?.seconds ? new Date(b.addedAt.seconds * 1000) : 
+                       new Date(b.addedAt)
+          return dateB.getTime() - dateA.getTime()
+        })
+        
+        setFavorites(favoritesData)
+        
+        return
+      }
+
+      // Obtener información de productos para cada compra
+      const enrichedPurchases = await Promise.all(
+        purchases.map(async (purchase) => {
+          try {
+            // Obtener datos del producto usando getDoc en lugar de getDocs
+            const productDocRef = doc(db, "products", purchase.productId)
+            const productSnapshot = await getDoc(productDocRef)
+            
+            if (productSnapshot.exists()) {
+              const productData = productSnapshot.data()
+              purchase.productName = productData.name
+              purchase.productDescription = productData.description
+              purchase.productImageUrl = productData.media?.[0]?.url || productData.imageUrl
+              purchase.productIsService = productData.isService || false
+              console.log("Product found:", productData.name)
+            } else {
+              console.log("Product not found for ID:", purchase.productId)
+            }
+
+            // Obtener datos del vendedor usando getDoc en lugar de query
+            const vendorDocRef = doc(db, "users", purchase.vendedorId)
+            const vendorSnapshot = await getDoc(vendorDocRef)
+            
+            if (vendorSnapshot.exists()) {
+              const vendorData = vendorSnapshot.data()
+              purchase.vendorName = vendorData.name || vendorData.displayName
+              console.log("Vendor found:", purchase.vendorName)
+            } else {
+              console.log("Vendor not found for ID:", purchase.vendedorId)
+            }
+
+            return purchase
+          } catch (error) {
+            console.error("Error enriching purchase:", error)
+            return purchase
+          }
+        })
+      )
+
+      // Convertir compras a formato de órdenes para mantener compatibilidad con la UI
+      const ordersFromPurchases: Order[] = enrichedPurchases.map((purchase) => ({
+        id: purchase.paymentId.toString(),
+        products: [{
+          id: purchase.productId,
+          name: purchase.productName || "Producto desconocido",
+          price: purchase.amount,
+          quantity: 1, // Las compras individuales tienen cantidad 1
+          imageUrl: purchase.productImageUrl || "/placeholder.svg"
+        }],
+        total: purchase.amount,
+        status: purchase.status === "approved" ? "delivered" : 
+               purchase.status === "pending" ? "processing" : 
+               purchase.status === "rejected" ? "cancelled" : "pending",
+        createdAt: purchase.createdAt?.toDate ? purchase.createdAt.toDate() : 
+                  purchase.createdAt?.seconds ? new Date(purchase.createdAt.seconds * 1000) : 
+                  new Date(purchase.createdAt),
+        address: "Dirección no especificada" // TODO: Agregar direcciones de envío
+      }))
+
+             setOrders(ordersFromPurchases)
+       setPurchases(enrichedPurchases)
 
       // Fetch real favorites from Firestore
       const favoritesQuery = query(
         collection(db, "favorites"),
-        where("userId", "==", userId),
-        orderBy("addedAt", "desc"),
+        where("userId", "==", userId)
       )
       const favoriteSnapshot = await getDocs(favoritesQuery)
-      setFavorites(favoriteSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as FavoriteProduct))
+      const favoritesData = favoriteSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as FavoriteProduct)
+      
+      // Ordenar favoritos por fecha de agregado (más reciente primero)
+      favoritesData.sort((a, b) => {
+        const dateA = a.addedAt?.toDate ? a.addedAt.toDate() : 
+                     a.addedAt?.seconds ? new Date(a.addedAt.seconds * 1000) : 
+                     new Date(a.addedAt)
+        const dateB = b.addedAt?.toDate ? b.addedAt.toDate() : 
+                     b.addedAt?.seconds ? new Date(b.addedAt.seconds * 1000) : 
+                     new Date(b.addedAt)
+        return dateB.getTime() - dateA.getTime()
+      })
+      
+      setFavorites(favoritesData)
     } catch (err) {
       console.error("Error fetching buyer data:", err)
-      setError("Error al cargar tus datos de comprador.")
+      if (err instanceof Error) {
+        setError(`Error al cargar tus datos de comprador: ${err.message}`)
+      } else {
+        setError("Error al cargar tus datos de comprador.")
+      }
     } finally {
       setLoadingData(false)
     }
@@ -243,7 +348,7 @@ export default function BuyerDashboardPage() {
     setProfileUpdateError(null)
     setProfileUpdateSuccess(null)
 
-    const filePath = `users/${currentUser.uid}/profile.jpg` // Consistent file name
+    const filePath = `users/${currentUser.firebaseUser.uid}/profile.jpg` // Consistent file name
     const storageRef = ref(storage, filePath)
 
     try {
@@ -257,7 +362,7 @@ export default function BuyerDashboardPage() {
       const downloadURL = await getDownloadURL(storageRef)
 
       // Update Firestore user document
-      const userDocRef = doc(db, "users", currentUser.uid)
+      const userDocRef = doc(db, "users", currentUser.firebaseUser.uid)
       await updateDoc(userDocRef, {
         photoURL: downloadURL,
         photoPath: filePath,
@@ -298,7 +403,7 @@ export default function BuyerDashboardPage() {
       await deleteObject(imageRef)
 
       // Update Firestore user document
-      const userDocRef = doc(db, "users", currentUser.uid)
+      const userDocRef = doc(db, "users", currentUser.firebaseUser.uid)
       await updateDoc(userDocRef, {
         photoURL: null,
         photoPath: null,
@@ -357,6 +462,14 @@ export default function BuyerDashboardPage() {
               >
                 <ShoppingBag className="h-4 w-4" />
                 Mis Compras
+              </Button>
+              <Button
+                variant={activeTab === "purchases" ? "secondary" : "ghost"}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-blue-600 justify-start"
+                onClick={() => setActiveTab("purchases")}
+              >
+                <CreditCard className="h-4 w-4" />
+                Historial de Pagos
               </Button>
               <Button
                 variant={activeTab === "favorites" ? "secondary" : "ghost"}
@@ -429,6 +542,14 @@ export default function BuyerDashboardPage() {
                   Mis Compras
                 </Button>
                 <Button
+                  variant={activeTab === "purchases" ? "secondary" : "ghost"}
+                  onClick={() => setActiveTab("purchases")}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-blue-600 justify-start"
+                >
+                  <CreditCard className="mr-2 h-5 w-5" />
+                  Historial de Pagos
+                </Button>
+                <Button
                   variant={activeTab === "favorites" ? "secondary" : "ghost"}
                   onClick={() => setActiveTab("favorites")}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-blue-600 justify-start"
@@ -462,7 +583,7 @@ export default function BuyerDashboardPage() {
             </SheetContent>
           </Sheet>
           <h1 className="font-semibold text-lg md:text-2xl text-gray-800 flex-1 text-center lg:text-left">
-            Bienvenido a tu Panel, {currentUser?.displayName || "Comprador"}
+            Bienvenido a tu Panel, {currentUser?.firebaseUser?.displayName || "Comprador"}
           </h1>
         </header>
 
@@ -494,7 +615,18 @@ export default function BuyerDashboardPage() {
                   <ShoppingBag className="w-4 h-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{orders.length}</div>
+                  <div className="text-2xl font-bold">{purchases.length}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-sm font-medium">Total Gastado</CardTitle>
+                  <CreditCard className="w-4 h-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    ${purchases.filter(p => p.status === "approved").reduce((sum, p) => sum + p.amount, 0).toFixed(2)}
+                  </div>
                 </CardContent>
               </Card>
               <Card>
@@ -508,23 +640,12 @@ export default function BuyerDashboardPage() {
               </Card>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                  <CardTitle className="text-sm font-medium">En Camino</CardTitle>
-                  <Package className="w-4 h-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {orders.filter((order) => order.status === "shipped").length}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                  <CardTitle className="text-sm font-medium">Entregados</CardTitle>
+                  <CardTitle className="text-sm font-medium">Pagos Pendientes</CardTitle>
                   <Clock className="w-4 h-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {orders.filter((order) => order.status === "delivered").length}
+                    {purchases.filter((purchase) => purchase.status === "pending").length}
                   </div>
                 </CardContent>
               </Card>
@@ -551,38 +672,55 @@ export default function BuyerDashboardPage() {
                   </div>
                 ) : (
                   <div className="space-y-8">
-                    {orders.slice(0, 3).map((order) => (
-                      <div key={order.id} className="flex flex-col space-y-2">
+                    {purchases.slice(0, 3).map((purchase) => (
+                      <div key={purchase.id} className="flex flex-col space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-4">
                             <div className="rounded-full bg-gray-100 p-2">
                               <ShoppingBag className="h-4 w-4" />
                             </div>
                             <div>
-                              <p className="text-sm font-medium">Pedido #{order.id}</p>
-                              <p className="text-xs text-muted-foreground">{order.createdAt.toLocaleDateString()}</p>
+                              <p className="text-sm font-medium">
+                                {purchase.productName || "Producto desconocido"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {purchase.createdAt?.toDate ? 
+                                  purchase.createdAt.toDate().toLocaleDateString() : 
+                                  new Date(purchase.createdAt).toLocaleDateString()
+                                }
+                              </p>
                             </div>
                           </div>
                           <div>
                             <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(
-                                order.status,
-                              )}`}
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                purchase.status === "approved" 
+                                  ? "bg-green-100 text-green-800" 
+                                  : purchase.status === "pending"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : purchase.status === "rejected"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-gray-100 text-gray-800"
+                              }`}
                             >
-                              {getStatusText(order.status)}
+                              {purchase.status === "approved" ? "Aprobado" :
+                               purchase.status === "pending" ? "Pendiente" :
+                               purchase.status === "rejected" ? "Rechazado" :
+                               purchase.status === "cancelled" ? "Cancelado" : purchase.status}
                             </span>
                           </div>
                         </div>
                         <div className="ml-10">
                           <p className="text-sm">
-                            {order.products.length} producto{order.products.length > 1 ? "s" : ""} - Total: $
-                            {order.total.toFixed(2)}
+                            {purchase.productIsService ? "Servicio" : "Producto"} - 
+                            Vendedor: {purchase.vendorName || "Desconocido"} - 
+                            Total: ${purchase.amount.toFixed(2)}
                           </p>
                         </div>
                       </div>
                     ))}
-                    {orders.length > 3 && (
-                      <Button variant="outline" className="w-full" onClick={() => setActiveTab("orders")}>
+                    {purchases.length > 3 && (
+                      <Button variant="outline" className="w-full" onClick={() => setActiveTab("purchases")}>
                         Ver todas mis compras
                       </Button>
                     )}
@@ -741,7 +879,7 @@ export default function BuyerDashboardPage() {
                 <CardTitle>Mis Chats</CardTitle>
                 <CardDescription>Conversaciones con vendedores.</CardDescription>
               </CardHeader>
-              <CardContent>{currentUser && <ChatList userId={currentUser.uid} role="buyer" />}</CardContent>
+              <CardContent>{currentUser && <ChatList userId={currentUser.firebaseUser.uid} role="buyer" />}</CardContent>
             </Card>
           )}
 
@@ -765,11 +903,11 @@ export default function BuyerDashboardPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <p className="text-sm text-muted-foreground">Nombre</p>
-                            <p className="font-medium">{currentUser?.displayName || "No especificado"}</p>
+                            <p className="font-medium">{currentUser?.firebaseUser?.displayName || "No especificado"}</p>
                           </div>
                           <div>
                             <p className="text-sm text-muted-foreground">Email</p>
-                            <p className="font-medium">{currentUser?.email}</p>
+                            <p className="font-medium">{currentUser?.firebaseUser?.email}</p>
                           </div>
                         </div>
                       </div>
@@ -932,6 +1070,102 @@ export default function BuyerDashboardPage() {
                     </div>
                   </TabsContent>
                 </Tabs>
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === "purchases" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Historial de Pagos</CardTitle>
+                <CardDescription>Detalle de todas tus transacciones y pagos realizados</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingData ? (
+                  <div className="flex justify-center items-center py-10">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                  </div>
+                ) : purchases.length === 0 ? (
+                  <div className="text-center py-10">
+                    <p className="text-lg text-muted-foreground mb-6">Aún no tienes transacciones registradas.</p>
+                    <Button asChild>
+                      <Link href="/">Explorar productos</Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {purchases.map((purchase) => (
+                      <Card key={purchase.id} className="overflow-hidden">
+                        <CardContent className="p-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex items-center space-x-4">
+                              <div className="h-12 w-12 relative flex-shrink-0">
+                                <Image
+                                  src={purchase.productImageUrl || "/placeholder.svg"}
+                                  alt={purchase.productName || "Producto"}
+                                  width={48}
+                                  height={48}
+                                  className="rounded-md object-cover"
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">
+                                  {purchase.productName || "Producto desconocido"}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {purchase.productIsService ? "Servicio" : "Producto"} • 
+                                  Vendedor: {purchase.vendorName || "Desconocido"}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  ID de Pago: {purchase.paymentId}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex flex-col sm:items-end gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg font-semibold">${purchase.amount.toFixed(2)}</span>
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    purchase.status === "approved" 
+                                      ? "bg-green-100 text-green-800" 
+                                      : purchase.status === "pending"
+                                      ? "bg-yellow-100 text-yellow-800"
+                                      : purchase.status === "rejected"
+                                      ? "bg-red-100 text-red-800"
+                                      : "bg-gray-100 text-gray-800"
+                                  }`}
+                                >
+                                  {purchase.status === "approved" ? "Aprobado" :
+                                   purchase.status === "pending" ? "Pendiente" :
+                                   purchase.status === "rejected" ? "Rechazado" :
+                                   purchase.status === "cancelled" ? "Cancelado" : purchase.status}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {purchase.createdAt?.toDate ? 
+                                  purchase.createdAt.toDate().toLocaleDateString("es-ES", {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  }) : 
+                                  new Date(purchase.createdAt).toLocaleDateString("es-ES", {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })
+                                }
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

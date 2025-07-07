@@ -84,6 +84,7 @@ export class ApiService {
     productId: string
     quantity: number
     vendedorId: string
+    buyerId: string
   }): Promise<ApiResponse<PaymentPreference>> {
     return this.fetchApi<PaymentPreference>('/api/mercadopago/payments/create-preference', {
       method: 'POST',

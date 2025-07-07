@@ -137,6 +137,19 @@ interface Coupon {
   createdAt: any
 }
 
+// Función utilitaria para limpiar campos undefined, null vacíos
+function cleanUndefinedFields<T extends object>(obj: T): any {
+  const cleanObj: any = { ...obj }
+  Object.keys(cleanObj).forEach((key) => {
+    const value = cleanObj[key]
+    // Eliminar campos undefined, null, o strings vacíos
+    if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+      delete cleanObj[key]
+    }
+  })
+  return cleanObj
+}
+
 export default function SellerDashboardPage() {
   const { currentUser, authLoading, handleLogout, refreshUserProfile } = useAuth()
   const router = useRouter()
@@ -198,6 +211,12 @@ export default function SellerDashboardPage() {
   const [couponApplyEndDate, setCouponApplyEndDate] = useState<Date | undefined>(undefined)
   const [associatingCoupon, setAssociatingCoupon] = useState(false)
   const [isCouponModalOpen, setIsCouponModalOpen] = useState(false)
+
+  // Estados para validación visual de formularios
+  const [productFormErrors, setProductFormErrors] = useState<{[key:string]:string}>({})
+  const [serviceFormErrors, setServiceFormErrors] = useState<{[key:string]:string}>({})
+  const [productFormTouched, setProductFormTouched] = useState(false)
+  const [serviceFormTouched, setServiceFormTouched] = useState(false)
 
   useEffect(() => {
     if (currentUser) {
@@ -438,12 +457,13 @@ export default function SellerDashboardPage() {
     try {
       for (const productId of selectedProductIds) {
         const productRef = doc(db, "products", productId)
-        await updateDoc(productRef, {
+        const couponData = cleanUndefinedFields({
           couponId: selectedCouponId,
           couponStartDate: couponApplyStartDate,
           couponEndDate: couponApplyEndDate,
           updatedAt: serverTimestamp(),
         })
+        await updateDoc(productRef, couponData)
       }
 
       await fetchSellerData(currentUser.firebaseUser.uid) // Refresh product list
@@ -469,12 +489,13 @@ export default function SellerDashboardPage() {
 
     try {
       const productRef = doc(db, "products", productId)
-      await updateDoc(productRef, {
+      const couponRemovalData = cleanUndefinedFields({
         couponId: null,
         couponStartDate: null,
         couponEndDate: null,
         updatedAt: serverTimestamp(),
       })
+      await updateDoc(productRef, couponRemovalData)
 
       await fetchSellerData(currentUser.firebaseUser.uid) // Refresh product list
       toast({
@@ -593,12 +614,21 @@ export default function SellerDashboardPage() {
         thumbnail = await generateVideoThumbnail(file)
       }
 
-      return {
+      const result = {
         type: isVideo ? "video" : "image",
         url: downloadURL,
         path: filePath,
         thumbnail,
       }
+      
+      // Verificar si hay campos undefined y eliminarlos
+      const undefinedFields = Object.keys(result).filter(key => result[key as keyof typeof result] === undefined)
+      if (undefinedFields.length > 0) {
+        // Eliminar campos undefined
+        undefinedFields.forEach(field => delete result[field as keyof typeof result])
+      }
+
+      return result as ProductMedia
     } catch (error) {
       console.error("Error uploading media: ", error)
       throw new Error("Error al subir el archivo.")
@@ -713,8 +743,29 @@ export default function SellerDashboardPage() {
     }
   }
 
+  // Nueva función de validación para productos
+  const validateProductForm = () => {
+    const errors: {[key:string]:string} = {}
+    if (!productName.trim()) errors.name = "El nombre es obligatorio"
+    if (!productDescription.trim()) errors.description = "La descripción es obligatoria"
+    if (!productPrice || isNaN(Number(productPrice)) || Number(productPrice) <= 0) errors.price = "El precio es obligatorio y debe ser mayor a 0"
+    if (!productCategory) errors.category = "La categoría es obligatoria"
+    if (!productIsService && (!productStock || isNaN(Number(productStock)) || Number(productStock) < 0)) errors.stock = "El stock es obligatorio y debe ser 0 o mayor"
+    if (mediaFiles.length === 0 && currentProductMedia.length === 0) errors.media = "Debes subir al menos una imagen o video"
+    return errors
+  }
+
+  // Modificar handleSubmitProduct para usar validación visual
   const handleSubmitProduct = async (e: FormEvent) => {
     e.preventDefault()
+    setProductFormTouched(true)
+    const errors = validateProductForm()
+    setProductFormErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      setError("Por favor, corrige los errores antes de continuar.")
+      return
+    }
+
     if (!productName || !productPrice || !productCategory || !currentUser) {
       setError("Nombre, precio y categoría son obligatorios.")
       return
@@ -749,17 +800,25 @@ export default function SellerDashboardPage() {
         }
       }
 
-      const productData: Partial<Product> = {
+      const productData: any = {
         name: productName,
         description: productDescription,
         price: Number.parseFloat(productPrice),
         category: productCategory,
-        brand: productBrand || undefined,
         media: newMedia,
         isService: productIsService,
-        stock: !productIsService && productStock ? Number.parseInt(productStock) : undefined,
         sellerId: currentUser.firebaseUser.uid,
         updatedAt: serverTimestamp(),
+      }
+
+      // Solo agregar brand si tiene valor
+      if (productBrand && productBrand.trim()) {
+        productData.brand = productBrand
+      }
+
+      // Solo agregar stock si no es servicio y tiene valor
+      if (!productIsService && productStock && productStock.trim()) {
+        productData.stock = Number.parseInt(productStock)
       }
 
       if (isEditing && editingProductId) {
@@ -770,10 +829,10 @@ export default function SellerDashboardPage() {
         )
         setSuccessMessage("Producto actualizado exitosamente.")
       } else {
-        const fullProductData = { ...productData, createdAt: serverTimestamp() } as Omit<Product, "id">
-        const docRef = await addDoc(collection(db, "products"), fullProductData)
+        const productDataWithTimestamp = { ...productData, createdAt: serverTimestamp() }
+        const docRef = await addDoc(collection(db, "products"), productDataWithTimestamp)
         setMyProducts((prevProducts) => [
-          { id: docRef.id, ...fullProductData, createdAt: new Date(), updatedAt: new Date() } as Product,
+          { id: docRef.id, ...productDataWithTimestamp, createdAt: new Date(), updatedAt: new Date() } as Product,
           ...prevProducts,
         ])
         setSuccessMessage("Producto añadido exitosamente.")
@@ -845,11 +904,12 @@ export default function SellerDashboardPage() {
       const { downloadURL, filePath } = await uploadProfileImageToStorage(profileImageFile)
 
       const userRef = doc(db, "users", currentUser.firebaseUser.uid)
-      await updateDoc(userRef, {
+      const userData = cleanUndefinedFields({
         photoURL: downloadURL,
         photoPath: filePath,
         updatedAt: serverTimestamp(),
       })
+      await updateDoc(userRef, userData)
 
       await refreshUserProfile()
 
@@ -881,11 +941,12 @@ export default function SellerDashboardPage() {
       await deleteProfileImageFromStorage(currentUser.photoPath) // currentUser.photoPath ya está validado como string aquí
 
       const userRef = doc(db, "users", currentUser.firebaseUser.uid)
-      await updateDoc(userRef, {
+      const userData = cleanUndefinedFields({
         photoURL: null,
         photoPath: null,
         updatedAt: serverTimestamp(),
       })
+      await updateDoc(userRef, userData)
 
       await refreshUserProfile()
 
@@ -999,6 +1060,106 @@ export default function SellerDashboardPage() {
       });
     }
   }, [refreshUserProfile]);
+
+  // Nueva función de validación para servicios
+  const validateServiceForm = () => {
+    const errors: {[key:string]:string} = {}
+    if (!productName.trim()) errors.name = "El nombre es obligatorio"
+    if (!productDescription.trim()) errors.description = "La descripción es obligatoria"
+    if (!productPrice || isNaN(Number(productPrice)) || Number(productPrice) <= 0) errors.price = "El precio es obligatorio y debe ser mayor a 0"
+    if (!productCategory) errors.category = "La categoría es obligatoria"
+    if (mediaFiles.length === 0 && currentProductMedia.length === 0) errors.media = "Debes subir al menos una imagen o video"
+    return errors
+  }
+
+  // Nuevo handleSubmitService para validación visual
+  const handleSubmitService = async (e: FormEvent) => {
+    e.preventDefault()
+    setServiceFormTouched(true)
+    const errors = validateServiceForm()
+    setServiceFormErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      setError("Por favor, corrige los errores antes de continuar.")
+      return
+    }
+
+    if (!productName || !productPrice || !productCategory || !currentUser) {
+      setError("Nombre, precio y categoría son obligatorios.")
+      return
+    }
+
+    if (mediaFiles.length === 0 && currentProductMedia.length === 0) {
+      setError("Debes subir al menos una imagen o video del servicio.")
+      return
+    }
+
+    setSubmittingProduct(true)
+    setError(null)
+    setSuccessMessage(null)
+
+    let newMedia: ProductMedia[] = [...currentProductMedia]
+
+    try {
+      // Upload new media files
+      if (mediaFiles.length > 0) {
+        // Delete old media if editing
+        if (isEditing && currentProductMedia.length > 0) {
+          for (const media of currentProductMedia) {
+            await deleteMediaFromStorage(media.path)
+          }
+          newMedia = []
+        }
+
+        // Upload new media
+        for (const file of mediaFiles) {
+          const uploadedMedia = await uploadMediaToStorage(file)
+          newMedia.push(uploadedMedia)
+        }
+      }
+
+      const serviceData: any = {
+        name: productName,
+        description: productDescription,
+        price: Number.parseFloat(productPrice),
+        category: productCategory,
+        media: newMedia,
+        isService: true, // Siempre true para servicios
+        sellerId: currentUser.firebaseUser.uid,
+        updatedAt: serverTimestamp(),
+      }
+
+      // Solo agregar brand si tiene valor
+      if (productBrand && productBrand.trim()) {
+        serviceData.brand = productBrand
+      }
+
+      if (isEditing && editingProductId) {
+        const serviceRef = doc(db, "products", editingProductId)
+        await updateDoc(serviceRef, serviceData)
+        setMyProducts((prevProducts) =>
+          prevProducts.map((p) => (p.id === editingProductId ? { ...p, ...serviceData, updatedAt: new Date() } : p)),
+        )
+        setSuccessMessage("Servicio actualizado exitosamente.")
+      } else {
+        const serviceDataWithTimestamp = { ...serviceData, createdAt: serverTimestamp() }
+        const docRef = await addDoc(collection(db, "products"), serviceDataWithTimestamp)
+        setMyProducts((prevProducts) => [
+          { id: docRef.id, ...serviceDataWithTimestamp, createdAt: new Date(), updatedAt: new Date() } as Product,
+          ...prevProducts,
+        ])
+        setSuccessMessage("Servicio añadido exitosamente.")
+      }
+      resetForm()
+      setActiveTab("products")
+    } catch (err) {
+      console.error("Error submitting service:", err)
+      setError(
+        `Error al ${isEditing ? "actualizar" : "añadir"} el servicio. ${err instanceof Error ? err.message : ""}`,
+      )
+    } finally {
+      setSubmittingProduct(false)
+    }
+  }
 
   if (authLoading || (!currentUser && !authLoading)) {
     return (
@@ -1241,33 +1402,33 @@ export default function SellerDashboardPage() {
           <Card className="p-6 mb-8">
             <h2 className="text-2xl font-semibold mb-4">Cuenta de MercadoPago</h2>
             {currentUser?.mercadopagoConnected ? (
-              <div className="flex flex-col gap-2">
-                <div className="bg-green-100 text-green-800 p-3 rounded flex items-center gap-2">
-                  <span className="font-semibold">✅ Cuenta conectada correctamente.</span>
-                  <span className="text-xs">Ya puedes recibir pagos y vender productos.</span>
-                </div>
-                <Button
-                  variant="destructive"
-                  disabled={isDisconnecting}
-                  onClick={() => {
-                    if (window.confirm('¿Seguro que quieres desconectar tu cuenta de MercadoPago? No podrás vender productos hasta volver a conectar tu cuenta.')) {
-                      handleDisconnect();
-                    }
-                  }}
-                  className="w-full mt-2"
-                >
-                  {isDisconnecting ? 'Desconectando...' : 'Desconectar cuenta de MercadoPago'}
-                </Button>
-                <div className="text-xs text-orange-700 mt-1">
-                  <AlertTriangle className="inline w-4 h-4 mr-1 align-text-bottom" />
-                  Si desconectas tu cuenta, no podrás vender productos ni recibir pagos hasta volver a conectar.
-                </div>
+                <div className="flex flex-col gap-2">
+                  <div className="bg-green-100 text-green-800 p-3 rounded flex items-center gap-2">
+                    <span className="font-semibold">✅ Cuenta conectada correctamente.</span>
+                    <span className="text-xs">Ya puedes recibir pagos y vender productos.</span>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    disabled={isDisconnecting}
+                    onClick={() => {
+                      if (window.confirm('¿Seguro que quieres desconectar tu cuenta de MercadoPago? No podrás vender productos hasta volver a conectar tu cuenta.')) {
+                        handleDisconnect();
+                      }
+                    }}
+                    className="w-full mt-2"
+                  >
+                    {isDisconnecting ? 'Desconectando...' : 'Desconectar cuenta de MercadoPago'}
+                  </Button>
+                  <div className="text-xs text-orange-700 mt-1">
+                    <AlertTriangle className="inline w-4 h-4 mr-1 align-text-bottom" />
+                    Si desconectas tu cuenta, no podrás vender productos ni recibir pagos hasta volver a conectar.
+                  </div>
               </div>
             ) : (
-              <div className="flex flex-col gap-2">
-                <div className="bg-yellow-100 text-yellow-800 p-3 rounded flex items-center gap-2">
-                  <span className="font-semibold">⚠️ Debes conectar tu cuenta de MercadoPago para vender productos y recibir pagos.</span>
-                </div>
+                <div className="flex flex-col gap-2">
+                  <div className="bg-yellow-100 text-yellow-800 p-3 rounded flex items-center gap-2">
+                    <span className="font-semibold">⚠️ Debes conectar tu cuenta de MercadoPago para vender productos y recibir pagos.</span>
+                  </div>
                 <ConnectMercadoPagoButton />
               </div>
             )}
@@ -1428,267 +1589,29 @@ export default function SellerDashboardPage() {
                     <AlertTriangle className="h-5 w-5" />
                     <AlertTitle>Conexión requerida</AlertTitle>
                     <AlertDescription>
-                      Debes conectar tu cuenta de MercadoPago para poder crear y publicar productos en la plataforma.
-                    </AlertDescription>
+                        Debes conectar tu cuenta de MercadoPago para poder crear y publicar productos en la plataforma.
+                      </AlertDescription>
                     <ConnectMercadoPagoButton />
+                  </Alert>
+                )}
+                {/* Resumen de errores */}
+                {productFormTouched && Object.keys(productFormErrors).length > 0 && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Faltan campos obligatorios</AlertTitle>
+                    <AlertDescription>
+                      <ul className="list-disc list-inside space-y-1 mt-2">
+                        {Object.values(productFormErrors).map((err, idx) => <li key={idx}>{err}</li>)}
+                      </ul>
+                    </AlertDescription>
                   </Alert>
                 )}
                 <form onSubmit={handleSubmitProduct} className="space-y-6">
                   <fieldset disabled={!currentUser?.mercadopagoConnected} style={{ opacity: !currentUser?.mercadopagoConnected ? 0.5 : 1 }}>
-                    {/* Media Upload Section */}
-<div>
-  <Label htmlFor="productMedia" className="text-base">
-    Imágenes y Videos del Producto
-  </Label>
-  <div className="mt-2 space-y-4">
-    {/* Validation Requirements */}
-    <Alert className="bg-blue-50 border-blue-200">
-      <AlertTriangle className="h-4 w-4 text-blue-600" />
-      <AlertTitle className="text-blue-800">Requisitos importantes:</AlertTitle>
-      <AlertDescription className="text-blue-700">
-        <ul className="list-disc list-inside space-y-1 mt-2">
-          <li><strong>Imágenes:</strong> Deben tener fondo blanco obligatoriamente</li>
-          <li><strong>Videos:</strong> Máximo 60 segundos y 50MB de tamaño</li>
-          <li>Formatos soportados: JPG, PNG, WebP para imágenes | MP4, WebM para videos</li>
-        </ul>
-      </AlertDescription>
-    </Alert>
-
-    {/* Validation Errors */}
-    {mediaValidationErrors.length > 0 && (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Errores de validación:</AlertTitle>
-        <AlertDescription>
-          <ul className="list-disc list-inside space-y-1 mt-2">
-            {mediaValidationErrors.map((error, index) => (
-              <li key={index}>{error}</li>
-            ))}
-          </ul>
-        </AlertDescription>
-      </Alert>
-    )}
-
-    {/* Input File */}
-    <Input
-      id="productMedia"
-      type="file"
-      accept="image/*,video/*"
-      multiple
-      onChange={handleMediaChange}
-      className="block w-full max-w-xs text-sm text-slate-500
-        file:mr-4 file:py-2 file:px-4
-        file:rounded-md file:border-0
-        file:text-sm file:font-semibold
-        file:bg-orange-100 file:text-orange-700
-        hover:file:bg-orange-200
-        cursor-pointer"
-      disabled={validatingImages}
-    />
-
-    {/* Preview */}
-    {mediaPreviewUrls.length > 0 && (
-      <div>
-        <Label className="text-sm font-medium text-gray-700 mb-2 block">Nuevos archivos seleccionados:</Label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {mediaPreviewUrls.map((url, index) => (
-            <div key={index} className="relative group">
-              <div className="aspect-square relative bg-gray-100 rounded-lg overflow-hidden">
-                {mediaFiles[index].type.startsWith("image/") ? (
-                  <Image
-                    src={url || "/placeholder.svg"}
-                    alt={`Preview ${index + 1}`}
-                    layout="fill"
-                    objectFit="cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                    <div className="text-center">
-                      <Video className="h-8 w-8 text-gray-600 mx-auto mb-2" />
-                      <span className="text-xs text-gray-600">Video</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <Button
-                type="button"
-                variant="destructive"
-                size="icon"
-                className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={() => handleRemoveMedia(index)}
-              >
-                <XCircle className="h-4 w-4" />
-              </Button>
-              <Badge variant="secondary" className="absolute bottom-2 left-2 text-xs">
-                {mediaFiles[index].type.startsWith("image/") ? "imagen" : "video"}
-              </Badge>
-            </div>
-          ))}
-        </div>
-      </div>
-    )}
-
-    {/* Loading States */}
-    {validatingImages && (
-      <div className="flex items-center gap-2 text-orange-600">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        <span className="text-sm">Validando archivos...</span>
-      </div>
-    )}
-  </div>
-</div>
-
-                    <div>
-                      <Label htmlFor="productName" className="text-base">
-                        Nombre
-                      </Label>
-                      <Input
-                        id="productName"
-                        value={productName}
-                        onChange={(e) => setProductName(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="productDescription" className="text-base">
-                        Descripción
-                      </Label>
-                      <Textarea
-                        id="productDescription"
-                        value={productDescription}
-                        onChange={(e) => setProductDescription(e.target.value)}
-                        rows={4}
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="productPrice" className="text-base">
-                          Precio ($)
-                        </Label>
-                        <Input
-                          id="productPrice"
-                          type="number"
-                          step="0.01"
-                          value={productPrice}
-                          onChange={(e) => setProductPrice(e.target.value)}
-                          required
-                        />
-                      </div>
-                      {!productIsService && (
-                        <div>
-                          <Label htmlFor="productStock" className="text-base">
-                            Stock (Unidades)
-                          </Label>
-                          <Input
-                            id="productStock"
-                            type="number"
-                            value={productStock}
-                            onChange={(e) => setProductStock(e.target.value)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="productCategory" className="text-base">
-                          Categoría
-                        </Label>
-                        <Select value={productCategory} onValueChange={setProductCategory} required>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona una categoría" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>
-                                {cat.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="productBrand" className="text-base">
-                          Marca (Opcional)
-                        </Label>
-                        <Select value={productBrand} onValueChange={setProductBrand}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona una marca" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {brands.map((brand) => (
-                              <SelectItem key={brand.id} value={brand.id}>
-                                {brand.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 pt-4">
-                      <Button type="submit" disabled={submittingProduct || (!isEditing)}>
-                      {submittingProduct ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Guardando...
-                        </>
-                      ) : isEditing ? (
-                        "Actualizar Producto"
-                      ) : (
-                        "Añadir Producto"
-                      )}
-                    </Button>
-                    <Button type="button" variant="ghost" onClick={resetForm} disabled={submittingProduct}>
-                      Cancelar
-                    </Button>
-                    </div>
-                  </fieldset>
-                  
-                </form>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Add/Edit Service Tab - Updated with new media upload */}
-          {activeTab === "addService" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Añadir Nuevo Servicio</CardTitle>
-                <CardDescription>Completa los detalles para agregar un servicio.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {currentUser && currentUser.role === 'seller' && !currentUser.isSubscribed && (
-                  <div className="mb-6">
-                    <Alert className="bg-yellow-50 border-yellow-200 mb-4">
-                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                      <AlertTitle className="text-yellow-800">Suscripción requerida</AlertTitle>
-                      <AlertDescription className="text-yellow-700">
-                        Debes suscribirte para poder crear y publicar servicios en la plataforma.
-                      </AlertDescription>
-                    </Alert>
-                    <Button
-                      onClick={handleSubscribe}
-                      disabled={!currentUser || authLoading || subscribing}
-                      className="bg-purple-700 text-white px-4 py-2 rounded"
-                    >
-                      {subscribing ? 'Redirigiendo...' : 'Suscribirse con MercadoPago'}
-                    </Button>
-                  </div>
-                )}
-                <form
-                  onSubmit={async (e) => {
-                    if (currentUser && !currentUser.isSubscribed) {
-                      e.preventDefault();
-                      return;
-                    }
-                    // ... lógica original del submit ...
-                  }}
-                  className="space-y-6 relative"
-                >
-                  <fieldset disabled={!!currentUser && !currentUser.isSubscribed} style={{ opacity: !!currentUser && !currentUser.isSubscribed ? 0.5 : 1 }}>
-                    {/* Media Upload Section */}
+                  {/* Media Upload Section */}
                   <div>
-                    <Label htmlFor="serviceMedia" className="text-base">
-                      Imágenes y Videos del Servicio
+                    <Label htmlFor="productMedia" className="text-base">
+                      Imágenes y Videos del Producto
                     </Label>
                     <div className="mt-2 space-y-4">
                       {/* Validation Requirements */}
@@ -1697,12 +1620,8 @@ export default function SellerDashboardPage() {
                         <AlertTitle className="text-blue-800">Requisitos importantes:</AlertTitle>
                         <AlertDescription className="text-blue-700">
                           <ul className="list-disc list-inside space-y-1 mt-2">
-                            <li>
-                              <strong>Imágenes:</strong> Deben tener fondo blanco obligatoriamente
-                            </li>
-                            <li>
-                              <strong>Videos:</strong> Máximo 60 segundos y 50MB de tamaño
-                            </li>
+                              <li><strong>Imágenes:</strong> Deben tener fondo blanco obligatoriamente</li>
+                              <li><strong>Videos:</strong> Máximo 60 segundos y 50MB de tamaño</li>
                             <li>Formatos soportados: JPG, PNG, WebP para imágenes | MP4, WebM para videos</li>
                           </ul>
                         </AlertDescription>
@@ -1723,29 +1642,9 @@ export default function SellerDashboardPage() {
                         </Alert>
                       )}
 
-                      {/* Drag and Drop Area */}
-                      <div
-                        className={`flex flex-col items-center gap-4 p-6 border-2 border-dashed rounded-lg transition-colors
-                          ${isDraggingOver ? "border-orange-500 bg-orange-50" : "border-gray-300 hover:border-orange-400"}
-                          ${validatingImages ? "opacity-50" : ""}`}
-                        onDragEnter={handleDragEnter}
-                        onDragLeave={handleDragLeave}
-                        onDragOver={handleDragOver}
-                        onDrop={handleDrop}
-                      >
-                        <div className="text-center">
-                          <div className="flex justify-center gap-4 mb-4">
-                            <ImageIconLucide className="h-12 w-12 text-gray-400" />
-                            <Video className="h-12 w-12 text-gray-400" />
-                          </div>
-                          <p className="text-lg font-medium text-gray-700 mb-2">
-                            {isDraggingOver ? "¡Suelta los archivos aquí!" : "Arrastra imágenes y videos aquí"}
-                          </p>
-                          <p className="text-sm text-gray-500 mb-4">o haz clic para seleccionar archivos</p>
-                        </div>
-
+                        {/* Input File */}
                         <Input
-                          id="serviceMedia"
+                          id="productMedia"
                           type="file"
                           accept="image/*,video/*"
                           multiple
@@ -1760,62 +1659,10 @@ export default function SellerDashboardPage() {
                           disabled={validatingImages}
                         />
 
-                        {validatingImages && (
-                          <div className="flex items-center gap-2 text-orange-600">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span className="text-sm">Validando archivos...</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Current Media Preview */}
-                      {currentProductMedia.length > 0 && (
-                        <div>
-                          <Label className="text-sm font-medium text-gray-700 mb-2 block">Media actual:</Label>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                            {currentProductMedia.map((media, index) => (
-                              <div key={index} className="relative group">
-                                <div className="aspect-square relative bg-gray-100 rounded-lg overflow-hidden">
-                                  {media.type === "image" ? (
-                                    <Image
-                                      src={media.url || "/placeholder.svg"}
-                                      alt={`Media ${index + 1}`}
-                                      layout="fill"
-                                      objectFit="cover"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                                      <div className="text-center">
-                                        <Video className="h-8 w-8 text-gray-600 mx-auto mb-2" />
-                                        <span className="text-xs text-gray-600">Video</span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="destructive"
-                                  size="icon"
-                                  className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={() => handleRemoveCurrentMedia(index)}
-                                >
-                                  <XCircle className="h-4 w-4" />
-                                </Button>
-                                <Badge variant="secondary" className="absolute bottom-2 left-2 text-xs">
-                                  {media.type}
-                                </Badge>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* New Media Preview */}
+                        {/* Preview */}
                       {mediaPreviewUrls.length > 0 && (
                         <div>
-                          <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                            Nuevos archivos seleccionados:
-                          </Label>
+                            <Label className="text-sm font-medium text-gray-700 mb-2 block">Nuevos archivos seleccionados:</Label>
                           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                             {mediaPreviewUrls.map((url, index) => (
                               <div key={index} className="relative group">
@@ -1854,43 +1701,385 @@ export default function SellerDashboardPage() {
                         </div>
                       )}
 
-                      {uploadingMedia && (
+                        {/* Loading States */}
+                        {validatingImages && (
                         <div className="flex items-center gap-2 text-orange-600">
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="text-sm">Subiendo archivos...</span>
+                            <span className="text-sm">Validando archivos...</span>
                         </div>
                       )}
+                        {/* Error de media */}
+                        {productFormTouched && productFormErrors.media && (
+                          <p className="text-xs text-red-600 mt-1">{productFormErrors.media}</p>
+                        )}
                     </div>
                   </div>
 
+                  <div>
+                      <Label htmlFor="productName" className="text-base">Nombre</Label>
+                    <Input
+                      id="productName"
+                      value={productName}
+                      onChange={(e) => setProductName(e.target.value)}
+                      required
+                        className={productFormTouched && productFormErrors.name ? 'border-red-500' : ''}
+                    />
+                      {productFormTouched && productFormErrors.name && (
+                        <p className="text-xs text-red-600 mt-1">{productFormErrors.name}</p>
+                      )}
+                  </div>
+                  <div>
+                      <Label htmlFor="productDescription" className="text-base">Descripción</Label>
+                    <Textarea
+                      id="productDescription"
+                      value={productDescription}
+                      onChange={(e) => setProductDescription(e.target.value)}
+                      rows={4}
+                        className={productFormTouched && productFormErrors.description ? 'border-red-500' : ''}
+                    />
+                      {productFormTouched && productFormErrors.description && (
+                        <p className="text-xs text-red-600 mt-1">{productFormErrors.description}</p>
+                      )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="serviceName" className="text-base">
-                        Nombre del Servicio
+                        <Label htmlFor="productPrice" className="text-base">Precio ($)</Label>
+                      <Input
+                        id="productPrice"
+                        type="number"
+                        step="0.01"
+                        value={productPrice}
+                        onChange={(e) => setProductPrice(e.target.value)}
+                        required
+                          className={productFormTouched && productFormErrors.price ? 'border-red-500' : ''}
+                      />
+                        {productFormTouched && productFormErrors.price && (
+                          <p className="text-xs text-red-600 mt-1">{productFormErrors.price}</p>
+                        )}
+                    </div>
+                    {!productIsService && (
+                      <div>
+                          <Label htmlFor="productStock" className="text-base">Stock (Unidades)</Label>
+                        <Input
+                          id="productStock"
+                          type="number"
+                          value={productStock}
+                          onChange={(e) => setProductStock(e.target.value)}
+                            className={productFormTouched && productFormErrors.stock ? 'border-red-500' : ''}
+                        />
+                          {productFormTouched && productFormErrors.stock && (
+                            <p className="text-xs text-red-600 mt-1">{productFormErrors.stock}</p>
+                          )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <Label htmlFor="productCategory" className="text-base">Categoría</Label>
+                      <Select value={productCategory} onValueChange={setProductCategory} required>
+                          <SelectTrigger className={productFormTouched && productFormErrors.category ? 'border-red-500' : ''}>
+                          <SelectValue placeholder="Selecciona una categoría" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                        {productFormTouched && productFormErrors.category && (
+                          <p className="text-xs text-red-600 mt-1">{productFormErrors.category}</p>
+                        )}
+                    </div>
+                    <div>
+                      <Label htmlFor="productBrand" className="text-base">
+                        Marca (Opcional)
                       </Label>
+                      <Select value={productBrand} onValueChange={setProductBrand}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona una marca" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {brands.map((brand) => (
+                            <SelectItem key={brand.id} value={brand.id}>
+                              {brand.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-4">
+                      <Button type="submit" disabled={submittingProduct}>
+                      {submittingProduct ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Guardando...
+                        </>
+                      ) : isEditing ? (
+                        "Actualizar Producto"
+                      ) : (
+                        "Añadir Producto"
+                      )}
+                    </Button>
+                    <Button type="button" variant="ghost" onClick={resetForm} disabled={submittingProduct}>
+                      Cancelar
+                    </Button>
+                  </div>
+                  </fieldset>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Add/Edit Service Tab - Updated with new media upload */}
+          {activeTab === "addService" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Añadir Nuevo Servicio</CardTitle>
+                <CardDescription>Completa los detalles para agregar un servicio.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {currentUser && currentUser.role === 'seller' && !currentUser.isSubscribed && (
+                  <div className="mb-6">
+                    <Alert className="bg-yellow-50 border-yellow-200 mb-4">
+                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                      <AlertTitle className="text-yellow-800">Suscripción requerida</AlertTitle>
+                      <AlertDescription className="text-yellow-700">
+                        Debes suscribirte para poder crear y publicar servicios en la plataforma.
+                      </AlertDescription>
+                    </Alert>
+                    <Button
+                      onClick={handleSubscribe}
+                      disabled={!currentUser || authLoading || subscribing}
+                      className="bg-purple-700 text-white px-4 py-2 rounded"
+                    >
+                      {subscribing ? 'Redirigiendo...' : 'Suscribirse con MercadoPago'}
+                    </Button>
+                  </div>
+                )}
+                {/* Resumen de errores */}
+                {serviceFormTouched && Object.keys(serviceFormErrors).length > 0 && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Faltan campos obligatorios</AlertTitle>
+                    <AlertDescription>
+                      <ul className="list-disc list-inside space-y-1 mt-2">
+                        {Object.values(serviceFormErrors).map((err, idx) => <li key={idx}>{err}</li>)}
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                <form onSubmit={handleSubmitService} className="space-y-6 relative">
+                  <fieldset disabled={!!currentUser && !currentUser.isSubscribed} style={{ opacity: !!currentUser && !currentUser.isSubscribed ? 0.5 : 1 }}>
+                    {/* Media Upload Section */}
+                    <div>
+                      <Label htmlFor="serviceMedia" className="text-base">Imágenes y Videos del Servicio</Label>
+                      <div className="mt-2 space-y-4">
+                        {/* Validation Requirements */}
+                        <Alert className="bg-blue-50 border-blue-200">
+                          <AlertTriangle className="h-4 w-4 text-blue-600" />
+                          <AlertTitle className="text-blue-800">Requisitos importantes:</AlertTitle>
+                          <AlertDescription className="text-blue-700">
+                            <ul className="list-disc list-inside space-y-1 mt-2">
+                              <li>
+                                <strong>Imágenes:</strong> Deben tener fondo blanco obligatoriamente
+                              </li>
+                              <li>
+                                <strong>Videos:</strong> Máximo 60 segundos y 50MB de tamaño
+                              </li>
+                              <li>Formatos soportados: JPG, PNG, WebP para imágenes | MP4, WebM para videos</li>
+                            </ul>
+                          </AlertDescription>
+                        </Alert>
+
+                        {/* Validation Errors */}
+                        {mediaValidationErrors.length > 0 && (
+                          <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle>Errores de validación:</AlertTitle>
+                            <AlertDescription>
+                              <ul className="list-disc list-inside space-y-1 mt-2">
+                                {mediaValidationErrors.map((error, index) => (
+                                  <li key={index}>{error}</li>
+                                ))}
+                              </ul>
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
+                        {/* Drag and Drop Area */}
+                        <div
+                          className={`flex flex-col items-center gap-4 p-6 border-2 border-dashed rounded-lg transition-colors
+                            ${isDraggingOver ? "border-orange-500 bg-orange-50" : "border-gray-300 hover:border-orange-400"}
+                            ${validatingImages ? "opacity-50" : ""}`}
+                          onDragEnter={handleDragEnter}
+                          onDragLeave={handleDragLeave}
+                          onDragOver={handleDragOver}
+                          onDrop={handleDrop}
+                        >
+                          <div className="text-center">
+                            <div className="flex justify-center gap-4 mb-4">
+                              <ImageIconLucide className="h-12 w-12 text-gray-400" />
+                              <Video className="h-12 w-12 text-gray-400" />
+                            </div>
+                            <p className="text-lg font-medium text-gray-700 mb-2">
+                              {isDraggingOver ? "¡Suelta los archivos aquí!" : "Arrastra imágenes y videos aquí"}
+                            </p>
+                            <p className="text-sm text-gray-500 mb-4">o haz clic para seleccionar archivos</p>
+                          </div>
+
+                          <Input
+                            id="serviceMedia"
+                            type="file"
+                            accept="image/*,video/*"
+                            multiple
+                            onChange={handleMediaChange}
+                            className="block w-full max-w-xs text-sm text-slate-500
+                              file:mr-4 file:py-2 file:px-4
+                              file:rounded-md file:border-0
+                              file:text-sm file:font-semibold
+                              file:bg-orange-100 file:text-orange-700
+                              hover:file:bg-orange-200
+                              cursor-pointer"
+                            disabled={validatingImages}
+                          />
+
+                          {validatingImages && (
+                            <div className="flex items-center gap-2 text-orange-600">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span className="text-sm">Validando archivos...</span>
+                            </div>
+                          )}
+                          {/* Error de media */}
+                          {serviceFormTouched && serviceFormErrors.media && (
+                            <p className="text-xs text-red-600 mt-1">{serviceFormErrors.media}</p>
+                          )}
+                        </div>
+
+                        {/* Current Media Preview */}
+                        {currentProductMedia.length > 0 && (
+                          <div>
+                            <Label className="text-sm font-medium text-gray-700 mb-2 block">Media actual:</Label>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                              {currentProductMedia.map((media, index) => (
+                                <div key={index} className="relative group">
+                                  <div className="aspect-square relative bg-gray-100 rounded-lg overflow-hidden">
+                                    {media.type === "image" ? (
+                                      <Image
+                                        src={media.url || "/placeholder.svg"}
+                                        alt={`Media ${index + 1}`}
+                                        layout="fill"
+                                        objectFit="cover"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                                        <div className="text-center">
+                                          <Video className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+                                          <span className="text-xs text-gray-600">Video</span>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="icon"
+                                    className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={() => handleRemoveCurrentMedia(index)}
+                                  >
+                                    <XCircle className="h-4 w-4" />
+                                  </Button>
+                                  <Badge variant="secondary" className="absolute bottom-2 left-2 text-xs">
+                                    {media.type}
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* New Media Preview */}
+                        {mediaPreviewUrls.length > 0 && (
+                          <div>
+                            <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                              Nuevos archivos seleccionados:
+                      </Label>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                              {mediaPreviewUrls.map((url, index) => (
+                                <div key={index} className="relative group">
+                                  <div className="aspect-square relative bg-gray-100 rounded-lg overflow-hidden">
+                                    {mediaFiles[index].type.startsWith("image/") ? (
+                                      <Image
+                                        src={url || "/placeholder.svg"}
+                                        alt={`Preview ${index + 1}`}
+                                        layout="fill"
+                                        objectFit="cover"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                                        <div className="text-center">
+                                          <Video className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+                                          <span className="text-xs text-gray-600">Video</span>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="icon"
+                                    className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={() => handleRemoveMedia(index)}
+                                  >
+                                    <XCircle className="h-4 w-4" />
+                                  </Button>
+                                  <Badge variant="secondary" className="absolute bottom-2 left-2 text-xs">
+                                    {mediaFiles[index].type.startsWith("image/") ? "imagen" : "video"}
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {uploadingMedia && (
+                          <div className="flex items-center gap-2 text-orange-600">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Subiendo archivos...</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="serviceName" className="text-base">Nombre del Servicio</Label>
                       <Input
                         id="serviceName"
                         value={productName}
                         onChange={(e) => setProductName(e.target.value)}
                         required
+                        className={serviceFormTouched && serviceFormErrors.name ? 'border-red-500' : ''}
                       />
+                      {serviceFormTouched && serviceFormErrors.name && (
+                        <p className="text-xs text-red-600 mt-1">{serviceFormErrors.name}</p>
+                      )}
                     </div>
                     <div>
-                      <Label htmlFor="serviceDescription" className="text-base">
-                        Descripción
-                      </Label>
+                      <Label htmlFor="serviceDescription" className="text-base">Descripción</Label>
                     <Textarea
                       id="serviceDescription"
                       value={productDescription}
                       onChange={(e) => setProductDescription(e.target.value)}
                       rows={4}
-                      className="resize-y"
+                        className={serviceFormTouched && serviceFormErrors.description ? 'border-red-500' : ''}
                       required
                     />
+                      {serviceFormTouched && serviceFormErrors.description && (
+                        <p className="text-xs text-red-600 mt-1">{serviceFormErrors.description}</p>
+                      )}
                   </div>
                   <div>
-                    <Label htmlFor="servicePrice" className="text-base">
-                      Precio
-                    </Label>
+                      <Label htmlFor="servicePrice" className="text-base">Precio</Label>
                     <Input
                       id="servicePrice"
                       type="number"
@@ -1898,28 +2087,31 @@ export default function SellerDashboardPage() {
                       value={productPrice}
                       onChange={(e) => setProductPrice(e.target.value)}
                       required
+                        className={serviceFormTouched && serviceFormErrors.price ? 'border-red-500' : ''}
                     />
+                      {serviceFormTouched && serviceFormErrors.price && (
+                        <p className="text-xs text-red-600 mt-1">{serviceFormErrors.price}</p>
+                      )}
                   </div>
                   <div>
-                    <Label htmlFor="serviceCategory" className="text-base">
-                      Categoría
-                    </Label>
+                      <Label htmlFor="serviceCategory" className="text-base">Categoría</Label>
                     <Select
                       value={productCategory}
                       onValueChange={setProductCategory}
                       required
                     >
-                      <SelectTrigger>
+                        <SelectTrigger className={serviceFormTouched && serviceFormErrors.category ? 'border-red-500' : ''}>
                         <SelectValue placeholder="Selecciona una categoría" />
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
+                            <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                      {serviceFormTouched && serviceFormErrors.category && (
+                        <p className="text-xs text-red-600 mt-1">{serviceFormErrors.category}</p>
+                      )}
                   </div>
                   <div>
                     <Label htmlFor="serviceBrand" className="text-base">
@@ -2130,92 +2322,92 @@ export default function SellerDashboardPage() {
                       </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                      <Label className="text-base">Productos</Label>
-                      {myProducts.length === 0 ? (
-                        <p className="text-gray-500">No tienes productos para asociar.</p>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-60 overflow-y-auto pr-2">
-                          {myProducts.map((product) => (
-                            <div key={product.id} className="flex items-center space-x-2 border p-3 rounded-md">
-                              <Checkbox
-                                id={`product-${product.id}`}
-                                checked={selectedProductIds.includes(product.id)}
-                                onCheckedChange={(checked) =>
-                                  handleProductSelection(product.id, checked === true)}
-                              />
-                              <label
-                                htmlFor={`product-${product.id}`}
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                              >
-                                {product.name} - ${product.price.toFixed(2)}
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                        <Label className="text-base">Productos</Label>
+                        {myProducts.length === 0 ? (
+                          <p className="text-gray-500">No tienes productos para asociar.</p>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-60 overflow-y-auto pr-2">
+                            {myProducts.map((product) => (
+                              <div key={product.id} className="flex items-center space-x-2 border p-3 rounded-md">
+                                <Checkbox
+                                  id={`product-${product.id}`}
+                                  checked={selectedProductIds.includes(product.id)}
+                                  onCheckedChange={(checked) =>
+                                    handleProductSelection(product.id, checked === true)}
+                                />
+                                <label
+                                  htmlFor={`product-${product.id}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {product.name} - ${product.price.toFixed(2)}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="startDate">Fecha de Inicio</Label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant={"outline"}
-                              className={`w-full justify-start text-left font-normal ${!couponApplyStartDate && "text-muted-foreground"}
-                              `}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {couponApplyStartDate ? format(couponApplyStartDate, "PPP") : <span className="text-gray-500">Selecciona una fecha</span>}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={couponApplyStartDate}
-                              onSelect={setCouponApplyStartDate}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="startDate">Fecha de Inicio</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant={"outline"}
+                                className={`w-full justify-start text-left font-normal ${!couponApplyStartDate && "text-muted-foreground"}
+                                `}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {couponApplyStartDate ? format(couponApplyStartDate, "PPP") : <span className="text-gray-500">Selecciona una fecha</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar
+                                mode="single"
+                                selected={couponApplyStartDate}
+                                onSelect={setCouponApplyStartDate}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="endDate">Fecha de Fin</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant={"outline"}
+                                className={`w-full justify-start text-left font-normal ${!couponApplyEndDate && "text-muted-foreground"}`}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {couponApplyEndDate ? format(couponApplyEndDate, "PPP") : <span className="text-gray-500">Selecciona una fecha</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar
+                                mode="single"
+                                selected={couponApplyEndDate}
+                                onSelect={setCouponApplyEndDate}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="endDate">Fecha de Fin</Label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant={"outline"}
-                              className={`w-full justify-start text-left font-normal ${!couponApplyEndDate && "text-muted-foreground"}`}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {couponApplyEndDate ? format(couponApplyEndDate, "PPP") : <span className="text-gray-500">Selecciona una fecha</span>}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={couponApplyEndDate}
-                              onSelect={setCouponApplyEndDate}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    </div>
                  
-                  <DialogFooter>
-                    <Button
-                      onClick={associateCouponToProducts}
-                      disabled={associatingCoupon || selectedProductIds.length === 0 || !couponApplyStartDate || !couponApplyEndDate}
-                    >
-                      {associatingCoupon ? "Asociando..." : "Confirmar Asociación"}
-                    </Button>
-                    <Button variant="outline" onClick={() => setIsCouponModalOpen(false)}>
-                      Cancelar
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                    <DialogFooter>
+                      <Button
+                        onClick={associateCouponToProducts}
+                        disabled={associatingCoupon || selectedProductIds.length === 0 || !couponApplyStartDate || !couponApplyEndDate}
+                      >
+                        {associatingCoupon ? "Asociando..." : "Confirmar Asociación"}
+                      </Button>
+                      <Button variant="outline" onClick={() => setIsCouponModalOpen(false)}>
+                        Cancelar
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
 
                 <h3 className="text-lg font-semibold mt-8">Mis Productos con Cupones</h3>
                 {myProducts.filter(p => p.couponId).length === 0 ? (
