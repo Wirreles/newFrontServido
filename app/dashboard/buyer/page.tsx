@@ -20,9 +20,14 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle } from "lucide-react"
-import { Menu } from "lucide-react"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { 
+  AlertCircle, 
+  Menu, 
+  Loader2, 
+  Truck, 
+  CheckCircle
+} from "lucide-react"
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Image from "next/image"
 
@@ -31,14 +36,22 @@ import { db, storage } from "@/lib/firebase"
 import { doc, collection, query, where, getDocs, deleteDoc, orderBy, updateDoc, getDoc } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"
 import { updateProfile, getAuth } from "firebase/auth" // Import updateProfile
-import { Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { ChatList } from "@/components/chat-list"
 import { Input } from "@/components/ui/input" // Import Input
+import type { 
+  PurchaseWithShipping, 
+  SHIPPING_STATUS_LABELS, 
+  SHIPPING_STATUS_COLORS,
+  SHIPPING_STATUS_ICONS,
+  ShippingStatus
+} from "@/types/shipping"
+import { getBuyerShipments } from "@/lib/shipping"
 
 
 
+// Mantenemos la interface Purchase original para compatibilidad
 interface Purchase {
   id: string
   paymentId: string
@@ -92,6 +105,7 @@ export default function BuyerDashboardPage() {
   const [activeTab, setActiveTab] = useState("dashboard")
   const [orders, setOrders] = useState<Order[]>([])
   const [purchases, setPurchases] = useState<Purchase[]>([])
+  const [purchasesWithShipping, setPurchasesWithShipping] = useState<PurchaseWithShipping[]>([])
   const [favorites, setFavorites] = useState<FavoriteProduct[]>([])
 
   const [loadingData, setLoadingData] = useState(true)
@@ -104,6 +118,14 @@ export default function BuyerDashboardPage() {
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false)
   const [profileUpdateSuccess, setProfileUpdateSuccess] = useState<string | null>(null)
   const [profileUpdateError, setProfileUpdateError] = useState<string | null>(null)
+
+  // Mobile menu state
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  // Function to close mobile menu
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false)
+  }
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -159,6 +181,7 @@ export default function BuyerDashboardPage() {
       if (purchases.length === 0) {
         setOrders([])
         setPurchases([])
+        setPurchasesWithShipping([])
         console.log("No purchases found for user:", userId)
         
         // Aún obtener favoritos
@@ -244,8 +267,19 @@ export default function BuyerDashboardPage() {
         address: "Dirección no especificada" // TODO: Agregar direcciones de envío
       }))
 
-             setOrders(ordersFromPurchases)
-       setPurchases(enrichedPurchases)
+      setOrders(ordersFromPurchases)
+      setPurchases(enrichedPurchases)
+
+      // Obtener compras con información de envío usando la función de shipping
+      try {
+        const purchasesWithShippingData = await getBuyerShipments(userId)
+        setPurchasesWithShipping(purchasesWithShippingData)
+        console.log("Purchases with shipping found:", purchasesWithShippingData.length)
+      } catch (error) {
+        console.error("Error fetching purchases with shipping:", error)
+        // Si falla, usar las compras normales como fallback
+        setPurchasesWithShipping([])
+      }
 
       // Fetch real favorites from Firestore
       const favoritesQuery = query(
@@ -324,6 +358,60 @@ export default function BuyerDashboardPage() {
         return "Cancelado"
       default:
         return status
+    }
+  }
+
+  // Función para obtener el icono de estado de envío
+  const getShippingIcon = (status: ShippingStatus) => {
+    switch (status) {
+      case "pending":
+        return <Clock className="h-4 w-4" />
+      case "preparing":
+        return <Package className="h-4 w-4" />
+      case "shipped":
+        return <Truck className="h-4 w-4" />
+      case "delivered":
+        return <CheckCircle className="h-4 w-4" />
+      case "cancelled":
+        return <XCircle className="h-4 w-4" />
+      default:
+        return <Clock className="h-4 w-4" />
+    }
+  }
+
+  // Función para obtener el color del badge de envío
+  const getShippingBadgeClass = (status: ShippingStatus) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800"
+      case "preparing":
+        return "bg-blue-100 text-blue-800"
+      case "shipped":
+        return "bg-purple-100 text-purple-800"
+      case "delivered":
+        return "bg-green-100 text-green-800"
+      case "cancelled":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  // Función para obtener el texto del estado de envío
+  const getShippingStatusText = (status: ShippingStatus) => {
+    switch (status) {
+      case "pending":
+        return "Pendiente"
+      case "preparing":
+        return "En preparación"
+      case "shipped":
+        return "Enviado"
+      case "delivered":
+        return "Entregado"
+      case "cancelled":
+        return "Cancelado"
+      default:
+        return "Desconocido"
     }
   }
 
@@ -510,7 +598,7 @@ export default function BuyerDashboardPage() {
       <div className="flex flex-col">
         {/* Header for mobile sidebar */}
         <header className="flex h-14 lg:h-[60px] items-center gap-4 border-b bg-white px-6 lg:hidden">
-          <Sheet>
+          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" className="lg:hidden">
                 <Menu className="h-6 w-6" />
@@ -518,6 +606,7 @@ export default function BuyerDashboardPage() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="lg:hidden w-72">
+              <SheetTitle className="sr-only">Menú de navegación del panel comprador</SheetTitle>
               <div className="flex h-[60px] items-center border-b px-6">
                 <Link href="/" className="flex items-center gap-2 font-semibold text-blue-600">
                   <User className="h-6 w-6" />
@@ -527,7 +616,10 @@ export default function BuyerDashboardPage() {
               <nav className="grid gap-2 p-4 text-base font-medium">
                 <Button
                   variant={activeTab === "dashboard" ? "secondary" : "ghost"}
-                  onClick={() => setActiveTab("dashboard")}
+                  onClick={() => {
+                    setActiveTab("dashboard")
+                    closeMobileMenu()
+                  }}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-blue-600 justify-start"
                 >
                   <Home className="mr-2 h-5 w-5" />
@@ -535,7 +627,10 @@ export default function BuyerDashboardPage() {
                 </Button>
                 <Button
                   variant={activeTab === "orders" ? "secondary" : "ghost"}
-                  onClick={() => setActiveTab("orders")}
+                  onClick={() => {
+                    setActiveTab("orders")
+                    closeMobileMenu()
+                  }}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-blue-600 justify-start"
                 >
                   <ShoppingBag className="mr-2 h-5 w-5" />
@@ -543,7 +638,10 @@ export default function BuyerDashboardPage() {
                 </Button>
                 <Button
                   variant={activeTab === "purchases" ? "secondary" : "ghost"}
-                  onClick={() => setActiveTab("purchases")}
+                  onClick={() => {
+                    setActiveTab("purchases")
+                    closeMobileMenu()
+                  }}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-blue-600 justify-start"
                 >
                   <CreditCard className="mr-2 h-5 w-5" />
@@ -551,7 +649,10 @@ export default function BuyerDashboardPage() {
                 </Button>
                 <Button
                   variant={activeTab === "favorites" ? "secondary" : "ghost"}
-                  onClick={() => setActiveTab("favorites")}
+                  onClick={() => {
+                    setActiveTab("favorites")
+                    closeMobileMenu()
+                  }}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-blue-600 justify-start"
                 >
                   <Heart className="mr-2 h-5 w-5" />
@@ -559,7 +660,10 @@ export default function BuyerDashboardPage() {
                 </Button>
                 <Button
                   variant={activeTab === "chats" ? "secondary" : "ghost"}
-                  onClick={() => setActiveTab("chats")}
+                  onClick={() => {
+                    setActiveTab("chats")
+                    closeMobileMenu()
+                  }}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-blue-600 justify-start"
                 >
                   <MessageSquare className="mr-2 h-5 w-5" />
@@ -567,7 +671,10 @@ export default function BuyerDashboardPage() {
                 </Button>
                 <Button
                   variant={activeTab === "profile" ? "secondary" : "ghost"}
-                  onClick={() => setActiveTab("profile")}
+                  onClick={() => {
+                    setActiveTab("profile")
+                    closeMobileMenu()
+                  }}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-blue-600 justify-start"
                 >
                   <Settings className="mr-2 h-5 w-5" />
@@ -575,7 +682,14 @@ export default function BuyerDashboardPage() {
                 </Button>
               </nav>
               <div className="mt-auto p-4">
-                <Button variant="outline" className="w-full" onClick={handleLogout}>
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={() => {
+                    handleLogout()
+                    closeMobileMenu()
+                  }}
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   Cerrar Sesión
                 </Button>
@@ -741,7 +855,7 @@ export default function BuyerDashboardPage() {
                   <div className="flex justify-center items-center py-10">
                     <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
                   </div>
-                ) : orders.length === 0 ? (
+                ) : purchases.length === 0 ? (
                   <div className="text-center py-10">
                     <p className="text-lg text-muted-foreground mb-6">Aún no has realizado compras.</p>
                     <Button asChild>
@@ -750,65 +864,152 @@ export default function BuyerDashboardPage() {
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {orders.map((order) => (
-                      <Card key={order.id} className="overflow-hidden">
-                        <CardHeader className="bg-gray-50 py-3">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                              <p className="text-sm font-medium">
-                                Pedido #{order.id} -{" "}
-                                <span className="text-muted-foreground">{order.createdAt.toLocaleDateString()}</span>
-                              </p>
+                    {purchases.map((purchase) => {
+                      // Buscar información de envío correspondiente
+                      const shippingInfo = purchasesWithShipping.find(p => p.id === purchase.id)?.shipping
+                      
+                      return (
+                        <Card key={purchase.id} className="overflow-hidden">
+                          <CardHeader className="bg-gray-50 py-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <p className="text-sm font-medium">
+                                  Compra #{purchase.paymentId} -{" "}
+                                  <span className="text-muted-foreground">
+                                    {purchase.createdAt?.toDate ? 
+                                      purchase.createdAt.toDate().toLocaleDateString() : 
+                                      new Date(purchase.createdAt).toLocaleDateString()
+                                    }
+                                  </span>
+                                </p>
+                              </div>
+                              <div className="mt-2 sm:mt-0 flex gap-2">
+                                {/* Badge de estado de pago */}
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    purchase.status === "approved" 
+                                      ? "bg-green-100 text-green-800" 
+                                      : purchase.status === "pending"
+                                      ? "bg-yellow-100 text-yellow-800"
+                                      : purchase.status === "rejected"
+                                      ? "bg-red-100 text-red-800"
+                                      : "bg-gray-100 text-gray-800"
+                                  }`}
+                                >
+                                  {purchase.status === "approved" ? "Pagado" :
+                                   purchase.status === "pending" ? "Pendiente" :
+                                   purchase.status === "rejected" ? "Rechazado" :
+                                   purchase.status === "cancelled" ? "Cancelado" : purchase.status}
+                                </span>
+                                
+                                {/* Badge de estado de envío (solo para productos físicos aprobados) */}
+                                {purchase.status === "approved" && !purchase.productIsService && (
+                                  <span
+                                    className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
+                                      shippingInfo ? getShippingBadgeClass(shippingInfo.status) : "bg-gray-100 text-gray-800"
+                                    }`}
+                                  >
+                                    {shippingInfo ? getShippingIcon(shippingInfo.status) : <Clock className="h-4 w-4" />}
+                                    {shippingInfo ? getShippingStatusText(shippingInfo.status) : "Sin envío"}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <div className="mt-2 sm:mt-0">
-                              <span
-                                className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(
-                                  order.status,
-                                )}`}
-                              >
-                                {getStatusText(order.status)}
-                              </span>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="p-4">
-                          <div className="space-y-4">
-                            {order.products.map((product) => (
-                              <div key={product.id} className="flex items-center space-x-4">
+                          </CardHeader>
+                          <CardContent className="p-4">
+                            <div className="space-y-4">
+                              {/* Información del producto */}
+                              <div className="flex items-center space-x-4">
                                 <div className="h-12 w-12 relative flex-shrink-0">
                                   <Image
-                                    src={product.imageUrl || "/placeholder.svg"}
-                                    alt={product.name}
+                                    src={purchase.productImageUrl || "/placeholder.svg"}
+                                    alt={purchase.productName || "Producto"}
                                     layout="fill"
                                     objectFit="cover"
                                     className="rounded-md"
                                   />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">{product.name}</p>
+                                  <p className="text-sm font-medium truncate">
+                                    {purchase.productName || "Producto desconocido"}
+                                  </p>
                                   <p className="text-xs text-muted-foreground">
-                                    Cantidad: {product.quantity} x ${product.price.toFixed(2)}
+                                    {purchase.productIsService ? "Servicio" : "Producto"} - 
+                                    Vendedor: {purchase.vendorName || "Desconocido"}
                                   </p>
                                 </div>
                                 <div className="text-sm font-medium">
-                                  ${(product.price * product.quantity).toFixed(2)}
+                                  ${purchase.amount.toFixed(2)}
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                          <div className="mt-4 pt-4 border-t flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex items-center space-x-2 text-sm">
-                              <MapPin className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-muted-foreground">{order.address}</span>
+                              
+                              {/* Información de envío detallada (solo para productos físicos) */}
+                              {purchase.status === "approved" && !purchase.productIsService && shippingInfo && (
+                                <div className="mt-4 pt-4 border-t bg-gray-50 p-3 rounded-lg">
+                                  <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                                    <Truck className="h-4 w-4" />
+                                    Información de Envío
+                                  </h4>
+                                  <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                      <span className="text-muted-foreground">Estado:</span>
+                                      <span className="font-medium">{getShippingStatusText(shippingInfo.status)}</span>
+                                    </div>
+                                    
+                                    {shippingInfo.trackingNumber && (
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Número de seguimiento:</span>
+                                        <span className="font-mono text-xs">{shippingInfo.trackingNumber}</span>
+                                      </div>
+                                    )}
+                                    
+                                    {shippingInfo.carrierName && (
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Transportista:</span>
+                                        <span>{shippingInfo.carrierName}</span>
+                                      </div>
+                                    )}
+                                    
+                                    {shippingInfo.estimatedDelivery && (
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Entrega estimada:</span>
+                                        <span>{new Date(shippingInfo.estimatedDelivery).toLocaleDateString()}</span>
+                                      </div>
+                                    )}
+                                    
+                                    {shippingInfo.actualDelivery && (
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Entregado el:</span>
+                                        <span className="text-green-600 font-medium">
+                                          {new Date(shippingInfo.actualDelivery).toLocaleDateString()}
+                                        </span>
+                                      </div>
+                                    )}
+                                    
+                                    {shippingInfo.notes && (
+                                      <div className="mt-2 pt-2 border-t">
+                                        <span className="text-muted-foreground">Notas:</span>
+                                        <p className="text-sm mt-1">{shippingInfo.notes}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Mensaje para servicios */}
+                              {purchase.productIsService && (
+                                <div className="mt-4 pt-4 border-t bg-blue-50 p-3 rounded-lg">
+                                  <p className="text-sm text-blue-700 flex items-center gap-2">
+                                    <CheckCircle className="h-4 w-4" />
+                                    Este es un servicio. No requiere envío físico.
+                                  </p>
+                                </div>
+                              )}
                             </div>
-                            <div className="mt-2 sm:mt-0 text-right">
-                              <p className="text-xs text-muted-foreground">Total</p>
-                              <p className="text-base font-medium">${order.total.toFixed(2)}</p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
                   </div>
                 )}
               </CardContent>

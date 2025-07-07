@@ -21,6 +21,9 @@ import {
   Tag,
   LineChart,
   User,
+  Clock,
+  Package,
+  Truck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,7 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 import { Menu } from "lucide-react"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import Image from "next/image"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -68,6 +71,15 @@ import { hasWhiteBackground, isValidVideoFile, getVideoDuration } from "@/lib/im
 import { ConnectMercadoPagoButton } from "@/components/ui/connect-mercadopago-button"
 import { useToast } from "@/components/ui/use-toast"
 import { ApiService } from "@/lib/services/api"
+import type { 
+  PurchaseWithShipping, 
+  ShippingStatus, 
+  ShippingUpdateRequest,
+  SHIPPING_STATUS_LABELS, 
+  SHIPPING_STATUS_COLORS 
+} from "@/types/shipping"
+import { getSellerShipments, updateShippingStatus, initializeShipping } from "@/lib/shipping"
+// Los iconos ya están importados arriba
 
 interface UserProfile {
   uid: string
@@ -198,6 +210,20 @@ export default function SellerDashboardPage() {
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
+  // Shipping management state
+  const [shipments, setShipments] = useState<PurchaseWithShipping[]>([])
+  const [loadingShipments, setLoadingShipments] = useState(false)
+  const [shippingFilter, setShippingFilter] = useState<ShippingStatus | "all">("all")
+  const [updatingShipment, setUpdatingShipment] = useState<string | null>(null)
+  
+  // Shipping update modal state
+  const [isShippingModalOpen, setIsShippingModalOpen] = useState(false)
+  const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(null)
+  const [selectedNewStatus, setSelectedNewStatus] = useState<ShippingStatus | null>(null)
+  const [trackingNumber, setTrackingNumber] = useState("")
+  const [carrierName, setCarrierName] = useState("")
+  const [shippingNotes, setShippingNotes] = useState("")
+
   // 1. Añadir estado para la pestaña activa de añadir: producto o servicio
   const [activeAddTab, setActiveAddTab] = useState<'product' | 'service'>('product')
 
@@ -217,6 +243,223 @@ export default function SellerDashboardPage() {
   const [serviceFormErrors, setServiceFormErrors] = useState<{[key:string]:string}>({})
   const [productFormTouched, setProductFormTouched] = useState(false)
   const [serviceFormTouched, setServiceFormTouched] = useState(false)
+
+  // Mobile menu state
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  // Function to close mobile menu
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false)
+  }
+
+  // Shipping management functions
+  const fetchShipments = async () => {
+    if (!currentUser) return
+    
+    setLoadingShipments(true)
+    try {
+      const shipmentsData = await getSellerShipments(currentUser.firebaseUser.uid)
+      setShipments(shipmentsData)
+      
+      // Inicializar envíos para compras aprobadas que no tengan información de envío
+      const shipmentsToInitialize = shipmentsData.filter(
+        shipment => shipment.status === "approved" && 
+                   !shipment.productIsService && 
+                   !shipment.shipping
+      )
+      
+      if (shipmentsToInitialize.length > 0) {
+        console.log(`Inicializando ${shipmentsToInitialize.length} envíos...`)
+        for (const shipment of shipmentsToInitialize) {
+          try {
+            await initializeShipping(shipment.id, currentUser.firebaseUser.uid)
+          } catch (error) {
+            console.error(`Error inicializando envío ${shipment.id}:`, error)
+          }
+        }
+        // Recargar datos después de inicializar
+        const updatedShipments = await getSellerShipments(currentUser.firebaseUser.uid)
+        setShipments(updatedShipments)
+      }
+    } catch (error) {
+      console.error("Error fetching shipments:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los envíos",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingShipments(false)
+    }
+  }
+
+  const handleUpdateShippingStatus = async (
+    purchaseId: string, 
+    newStatus: ShippingStatus,
+    trackingNumber?: string,
+    carrierName?: string,
+    notes?: string
+  ) => {
+    if (!currentUser) return
+
+    setUpdatingShipment(purchaseId)
+    try {
+      const result = await updateShippingStatus(
+        purchaseId,
+        {
+          status: newStatus,
+          trackingNumber,
+          carrierName,
+          notes
+        },
+        currentUser.firebaseUser.uid
+      )
+
+      if (result.success) {
+        // Mensaje de éxito personalizado según el estado
+        const statusMessages = {
+          pending: "Estado cambiado a pendiente",
+          preparing: "Producto en preparación",
+          shipped: "Producto enviado",
+          delivered: "Producto entregado",
+          cancelled: "Envío cancelado"
+        }
+        
+        toast({
+          title: "Envío actualizado",
+          description: statusMessages[newStatus] || "Estado de envío actualizado correctamente",
+        })
+        
+        // Mostrar información adicional si se agregó tracking
+        if (trackingNumber && newStatus === "shipped") {
+          toast({
+            title: "Número de seguimiento",
+            description: `Tracking: ${trackingNumber}${carrierName ? ` - ${carrierName}` : ''}`,
+          })
+        }
+        
+        await fetchShipments() // Recargar datos
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "No se pudo actualizar el estado de envío",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error updating shipping status:", error)
+      toast({
+        title: "Error",
+        description: "Error al actualizar el estado de envío",
+        variant: "destructive",
+      })
+    } finally {
+      setUpdatingShipment(null)
+    }
+  }
+
+  const getShippingIcon = (status: ShippingStatus) => {
+    switch (status) {
+      case "pending":
+        return <Clock className="h-4 w-4" />
+      case "preparing":
+        return <Package className="h-4 w-4" />
+      case "shipped":
+        return <Truck className="h-4 w-4" />
+      case "delivered":
+        return <CheckCircle className="h-4 w-4" />
+      case "cancelled":
+        return <XCircle className="h-4 w-4" />
+      default:
+        return <Clock className="h-4 w-4" />
+    }
+  }
+
+  const getShippingBadgeClass = (status: ShippingStatus) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800"
+      case "preparing":
+        return "bg-blue-100 text-blue-800"
+      case "shipped":
+        return "bg-purple-100 text-purple-800"
+      case "delivered":
+        return "bg-green-100 text-green-800"
+      case "cancelled":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getShippingStatusText = (status: ShippingStatus) => {
+    switch (status) {
+      case "pending":
+        return "Pendiente"
+      case "preparing":
+        return "En preparación"
+      case "shipped":
+        return "Enviado"
+      case "delivered":
+        return "Entregado"
+      case "cancelled":
+        return "Cancelado"
+      default:
+        return "Desconocido"
+    }
+  }
+
+  const getFilteredShipments = () => {
+    if (shippingFilter === "all") {
+      return shipments
+    }
+    return shipments.filter(shipment => shipment.shipping?.status === shippingFilter)
+  }
+
+  // Abrir modal de actualización de envío
+  const openShippingUpdateModal = (shipmentId: string, newStatus: ShippingStatus) => {
+    const shipment = shipments.find(s => s.id === shipmentId)
+    setSelectedShipmentId(shipmentId)
+    setSelectedNewStatus(newStatus)
+    
+    // Pre-llenar con datos existentes si los hay
+    if (shipment?.shipping) {
+      setTrackingNumber(shipment.shipping.trackingNumber || "")
+      setCarrierName(shipment.shipping.carrierName || "")
+      setShippingNotes(shipment.shipping.notes || "")
+    } else {
+      setTrackingNumber("")
+      setCarrierName("")
+      setShippingNotes("")
+    }
+    
+    setIsShippingModalOpen(true)
+  }
+
+  // Cerrar modal y limpiar estado
+  const closeShippingUpdateModal = () => {
+    setIsShippingModalOpen(false)
+    setSelectedShipmentId(null)
+    setSelectedNewStatus(null)
+    setTrackingNumber("")
+    setCarrierName("")
+    setShippingNotes("")
+  }
+
+  // Confirmar actualización de envío con datos del modal
+  const confirmShippingUpdate = async () => {
+    if (!selectedShipmentId || !selectedNewStatus) return
+
+    await handleUpdateShippingStatus(
+      selectedShipmentId,
+      selectedNewStatus,
+      trackingNumber || undefined,
+      carrierName || undefined,
+      shippingNotes || undefined
+    )
+
+    closeShippingUpdateModal()
+  }
 
   useEffect(() => {
     if (currentUser) {
@@ -315,6 +558,13 @@ export default function SellerDashboardPage() {
       });
     }
   }, [refreshUserProfile]);
+
+  // Fetch shipments when shipping tab is active
+  useEffect(() => {
+    if (activeTab === "shipping" && currentUser) {
+      fetchShipments()
+    }
+  }, [activeTab, currentUser])
 
   const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -1174,6 +1424,16 @@ export default function SellerDashboardPage() {
     0,
   )
 
+  // Estadísticas de envíos
+  const shippingStats = {
+    total: shipments.length,
+    pending: shipments.filter(s => s.shipping?.status === "pending").length,
+    preparing: shipments.filter(s => s.shipping?.status === "preparing").length,
+    shipped: shipments.filter(s => s.shipping?.status === "shipped").length,
+    delivered: shipments.filter(s => s.shipping?.status === "delivered").length,
+    cancelled: shipments.filter(s => s.shipping?.status === "cancelled").length,
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -1238,6 +1498,14 @@ export default function SellerDashboardPage() {
                 Añadir Servicio
               </Button>
               <Button
+                variant={activeTab === "shipping" ? "secondary" : "ghost"}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
+                onClick={() => setActiveTab("shipping")}
+              >
+                <Truck className="h-4 w-4" />
+                Gestión de Envíos
+              </Button>
+              <Button
                 variant={activeTab === "chats" ? "secondary" : "ghost"}
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
                 onClick={() => setActiveTab("chats")}
@@ -1267,7 +1535,7 @@ export default function SellerDashboardPage() {
                 onClick={() => setActiveTab("profile")}
               >
                 <User className="h-4 w-4" />
-                Mi Perfil
+                Configuración
               </Button>
             </nav>
           </div>
@@ -1284,7 +1552,7 @@ export default function SellerDashboardPage() {
       <div className="flex flex-col">
         {/* Header for mobile sidebar - keeping existing code */}
         <header className="flex h-14 lg:h-[60px] items-center gap-4 border-b bg-white px-6 lg:hidden">
-          <Sheet>
+          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" className="lg:hidden">
                 <Menu className="h-6 w-6" />
@@ -1292,6 +1560,7 @@ export default function SellerDashboardPage() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="lg:hidden w-72">
+              <SheetTitle className="sr-only">Menú de navegación del panel vendedor</SheetTitle>
               {/* Mobile navigation - keeping existing code */}
               <div className="flex h-[60px] items-center border-b px-6">
                 <Link href="/" className="flex items-center gap-2 font-semibold text-orange-600">
@@ -1302,7 +1571,10 @@ export default function SellerDashboardPage() {
               <nav className="grid gap-2 p-4 text-base font-medium">
                 <Button
                   variant={activeTab === "dashboard" ? "secondary" : "ghost"}
-                  onClick={() => setActiveTab("dashboard")}
+                  onClick={() => {
+                    setActiveTab("dashboard")
+                    closeMobileMenu()
+                  }}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
                 >
                   <Home className="mr-2 h-5 w-5" />
@@ -1313,6 +1585,7 @@ export default function SellerDashboardPage() {
                   onClick={() => {
                     resetForm()
                     setActiveTab("products")
+                    closeMobileMenu()
                   }}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
                 >
@@ -1324,6 +1597,7 @@ export default function SellerDashboardPage() {
                   onClick={() => {
                     resetForm()
                     setActiveTab("addProduct")
+                    closeMobileMenu()
                   }}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
                 >
@@ -1336,6 +1610,7 @@ export default function SellerDashboardPage() {
                     resetForm()
                     setActiveTab("addService")
                     setActiveAddTab("service")
+                    closeMobileMenu()
                   }}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
                 >
@@ -1343,8 +1618,22 @@ export default function SellerDashboardPage() {
                   Añadir Servicio
                 </Button>
                 <Button
+                  variant={activeTab === "shipping" ? "secondary" : "ghost"}
+                  onClick={() => {
+                    setActiveTab("shipping")
+                    closeMobileMenu()
+                  }}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
+                >
+                  <Truck className="mr-2 h-5 w-5" />
+                  Gestión de Envíos
+                </Button>
+                <Button
                   variant={activeTab === "chats" ? "secondary" : "ghost"}
-                  onClick={() => setActiveTab("chats")}
+                  onClick={() => {
+                    setActiveTab("chats")
+                    closeMobileMenu()
+                  }}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
                 >
                   <MessageSquare className="mr-2 h-5 w-5" />
@@ -1352,7 +1641,10 @@ export default function SellerDashboardPage() {
                 </Button>
                 <Button
                   variant={activeTab === "stats" ? "secondary" : "ghost"}
-                  onClick={() => setActiveTab("stats")}
+                  onClick={() => {
+                    setActiveTab("stats")
+                    closeMobileMenu()
+                  }}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
                 >
                   <BarChart3 className="mr-2 h-5 w-5" />
@@ -1360,15 +1652,25 @@ export default function SellerDashboardPage() {
                 </Button>
                 <Button
                   variant={activeTab === "profile" ? "secondary" : "ghost"}
-                  onClick={() => setActiveTab("profile")}
+                  onClick={() => {
+                    setActiveTab("profile")
+                    closeMobileMenu()
+                  }}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
                 >
                   <UserIcon className="mr-2 h-5 w-5" />
-                  Mi Perfil
+                  Configuración
                 </Button>
               </nav>
               <div className="mt-auto p-4">
-                <Button variant="outline" className="w-full" onClick={handleLogout}>
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={() => {
+                    handleLogout()
+                    closeMobileMenu()
+                  }}
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   Cerrar Sesión
                 </Button>
@@ -1397,43 +1699,7 @@ export default function SellerDashboardPage() {
             </Alert>
           )}
 
-          {/* Sección de MercadoPago */}
-          {activeTab !== "addService" && (
-          <Card className="p-6 mb-8">
-            <h2 className="text-2xl font-semibold mb-4">Cuenta de MercadoPago</h2>
-            {currentUser?.mercadopagoConnected ? (
-                <div className="flex flex-col gap-2">
-                  <div className="bg-green-100 text-green-800 p-3 rounded flex items-center gap-2">
-                    <span className="font-semibold">✅ Cuenta conectada correctamente.</span>
-                    <span className="text-xs">Ya puedes recibir pagos y vender productos.</span>
-                  </div>
-                  <Button
-                    variant="destructive"
-                    disabled={isDisconnecting}
-                    onClick={() => {
-                      if (window.confirm('¿Seguro que quieres desconectar tu cuenta de MercadoPago? No podrás vender productos hasta volver a conectar tu cuenta.')) {
-                        handleDisconnect();
-                      }
-                    }}
-                    className="w-full mt-2"
-                  >
-                    {isDisconnecting ? 'Desconectando...' : 'Desconectar cuenta de MercadoPago'}
-                  </Button>
-                  <div className="text-xs text-orange-700 mt-1">
-                    <AlertTriangle className="inline w-4 h-4 mr-1 align-text-bottom" />
-                    Si desconectas tu cuenta, no podrás vender productos ni recibir pagos hasta volver a conectar.
-                  </div>
-              </div>
-            ) : (
-                <div className="flex flex-col gap-2">
-                  <div className="bg-yellow-100 text-yellow-800 p-3 rounded flex items-center gap-2">
-                    <span className="font-semibold">⚠️ Debes conectar tu cuenta de MercadoPago para vender productos y recibir pagos.</span>
-                  </div>
-                <ConnectMercadoPagoButton />
-              </div>
-            )}
-          </Card>
-          )}
+
 
           {/* Dashboard Tab - keeping existing code */}
           {activeTab === "dashboard" && (
@@ -1460,6 +1726,29 @@ export default function SellerDashboardPage() {
                   <CardContent>
                     <div className="text-2xl font-bold">${totalProductsValue.toFixed(2)}</div>
                     <p className="text-xs text-muted-foreground">Estimación basada en stock y precio actual.</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium">Gestión de Envíos</CardTitle>
+                    <Truck className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{shippingStats.total}</div>
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <div className="flex justify-between">
+                        <span>Pendientes:</span>
+                        <span className="font-medium">{shippingStats.pending}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Enviados:</span>
+                        <span className="font-medium">{shippingStats.shipped}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Entregados:</span>
+                        <span className="font-medium text-green-600">{shippingStats.delivered}</span>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </CardContent>
@@ -1584,15 +1873,31 @@ export default function SellerDashboardPage() {
                 <CardDescription>Completa los detalles para agregar un ítem.</CardDescription>
               </CardHeader>
               <CardContent>
-                {!currentUser?.mercadopagoConnected && (
-                  <Alert variant="default" className="mb-4">
-                    <AlertTriangle className="h-5 w-5" />
-                    <AlertTitle>Conexión requerida</AlertTitle>
-                    <AlertDescription>
-                        Debes conectar tu cuenta de MercadoPago para poder crear y publicar productos en la plataforma.
-                      </AlertDescription>
-                    <ConnectMercadoPagoButton />
-                  </Alert>
+                {/* Notificación de MercadoPago */}
+                {!currentUser?.mercadopagoConnected ? (
+                  <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                      <span className="text-sm text-yellow-800">
+                        Conecta MercadoPago para habilitar la publicación
+                      </span>
+                    </div>
+                    <Button
+                      onClick={() => setActiveTab("profile")}
+                      variant="outline"
+                      size="sm"
+                      className="text-yellow-700 border-yellow-300 hover:bg-yellow-100"
+                    >
+                      Ir a Configuración
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="bg-green-50 border border-green-200 p-3 rounded-lg mb-4 flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-sm text-green-800">
+                      MercadoPago conectado - Formulario habilitado
+                    </span>
+                  </div>
                 )}
                 {/* Resumen de errores */}
                 {productFormTouched && Object.keys(productFormErrors).length > 0 && (
@@ -1839,22 +2144,31 @@ export default function SellerDashboardPage() {
                 <CardDescription>Completa los detalles para agregar un servicio.</CardDescription>
               </CardHeader>
               <CardContent>
-                {currentUser && currentUser.role === 'seller' && !currentUser.isSubscribed && (
-                  <div className="mb-6">
-                    <Alert className="bg-yellow-50 border-yellow-200 mb-4">
+                {/* Notificación de suscripción */}
+                {currentUser && !currentUser.isSubscribed && (
+                  <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                      <AlertTitle className="text-yellow-800">Suscripción requerida</AlertTitle>
-                      <AlertDescription className="text-yellow-700">
-                        Debes suscribirte para poder crear y publicar servicios en la plataforma.
-                      </AlertDescription>
-                    </Alert>
+                      <span className="text-sm text-yellow-800">
+                        Suscripción requerida para crear servicios
+                      </span>
+                    </div>
                     <Button
-                      onClick={handleSubscribe}
-                      disabled={!currentUser || authLoading || subscribing}
-                      className="bg-purple-700 text-white px-4 py-2 rounded"
+                      onClick={() => setActiveTab("profile")}
+                      variant="outline"
+                      size="sm"
+                      className="text-yellow-700 border-yellow-300 hover:bg-yellow-100"
                     >
-                      {subscribing ? 'Redirigiendo...' : 'Suscribirse con MercadoPago'}
+                      Ir a Configuración
                     </Button>
+                  </div>
+                )}
+                {currentUser && currentUser.isSubscribed && (
+                  <div className="bg-green-50 border border-green-200 p-3 rounded-lg mb-4 flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-sm text-green-800">
+                      Suscripción activa - Puedes crear servicios
+                    </span>
                   </div>
                 )}
                 {/* Resumen de errores */}
@@ -2171,10 +2485,18 @@ export default function SellerDashboardPage() {
           {activeTab === "profile" && (
             <Card>
               <CardHeader>
-                <CardTitle>Mi Perfil</CardTitle>
-                <CardDescription>Actualiza tu información personal y de vendedor.</CardDescription>
+                <CardTitle>Configuración</CardTitle>
+                <CardDescription>Gestiona tu perfil y configuración de cuenta.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent>
+                <Tabs defaultValue="profile" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="profile">Mi Perfil</TabsTrigger>
+                    <TabsTrigger value="subscription">Suscripción</TabsTrigger>
+                    <TabsTrigger value="mercadopago">MercadoPago</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="profile" className="space-y-6 mt-6">
                 <div className="flex items-center gap-4">
                   <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-gray-200">
                     <Image
@@ -2223,49 +2545,132 @@ export default function SellerDashboardPage() {
                   <Label htmlFor="email" className="text-base">Email</Label>
                   <Input id="email" value={currentUser?.firebaseUser.email || ""} disabled className="mt-1" />
                 </div>
-                {currentUser?.isSubscribed === false && (
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>No Suscrito</AlertTitle>
-                    <AlertDescription>
-                      No tienes una suscripción activa. Para publicar más productos o servicios de los permitidos,
-                      necesitas suscribirte.
-                    </AlertDescription>
-                  </Alert>
-                )}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Suscripción</CardTitle>
-                    <CardDescription>
-                      Gestiona tu plan de suscripción para aumentar el límite de productos.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {currentUser?.isSubscribed ? (
-                      <div className="flex items-center gap-2 text-green-600 font-semibold">
-                        <CheckCircle className="h-5 w-5" />
-                        <span>Plan Básico Activo</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-yellow-600 font-semibold">
-                        <AlertTriangle className="h-5 w-5" />
-                        <span>No Suscrito</span>
-                      </div>
-                    )}
-                    <p className="text-sm text-gray-600 mt-2">
-                      Límite de productos: {currentUser?.productUploadLimit || 5}
-                    </p>
-                    {!currentUser?.isSubscribed && (
-                      <Button
-                        onClick={handleSubscribe}
-                        disabled={subscribing}
-                        className="mt-4 bg-purple-700 text-white hover:bg-purple-800"
-                      >
-                        {subscribing ? "Redirigiendo..." : "Suscribirse al Plan Básico"}
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
+
+                  </TabsContent>
+                  
+                  <TabsContent value="subscription" className="space-y-6 mt-6">
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Gestión de Suscripción</h3>
+                      
+                      {currentUser?.isSubscribed ? (
+                        <div className="space-y-4">
+                                                     <Alert className="border-green-200 bg-green-50">
+                             <CheckCircle className="h-4 w-4 text-green-600" />
+                             <AlertTitle className="text-green-800">Suscripción Activa</AlertTitle>
+                             <AlertDescription className="text-green-700">
+                               Tu suscripción está activa y puedes crear y ofrecer servicios sin restricciones.
+                             </AlertDescription>
+                           </Alert>
+                           
+                           <Card>
+                             <CardHeader>
+                               <CardTitle>Estado de tu Suscripción</CardTitle>
+                               <CardDescription>
+                                 Tu suscripción para servicios está activa y funcionando.
+                               </CardDescription>
+                             </CardHeader>
+                             <CardContent className="space-y-3">
+                               <div className="flex items-center gap-2">
+                                 <CheckCircle className="h-5 w-5 text-green-600" />
+                                 <span className="font-semibold">Suscripción Activa</span>
+                               </div>
+                               <div className="text-sm text-gray-600">
+                                 <p>• <strong>Servicios:</strong> Puedes crear y gestionar servicios</p>
+                                 <p>• <strong>Pagos:</strong> Recibe pagos por tus servicios</p>
+                                 <p>• <strong>Gestión:</strong> Administra todas tus ofertas</p>
+                                 <p>• <strong>Soporte:</strong> Acceso a soporte prioritario</p>
+                               </div>
+                               <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                                 <p className="text-sm text-green-800">
+                                   <strong>Recordatorio:</strong> Los productos físicos no requieren suscripción.
+                                 </p>
+                               </div>
+                             </CardContent>
+                           </Card>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                                                     <Alert variant="destructive">
+                             <AlertTriangle className="h-4 w-4" />
+                             <AlertTitle>Suscripción Requerida</AlertTitle>
+                             <AlertDescription>
+                               Para crear y ofrecer servicios en la plataforma, necesitas activar tu suscripción.
+                             </AlertDescription>
+                           </Alert>
+                           
+                           <Card>
+                             <CardHeader>
+                               <CardTitle>Suscripción para Servicios</CardTitle>
+                               <CardDescription>
+                                 Activa tu suscripción para poder crear y ofrecer servicios.
+                               </CardDescription>
+                             </CardHeader>
+                             <CardContent className="space-y-4">
+                               <div className="text-sm text-gray-600">
+                                 <p className="font-semibold mb-2">¿Para qué necesitas la suscripción?</p>
+                                 <ul className="space-y-1">
+                                   <li>• <strong>Crear servicios:</strong> Publica tus servicios profesionales</li>
+                                   <li>• <strong>Gestionar ofertas:</strong> Administra tus servicios activos</li>
+                                   <li>• <strong>Recibir pagos:</strong> Cobra por tus servicios de forma segura</li>
+                                   <li>• <strong>Acceso completo:</strong> Usa todas las herramientas de vendedor</li>
+                                 </ul>
+                               </div>
+                               <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                                 <p className="text-sm text-blue-800">
+                                   <strong>Nota:</strong> Los productos físicos no requieren suscripción, solo los servicios.
+                                 </p>
+                               </div>
+                               <Button
+                                 onClick={handleSubscribe}
+                                 disabled={subscribing}
+                                 className="w-full bg-purple-700 text-white hover:bg-purple-800"
+                               >
+                                 {subscribing ? "Redirigiendo..." : "Activar Suscripción"}
+                               </Button>
+                             </CardContent>
+                           </Card>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="mercadopago" className="space-y-6 mt-6">
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Cuenta de MercadoPago</h3>
+                      {currentUser?.mercadopagoConnected ? (
+                        <div className="flex flex-col gap-2">
+                          <div className="bg-green-100 text-green-800 p-3 rounded flex items-center gap-2">
+                            <span className="font-semibold">✅ Cuenta conectada correctamente.</span>
+                            <span className="text-xs">Ya puedes recibir pagos y vender productos.</span>
+                          </div>
+                          <Button
+                            variant="destructive"
+                            disabled={isDisconnecting}
+                            onClick={() => {
+                              if (window.confirm('¿Seguro que quieres desconectar tu cuenta de MercadoPago? No podrás vender productos hasta volver a conectar tu cuenta.')) {
+                                handleDisconnect();
+                              }
+                            }}
+                            className="w-full mt-2"
+                          >
+                            {isDisconnecting ? 'Desconectando...' : 'Desconectar cuenta de MercadoPago'}
+                          </Button>
+                          <div className="text-xs text-orange-700 mt-1">
+                            <AlertTriangle className="inline w-4 h-4 mr-1 align-text-bottom" />
+                            Si desconectas tu cuenta, no podrás vender productos ni recibir pagos hasta volver a conectar.
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          <div className="bg-yellow-100 text-yellow-800 p-3 rounded flex items-center gap-2">
+                            <span className="font-semibold">⚠️ Debes conectar tu cuenta de MercadoPago para vender productos y recibir pagos.</span>
+                          </div>
+                          <ConnectMercadoPagoButton />
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
           )}
@@ -2449,6 +2854,313 @@ export default function SellerDashboardPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Shipping Management Tab */}
+          {activeTab === "shipping" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Truck className="h-5 w-5" />
+                  Gestión de Envíos
+                </CardTitle>
+                <CardDescription>
+                  Administra el estado de envío de tus productos vendidos
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Filtros */}
+                <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="shipping-filter">Filtrar por estado:</Label>
+                    <Select
+                      value={shippingFilter}
+                      onValueChange={(value) => setShippingFilter(value as ShippingStatus | "all")}
+                    >
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los estados</SelectItem>
+                        <SelectItem value="pending">Pendiente</SelectItem>
+                        <SelectItem value="preparing">En preparación</SelectItem>
+                        <SelectItem value="shipped">Enviado</SelectItem>
+                        <SelectItem value="delivered">Entregado</SelectItem>
+                        <SelectItem value="cancelled">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <Button
+                    onClick={fetchShipments}
+                    variant="outline"
+                    disabled={loadingShipments}
+                    className="flex items-center gap-2"
+                  >
+                    {loadingShipments ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Package className="h-4 w-4" />
+                    )}
+                    Actualizar
+                  </Button>
+                </div>
+
+                {/* Lista de envíos */}
+                {loadingShipments ? (
+                  <div className="flex justify-center items-center py-10">
+                    <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
+                  </div>
+                ) : getFilteredShipments().length === 0 ? (
+                  <div className="text-center py-10">
+                    <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <p className="text-lg text-muted-foreground mb-2">
+                      {shippingFilter === "all" 
+                        ? "No tienes envíos que gestionar" 
+                        : `No hay envíos con estado "${getShippingStatusText(shippingFilter as ShippingStatus)}"`
+                      }
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Los envíos aparecerán aquí cuando tengas productos físicos vendidos
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {getFilteredShipments().map((shipment) => (
+                      <Card key={shipment.id} className="overflow-hidden">
+                        <CardContent className="p-6">
+                          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                            {/* Información del producto y compra */}
+                            <div className="flex items-start gap-4 flex-1">
+                              <div className="w-16 h-16 relative flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                                {shipment.productImageUrl ? (
+                                  <Image
+                                    src={shipment.productImageUrl}
+                                    alt={shipment.productName || "Producto"}
+                                    fill
+                                    className="object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <Package className="h-6 w-6 text-gray-400" />
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-medium text-lg mb-1 truncate">
+                                  {shipment.productName || "Producto desconocido"}
+                                </h3>
+                                <div className="space-y-1 text-sm text-gray-600">
+                                  <p>Compra #{shipment.paymentId}</p>
+                                  <p>Comprador: {shipment.vendorName || "Usuario"}</p>
+                                  <p>Monto: ${shipment.amount.toFixed(2)}</p>
+                                  <p>
+                                    Fecha: {shipment.createdAt?.toDate ? 
+                                      shipment.createdAt.toDate().toLocaleDateString() : 
+                                      new Date(shipment.createdAt).toLocaleDateString()
+                                    }
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Estado actual y acciones */}
+                            <div className="lg:w-80 space-y-4">
+                              {/* Estado actual */}
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium">Estado actual:</span>
+                                <Badge
+                                  className={`flex items-center gap-1 ${
+                                    shipment.shipping 
+                                      ? getShippingBadgeClass(shipment.shipping.status)
+                                      : "bg-gray-100 text-gray-800"
+                                  }`}
+                                >
+                                  {shipment.shipping ? (
+                                    <>
+                                      {getShippingIcon(shipment.shipping.status)}
+                                      {getShippingStatusText(shipment.shipping.status)}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Clock className="h-4 w-4" />
+                                      Sin envío
+                                    </>
+                                  )}
+                                </Badge>
+                              </div>
+
+                              {/* Selector de nuevo estado */}
+                              <div className="space-y-2">
+                                <Label className="text-sm">Actualizar estado:</Label>
+                                                               <Select
+                                   onValueChange={(newStatus) => {
+                                     openShippingUpdateModal(shipment.id, newStatus as ShippingStatus)
+                                   }}
+                                   disabled={updatingShipment === shipment.id}
+                                 >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar nuevo estado" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="pending">
+                                      <div className="flex items-center gap-2">
+                                        <Clock className="h-4 w-4" />
+                                        Pendiente
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="preparing">
+                                      <div className="flex items-center gap-2">
+                                        <Package className="h-4 w-4" />
+                                        En preparación
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="shipped">
+                                      <div className="flex items-center gap-2">
+                                        <Truck className="h-4 w-4" />
+                                        Enviado
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="delivered">
+                                      <div className="flex items-center gap-2">
+                                        <CheckCircle className="h-4 w-4" />
+                                        Entregado
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="cancelled">
+                                      <div className="flex items-center gap-2">
+                                        <XCircle className="h-4 w-4" />
+                                        Cancelado
+                                      </div>
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              {/* Información adicional de envío */}
+                              {shipment.shipping && (
+                                <div className="pt-2 border-t space-y-2 text-sm">
+                                  {shipment.shipping.trackingNumber && (
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Seguimiento:</span>
+                                      <span className="font-mono text-xs">
+                                        {shipment.shipping.trackingNumber}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {shipment.shipping.carrierName && (
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Transportista:</span>
+                                      <span>{shipment.shipping.carrierName}</span>
+                                    </div>
+                                  )}
+                                  {shipment.shipping.estimatedDelivery && (
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Entrega estimada:</span>
+                                      <span>
+                                        {new Date(shipment.shipping.estimatedDelivery).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {shipment.shipping.notes && (
+                                    <div className="pt-2">
+                                      <span className="text-gray-600">Notas:</span>
+                                      <p className="text-xs mt-1 bg-gray-50 p-2 rounded">
+                                        {shipment.shipping.notes}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Indicador de carga */}
+                          {updatingShipment === shipment.id && (
+                            <div className="mt-4 pt-4 border-t">
+                              <div className="flex items-center gap-2 text-sm text-orange-600">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Actualizando estado de envío...
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                                 )}
+
+                 {/* Modal de actualización de envío */}
+                 <Dialog open={isShippingModalOpen} onOpenChange={setIsShippingModalOpen}>
+                   <DialogContent className="sm:max-w-[500px]">
+                     <DialogHeader>
+                       <DialogTitle>Actualizar Estado de Envío</DialogTitle>
+                       <DialogDescription>
+                         {selectedNewStatus && (
+                           <>Cambiar estado a: <strong>{getShippingStatusText(selectedNewStatus)}</strong></>
+                         )}
+                       </DialogDescription>
+                     </DialogHeader>
+                     
+                     <div className="grid gap-4 py-4">
+                       {/* Número de seguimiento */}
+                       <div className="grid gap-2">
+                         <Label htmlFor="tracking">Número de seguimiento (opcional)</Label>
+                         <Input
+                           id="tracking"
+                           value={trackingNumber}
+                           onChange={(e) => setTrackingNumber(e.target.value)}
+                           placeholder="Ej: ABC123456789"
+                         />
+                       </div>
+
+                       {/* Transportista */}
+                       <div className="grid gap-2">
+                         <Label htmlFor="carrier">Empresa transportista (opcional)</Label>
+                         <Input
+                           id="carrier"
+                           value={carrierName}
+                           onChange={(e) => setCarrierName(e.target.value)}
+                           placeholder="Ej: Correos de México, DHL, FedEx"
+                         />
+                       </div>
+
+                       {/* Notas */}
+                       <div className="grid gap-2">
+                         <Label htmlFor="notes">Notas adicionales (opcional)</Label>
+                         <Textarea
+                           id="notes"
+                           value={shippingNotes}
+                           onChange={(e) => setShippingNotes(e.target.value)}
+                           placeholder="Información adicional sobre el envío..."
+                           rows={3}
+                         />
+                       </div>
+                     </div>
+
+                     <DialogFooter>
+                       <Button variant="outline" onClick={closeShippingUpdateModal}>
+                         Cancelar
+                       </Button>
+                       <Button 
+                         onClick={confirmShippingUpdate}
+                         disabled={updatingShipment === selectedShipmentId}
+                       >
+                         {updatingShipment === selectedShipmentId ? (
+                           <>
+                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                             Actualizando...
+                           </>
+                         ) : (
+                           "Actualizar Estado"
+                         )}
+                       </Button>
+                     </DialogFooter>
+                   </DialogContent>
+                 </Dialog>
+               </CardContent>
+             </Card>
+           )}
         </main>
       </div>
     </div>

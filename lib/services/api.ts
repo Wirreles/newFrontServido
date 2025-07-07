@@ -1,5 +1,10 @@
 import { Subscription, PaymentPreference } from '@/types/payments'
 import { auth } from '@/lib/firebase' // Importar instancia de auth
+import type { 
+  PurchaseWithShipping, 
+  ShippingUpdateRequest, 
+  ShippingStatus 
+} from '@/types/shipping'
 
 interface ApiResponse<T = any> {
   data?: T
@@ -113,4 +118,33 @@ export class ApiService {
   // static async getOAuthUrl(): Promise<ApiResponse<OAuthUrlResponse>> {
   //   return this.fetchApi('/mercadopago/oauth-callback')
   // }
+
+  // Gestión de envíos
+  static async updateShippingStatus(
+    purchaseId: string, 
+    update: Omit<ShippingUpdateRequest, 'purchaseId'>
+  ): Promise<ApiResponse<void>> {
+    return this.fetchApi(`/api/shipping/${purchaseId}/update`, {
+      method: 'POST',
+      body: JSON.stringify(update),
+    }, true)
+  }
+
+  static async getSellerShipments(sellerId: string): Promise<ApiResponse<PurchaseWithShipping[]>> {
+    return this.fetchApi<PurchaseWithShipping[]>(`/api/shipping/seller/${sellerId}`, {}, true)
+  }
+
+  static async getBuyerShipments(buyerId: string): Promise<ApiResponse<PurchaseWithShipping[]>> {
+    return this.fetchApi<PurchaseWithShipping[]>(`/api/shipping/buyer/${buyerId}`, {}, true)
+  }
+
+  static async getPurchaseWithShipping(purchaseId: string): Promise<ApiResponse<PurchaseWithShipping>> {
+    return this.fetchApi<PurchaseWithShipping>(`/api/shipping/purchase/${purchaseId}`, {}, true)
+  }
+
+  static async initializeShipping(purchaseId: string): Promise<ApiResponse<void>> {
+    return this.fetchApi(`/api/shipping/${purchaseId}/initialize`, {
+      method: 'POST',
+    }, true)
+  }
 } 

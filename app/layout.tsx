@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <AuthProvider>
             <CartProvider>
               <Header /> {/* Global Header */}
-              <main className="flex-1 pb-16">{children}</main> {/* Add padding-bottom for tab bar */}
+              <main className="flex-1 pb-16 md:pb-16">{children}</main> {/* Adjusted padding for mobile header */}
               <TabBar /> {/* Global Tab Bar */}
             </CartProvider>
           </AuthProvider>
