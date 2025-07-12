@@ -87,7 +87,7 @@ export default function ChatPage() {
           const chatData = { id: chatDocSnap.id, ...chatDocSnap.data() } as Chat
 
           // Check if current user is part of this chat
-          if (currentUser.uid !== chatData.buyerId && currentUser.uid !== chatData.sellerId) {
+          if (currentUser.firebaseUser.uid !== chatData.buyerId && currentUser.firebaseUser.uid !== chatData.sellerId) {
             setError("No tienes permiso para ver este chat.")
             setLoading(false)
             return
@@ -147,8 +147,8 @@ export default function ChatPage() {
     try {
       const messagesCollectionRef = collection(db, "chats", chatId, "messages")
       await addDoc(messagesCollectionRef, {
-        senderId: currentUser.uid,
-        senderName: currentUser.displayName || currentUser.email?.split("@")[0] || "Usuario",
+        senderId: currentUser.firebaseUser.uid,
+        senderName: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email?.split("@")[0] || "Usuario",
         text: newMessage.trim(),
         timestamp: serverTimestamp(),
       })
@@ -192,8 +192,8 @@ export default function ChatPage() {
     )
   }
 
-  const otherParticipantName = currentUser?.uid === chat.buyerId ? chat.sellerName : chat.buyerName
-  const otherParticipantPhotoURL = currentUser?.uid === chat.buyerId ? chat.sellerPhotoURL : chat.buyerPhotoURL
+  const otherParticipantName = currentUser?.firebaseUser.uid === chat.buyerId ? chat.sellerName : chat.buyerName
+  const otherParticipantPhotoURL = currentUser?.firebaseUser.uid === chat.buyerId ? chat.sellerPhotoURL : chat.buyerPhotoURL
 
   return (
     <div className="flex flex-col h-[calc(100vh-120px)] md:h-[calc(100vh-100px)] bg-gray-100">
@@ -236,17 +236,17 @@ export default function ChatPage() {
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`flex ${message.senderId === currentUser?.uid ? "justify-end" : "justify-start"}`}
+            className={`flex ${message.senderId === currentUser?.firebaseUser.uid ? "justify-end" : "justify-start"}`}
           >
             <div
               className={`max-w-[70%] p-3 rounded-lg ${
-                message.senderId === currentUser?.uid
+                message.senderId === currentUser?.firebaseUser.uid
                   ? "bg-blue-600 text-white rounded-br-none"
                   : "bg-white text-gray-800 rounded-bl-none"
               }`}
             >
               <p className="text-xs font-semibold mb-1">
-                {message.senderId === currentUser?.uid ? "Tú" : message.senderName}
+                {message.senderId === currentUser?.firebaseUser.uid ? "Tú" : message.senderName}
               </p>
               <p className="text-sm">{message.text}</p>
               <p className="text-xs text-right mt-1 opacity-75">

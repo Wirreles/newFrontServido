@@ -1,23 +1,9 @@
 import { Subscription, PaymentPreference } from '@/types/payments'
 import { auth } from '@/lib/firebase' // Importar instancia de auth
-import type { 
-  PurchaseWithShipping, 
-  ShippingUpdateRequest, 
-  ShippingStatus 
-} from '@/types/shipping'
 
 interface ApiResponse<T = any> {
   data?: T
   error?: string
-}
-
-interface OAuthUrlResponse {
-  authUrl: string
-}
-
-interface ConnectionStatusResponse {
-  isConnected: boolean
-  lastChecked: string
 }
 
 export class ApiService {
@@ -66,85 +52,121 @@ export class ApiService {
     }
   }
 
-  // Suscripciones
-  static async createSubscription(userId: string, planType: string): Promise<ApiResponse<PaymentPreference>> {
-    return this.fetchApi<any>('/api/mercadopago/subscription/create', {
-      method: 'POST',
-      body: JSON.stringify({ userId, planType }),
-    }, true)
-  }
+  // ============================================================================
+  // ENDPOINTS DE MERCADOPAGO
+  // ============================================================================
 
-  static async getSubscription(userId: string): Promise<ApiResponse<Subscription>> {
-    return this.fetchApi<Subscription>(`/api/mercadopago/subscriptions/${userId}`, {}, true)
-  }
-
-  static async cancelSubscription(subscriptionId: string): Promise<ApiResponse<void>> {
-    return this.fetchApi(`/api/mercadopago/subscriptions/${subscriptionId}/cancel`, {
-      method: 'POST',
-    }, true)
-  }
-
-  // Pagos
-  static async createPayment(data: {
-    productId: string
-    quantity: number
-    vendedorId: string
+  // Crear preferencia para productos (múltiples productos soportados)
+  static async createProductPreference(data: {
+    products: {
+      productId: string
+      quantity: number
+    }[]
     buyerId: string
-  }): Promise<ApiResponse<PaymentPreference>> {
-    return this.fetchApi<PaymentPreference>('/api/mercadopago/payments/create-preference', {
+    buyerEmail: string
+  }): Promise<ApiResponse<{
+    id: string
+    init_point: string
+    sandbox_init_point: string
+  }>> {
+    return this.fetchApi('/api/mercadopago/payments/create-preference', {
       method: 'POST',
       body: JSON.stringify(data),
     }, true)
   }
 
-  // OAuth y conexión
-  static async handleOAuthCallback(code: string, userId: string): Promise<ApiResponse<void>> {
-    return this.fetchApi('/api/mercadopago/oauth-callback', {
+  // Crear preferencia para suscripciones
+  static async createSubscriptionPreference(data: {
+    userId: string
+    planType: 'basic' | 'premium' | 'enterprise'
+  }): Promise<ApiResponse<{
+    id: string
+    init_point: string
+    sandbox_init_point: string
+  }>> {
+    return this.fetchApi('/api/mercadopago/subscription/create', {
       method: 'POST',
-      body: JSON.stringify({ code, userId }),
+      body: JSON.stringify(data),
     }, true)
   }
 
-  static async getConnectionStatus(userId: string): Promise<ApiResponse<ConnectionStatusResponse>> {
-    return this.fetchApi<ConnectionStatusResponse>(`/api/mercadopago/connection-status/${userId}`, {}, true)
+  // Obtener estado de conexión de MercadoPago
+  static async getConnectionStatus(userId: string): Promise<ApiResponse<{
+    connected: boolean
+    tokenExpired?: boolean
+    userId?: string
+  }>> {
+    return this.fetchApi(`/api/mercadopago/connection-status/${userId}`, {}, true)
   }
 
-  static async disconnectAccount(userId: string): Promise<ApiResponse<void>> {
-    return this.fetchApi(`/api/mercadopago/disconnect/${userId}`, {
+  // Webhook para notificaciones de MercadoPago
+  static async processMercadoPagoWebhook(data: {
+    type: string
+    data: {
+      id: string
+    }
+  }): Promise<ApiResponse<{ received: boolean }>> {
+    return this.fetchApi('/api/mercadopago/webhooks', {
       method: 'POST',
-    }, true)
+      body: JSON.stringify(data),
+    }, false) // No requiere autenticación ya que viene de MercadoPago
   }
 
-  // static async getOAuthUrl(): Promise<ApiResponse<OAuthUrlResponse>> {
-  //   return this.fetchApi('/mercadopago/oauth-callback')
-  // }
+  // ============================================================================
+  // MÉTODOS DE CONVENIENCIA PARA COMPRAS
+  // ============================================================================
 
-  // Gestión de envíos
-  static async updateShippingStatus(
-    purchaseId: string, 
-    update: Omit<ShippingUpdateRequest, 'purchaseId'>
-  ): Promise<ApiResponse<void>> {
-    return this.fetchApi(`/api/shipping/${purchaseId}/update`, {
-      method: 'POST',
-      body: JSON.stringify(update),
-    }, true)
+  // Método para crear una compra de producto único
+  static async createSingleProductPurchase(data: {
+    productId: string
+    quantity: number
+    buyerId: string
+    buyerEmail: string
+  }) {
+    return this.createProductPreference({
+      products: [{ productId: data.productId, quantity: data.quantity }],
+      buyerId: data.buyerId,
+      buyerEmail: data.buyerEmail
+    })
   }
 
-  static async getSellerShipments(sellerId: string): Promise<ApiResponse<PurchaseWithShipping[]>> {
-    return this.fetchApi<PurchaseWithShipping[]>(`/api/shipping/seller/${sellerId}`, {}, true)
+  // Método para crear una compra de múltiples productos
+  static async createMultipleProductsPurchase(data: {
+    products: {
+      productId: string
+      quantity: number
+    }[]
+    buyerId: string
+    buyerEmail: string
+  }) {
+    return this.createProductPreference(data)
   }
 
-  static async getBuyerShipments(buyerId: string): Promise<ApiResponse<PurchaseWithShipping[]>> {
-    return this.fetchApi<PurchaseWithShipping[]>(`/api/shipping/buyer/${buyerId}`, {}, true)
+  // ============================================================================
+  // MÉTODOS DE CONVENIENCIA PARA SUSCRIPCIONES
+  // ============================================================================
+
+  // Crear suscripción básica
+  static async createBasicSubscription(userId: string) {
+    return this.createSubscriptionPreference({
+      userId,
+      planType: 'basic'
+    })
   }
 
-  static async getPurchaseWithShipping(purchaseId: string): Promise<ApiResponse<PurchaseWithShipping>> {
-    return this.fetchApi<PurchaseWithShipping>(`/api/shipping/purchase/${purchaseId}`, {}, true)
+  // Crear suscripción premium
+  static async createPremiumSubscription(userId: string) {
+    return this.createSubscriptionPreference({
+      userId,
+      planType: 'premium'
+    })
   }
 
-  static async initializeShipping(purchaseId: string): Promise<ApiResponse<void>> {
-    return this.fetchApi(`/api/shipping/${purchaseId}/initialize`, {
-      method: 'POST',
-    }, true)
+  // Crear suscripción enterprise
+  static async createEnterpriseSubscription(userId: string) {
+    return this.createSubscriptionPreference({
+      userId,
+      planType: 'enterprise'
+    })
   }
 } 

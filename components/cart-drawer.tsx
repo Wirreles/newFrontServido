@@ -20,20 +20,84 @@ interface GroupedItems {
 }
 
 export function CartDrawer() {
-  const { items, removeFromCart, clearCart, getItemQuantity, getTotalPrice } = useCart()
+  const { 
+    items, 
+    removeFromCart, 
+    clearCart, 
+    getItemQuantity, 
+    getTotalPrice,
+    getItemsByVendor,
+    getVendorCount,
+    getTotalCommission,
+    getVendorSubtotal,
+    canCreateCentralizedPurchase
+  } = useCart()
   const { currentUser } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [loadingItems, setLoadingItems] = useState<Set<string>>(new Set())
 
-  const groupedItems = items.reduce<GroupedItems>((acc, item) => {
-    if (!acc[item.sellerId]) {
-      acc[item.sellerId] = []
+  const groupedItems = getItemsByVendor()
+
+  // Comprar un producto individual del carrito
+  const handleBuyIndividualItem = async (item: CartItem) => {
+    if (!currentUser) {
+      toast({
+        title: "Error",
+        description: "Debes iniciar sesión para realizar la compra",
+        variant: "destructive"
+      })
+      return
     }
-    acc[item.sellerId].push(item)
-    return acc
-  }, {})
 
-  const handleCheckout = async (sellerItems: CartItem[], sellerId: string) => {
+    try {
+      setLoadingItems(prev => new Set(prev).add(item.id))
+
+      // Usar el nuevo sistema centralizado para producto individual
+      const response = await ApiService.createSingleProductPurchase({
+        productId: item.id,
+        quantity: item.quantity,
+        buyerId: currentUser.firebaseUser.uid,
+        buyerEmail: currentUser.firebaseUser.email || ''
+      })
+
+      if (response.error) {
+        throw new Error(response.error)
+      }
+
+      if (!response.data?.init_point) {
+        throw new Error("No se recibió el punto de inicio del pago")
+      }
+
+      // Remover el item del carrito después de crear la compra
+      removeFromCart(item.id)
+
+      toast({
+        title: "✅ Compra creada",
+        description: `${item.name} - $${(item.price * item.quantity).toFixed(2)}`,
+        duration: 3000,
+      })
+
+      // Redirigir a MercadoPago
+      window.location.href = response.data.init_point
+    } catch (error) {
+      console.error("Error al procesar el pago:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Error al procesar el pago",
+        variant: "destructive"
+      })
+    } finally {
+      setLoadingItems(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(item.id)
+        return newSet
+      })
+    }
+  }
+
+  // Comprar productos por vendedor
+  const handleBuyVendorItems = async (sellerItems: CartItem[], sellerId: string) => {
     if (!currentUser) {
       toast({
         title: "Error",
@@ -46,16 +110,16 @@ export function CartDrawer() {
     try {
       setLoading(true)
 
-      // Crear preferencia de pago para todos los items del vendedor
-      const response = await ApiService.createPayment({
-        productId: sellerItems.map(item => item.id).join(','),
-        quantity: sellerItems.reduce((total, item) => total + item.quantity, 0),
-        vendedorId: sellerId,
-        // items: sellerItems.map(item => ({ 
-        //   name: item.name,
-        //   unit_price: item.discountedPrice,
-        //   quantity: item.quantity,
-        // })),
+      // Convertir items del vendedor a formato del backend
+      const products = sellerItems.map(item => ({
+        productId: item.id,
+        quantity: item.quantity
+      }))
+
+      const response = await ApiService.createMultipleProductsPurchase({
+        products,
+        buyerId: currentUser.firebaseUser.uid,
+        buyerEmail: currentUser.firebaseUser.email || ''
       })
 
       if (response.error) {
@@ -66,6 +130,87 @@ export function CartDrawer() {
         throw new Error("No se recibió el punto de inicio del pago")
       }
 
+      // Remover los items del carrito
+      sellerItems.forEach(item => removeFromCart(item.id))
+
+      const totalAmount = sellerItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+      
+      toast({
+        title: "✅ Compra creada",
+        description: `${sellerItems.length} productos - $${totalAmount.toFixed(2)}`,
+        duration: 3000,
+      })
+
+      // Redirigir a MercadoPago
+      window.location.href = response.data.init_point
+    } catch (error) {
+      console.error("Error al procesar el pago:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Error al procesar el pago",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Comprar todos los productos del carrito
+  const handleBuyAllItems = async () => {
+    if (!currentUser) {
+      toast({
+        title: "Error",
+        description: "Debes iniciar sesión para realizar la compra",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (items.length === 0) {
+      toast({
+        title: "Carrito vacío",
+        description: "No hay productos en el carrito",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      // Convertir todos los items del carrito
+      const products = items.map(item => ({
+        productId: item.id,
+        quantity: item.quantity
+      }))
+
+      const response = await ApiService.createMultipleProductsPurchase({
+        products,
+        buyerId: currentUser.firebaseUser.uid,
+        buyerEmail: currentUser.firebaseUser.email || ''
+      })
+
+      if (response.error) {
+        throw new Error(response.error)
+      }
+
+      if (!response.data?.init_point) {
+        throw new Error("No se recibió el punto de inicio del pago")
+      }
+
+      const totalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+      const vendorCount = getVendorCount()
+      
+      toast({
+        title: "🎉 Compra centralizada creada",
+        description: `${items.length} productos de ${vendorCount} vendedor${vendorCount > 1 ? 'es' : ''} - $${totalAmount.toFixed(2)}`,
+        duration: 5000,
+      })
+
+      // Limpiar carrito completo
+      clearCart()
+
+      // Redirigir a MercadoPago
       window.location.href = response.data.init_point
     } catch (error) {
       console.error("Error al procesar el pago:", error)
@@ -118,41 +263,53 @@ export function CartDrawer() {
                         {item.appliedCoupon && item.discountedPrice < item.price ? (
                           <>
                             <span className="line-through mr-1">${item.price.toFixed(2)}</span>
-                            <span className="font-semibold text-green-600">${item.discountedPrice.toFixed(2)}</span> x {item.quantity}
+                            <span className="text-green-600 font-medium">${item.discountedPrice.toFixed(2)}</span>
                           </>
                         ) : (
-                          `$${item.price.toFixed(2)} x ${item.quantity}`
+                          `$${item.price.toFixed(2)}`
                         )}
                       </p>
-                      {item.appliedCoupon && (
-                        <Badge variant="secondary" className="mt-1 bg-green-100 text-green-800">
-                          Cupón:{" "}
-                          {item.appliedCoupon.discountType === "percentage"
-                            ? `${item.appliedCoupon.discountValue}% OFF`
-                            : `$${item.appliedCoupon.discountValue.toFixed(2)} OFF`}
-                        </Badge>
-                      )}
+                      <p className="text-xs text-gray-400">Cantidad: {item.quantity}</p>
                     </div>
                   </div>
+                  <div className="flex items-center gap-2">
+                    {/* Botón de compra individual */}
+                    <Button
+                      size="sm"
+                      onClick={() => handleBuyIndividualItem(item)}
+                      disabled={loadingItems.has(item.id)}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      {loadingItems.has(item.id) ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        "Comprar"
+                      )}
+                    </Button>
+                    {/* Botón de eliminar */}
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => removeFromCart(item.id)}
+                      className="text-red-500 hover:text-red-700"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
+                  </div>
                 </div>
               ))}
-              <div className="flex justify-between items-center font-semibold text-base mt-4">
+              
+              {/* Botón para comprar todos los productos del vendedor */}
+              <div className="bg-gray-50 p-3 rounded-lg mt-4">
+                <div className="flex justify-between items-center font-semibold text-base mb-2">
                 <span>Subtotal Vendedor:</span>
-                <span>
-                  ${sellerItems.reduce((total, item) => total + (item.discountedPrice * item.quantity), 0).toFixed(2)}
-                </span>
+                  <span>${getVendorSubtotal(sellerId).toFixed(2)}</span>
               </div>
               <Button
-                className="w-full mt-4 bg-purple-600 hover:bg-purple-700"
-                onClick={() => handleCheckout(sellerItems, sellerId)}
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  onClick={() => handleBuyVendorItems(sellerItems, sellerId)}
                 disabled={loading}
+                  size="sm"
               >
                 {loading ? (
                   <>
@@ -160,34 +317,77 @@ export function CartDrawer() {
                     Procesando...
                   </>
                 ) : (
-                  `Pagar $${sellerItems.reduce((total, item) => total + (item.discountedPrice * item.quantity), 0).toFixed(2)}`
+                    `Comprar de este vendedor ($${getVendorSubtotal(sellerId).toFixed(2)})`
                 )}
               </Button>
+              </div>
             </div>
           ))}
-          {items.length === 0 ? (
+          
+          {items.length === 0 && (
             <div className="text-center py-8">
-              <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 mb-4">No hay productos en el carrito</p>
-              <Button asChild>
+              <ShoppingBag className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-500">Tu carrito está vacío</p>
                 <Link href="/products">
-                  Explorar productos
+                <Button className="mt-4">Ver productos</Button>
                 </Link>
-              </Button>
             </div>
-          ) : (
-            <div className="border-t pt-4 mt-4">
-              <div className="flex justify-between items-center font-bold text-lg mb-4">
-                <span>Total del Carrito:</span>
+          )}
+          
+          {items.length > 0 && (
+            <div className="mt-6 pt-4 border-t">
+              <div className="bg-purple-50 p-4 rounded-lg mb-4">
+                <h4 className="font-semibold text-sm text-purple-800 mb-2">
+                  🛒 Compra Centralizada
+                </h4>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Vendedores:</span>
+                    <span className="font-medium">{getVendorCount()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Productos:</span>
+                    <span className="font-medium">{items.length}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-lg border-t pt-2">
+                    <span>Total:</span>
                 <span>${getTotalPrice().toFixed(2)}</span>
+                  </div>
+                </div>
               </div>
+              
+              <div className="space-y-2">
+                <Button
+                  onClick={handleBuyAllItems}
+                  disabled={loading}
+                  className="w-full bg-purple-600 hover:bg-purple-700"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingBag className="mr-2 h-4 w-4" />
+                      Comprar Todo (${getTotalPrice().toFixed(2)})
+                    </>
+                  )}
+                </Button>
+                
               <Button
                 variant="outline"
+                  onClick={clearCart}
                 className="w-full"
-                onClick={clearCart}
               >
-                Vaciar Carrito
+                  Limpiar carrito
               </Button>
+              </div>
+              
+              <div className="mt-4 text-xs text-gray-500">
+                <p>💡 Puedes comprar productos individuales, por vendedor, o todo junto.</p>
+                <p>El sistema centralizado permite múltiples productos en una sola transacción.</p>
+              </div>
             </div>
           )}
         </div>

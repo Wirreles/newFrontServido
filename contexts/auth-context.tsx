@@ -14,7 +14,7 @@ interface UserProfile {
   productUploadLimit?: number
   photoURL?: string
   photoPath?: string
-  mercadopagoConnected?: boolean
+  // mercadopagoConnected?: boolean // ELIMINADO: Ya no se requiere OAuth MP para vendedores
 }
 
 interface AuthContextType {
@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           productUploadLimit: userData.productUploadLimit || 0,
           photoURL: userData.photoURL || user.photoURL || undefined,
           photoPath: userData.photoPath || undefined,
-          mercadopagoConnected: userData.mercadopagoConnected || false,
+          // mercadopagoConnected: userData.mercadopagoConnected || false, // ELIMINADO
         })
       } else {
         setCurrentUser({
@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           productUploadLimit: 0,
           photoURL: user.photoURL || undefined,
           photoPath: undefined,
-          mercadopagoConnected: false,
+              // mercadopagoConnected: false, // ELIMINADO
         })
       }
     } else {
@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             productUploadLimit: userData.productUploadLimit || 0,
             photoURL: userData.photoURL || user.photoURL || undefined,
             photoPath: userData.photoPath || undefined,
-            mercadopagoConnected: userData.mercadopagoConnected || false,
+            // mercadopagoConnected: userData.mercadopagoConnected || false, // ELIMINADO
           })
         } else {
           setCurrentUser({
@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             productUploadLimit: 0,
             photoURL: user.photoURL || undefined,
             photoPath: undefined,
-            mercadopagoConnected: false,
+            // mercadopagoConnected: false, // ELIMINADO
           })
         }
       } else {

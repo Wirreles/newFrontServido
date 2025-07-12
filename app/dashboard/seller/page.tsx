@@ -24,6 +24,11 @@ import {
   Clock,
   Package,
   Truck,
+  CreditCard,
+  DollarSign,
+  Download,
+  Filter,
+  TrendingUp,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -46,7 +51,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
-import { useState, useEffect, type FormEvent, type ChangeEvent, type DragEvent } from "react"
+import { useState, useEffect, type FormEvent, type ChangeEvent, type DragEvent, useMemo } from "react"
 import { db, storage, auth } from "@/lib/firebase"
 import {
   collection,
@@ -68,9 +73,19 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { ChatList } from "@/components/chat-list"
 import { hasWhiteBackground, isValidVideoFile, getVideoDuration } from "@/lib/image-validation"
-import { ConnectMercadoPagoButton } from "@/components/ui/connect-mercadopago-button"
+// import { ConnectMercadoPagoButton } from "@/components/ui/connect-mercadopago-button" // ELIMINADO
 import { useToast } from "@/components/ui/use-toast"
 import { ApiService } from "@/lib/services/api"
+import { BankConfigForm } from "@/components/seller/bank-config-form"
+import { 
+  getSellerSales, 
+  calculateCommissionDistribution, 
+  generateCommissionInvoice,
+  getCentralizedShipmentsByVendor,
+  updateCentralizedShippingStatus,
+  type CommissionDistribution
+} from "@/lib/centralized-payments-api"
+import type { AdminSaleRecord } from "@/types/centralized-payments"
 import type { 
   PurchaseWithShipping, 
   ShippingStatus, 
@@ -80,6 +95,7 @@ import type {
 } from "@/types/shipping"
 import { getSellerShipments, updateShippingStatus, initializeShipping } from "@/lib/shipping"
 // Los iconos ya están importados arriba
+import * as XLSX from "xlsx"
 
 interface UserProfile {
   uid: string
@@ -127,10 +143,11 @@ interface Brand {
   name: string
 }
 
-interface ConnectionStatus {
-  isConnected: boolean
-  lastChecked: string
-}
+// interface ConnectionStatus - YA NO ES NECESARIA EN SISTEMA CENTRALIZADO
+// interface ConnectionStatus {
+//   isConnected: boolean
+//   lastChecked: string
+// }
 
 interface Coupon {
   id: string
@@ -160,6 +177,42 @@ function cleanUndefinedFields<T extends object>(obj: T): any {
     }
   })
   return cleanObj
+}
+
+interface ProductSale {
+  id: string
+  buyerId: string
+  createdAt: any
+  needsTransfer: boolean
+  paymentId: string
+  productId: string
+  productName: string
+  productPrice: number
+  purchaseId: string
+  status: string
+  transferStatus: string
+  vendedorId: string
+}
+interface UserMap { [key: string]: any }
+interface ProductMap { [key: string]: any }
+
+// 1. Definir el tipo para la venta por producto del seller
+interface VentaProductoSeller {
+  compraId: string;
+  paymentId: string;
+  status: string;
+  totalAmount: number;
+  fechaCompra: string;
+  buyerId: string;
+  compradorNombre: string;
+  compradorEmail: string;
+  productId: string;
+  productName: string;
+  productPrice: number;
+  quantity: number;
+  vendedorId: string;
+  vendedorNombre: string;
+  vendedorEmail: string;
 }
 
 export default function SellerDashboardPage() {
@@ -206,12 +259,22 @@ export default function SellerDashboardPage() {
   const [profileImagePreviewUrl, setProfileImagePreviewUrl] = useState<string | null>(null)
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false)
 
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null>(null)
-  const [isDisconnecting, setIsDisconnecting] = useState(false)
+  // Earnings and payments states
+  const [sellerSales, setSellerSales] = useState<AdminSaleRecord[]>([])
+  const [commissionDistribution, setCommissionDistribution] = useState<CommissionDistribution | null>(null)
+  const [loadingEarnings, setLoadingEarnings] = useState(false)
+  const [earningsFilter, setEarningsFilter] = useState<'all' | 'pendiente' | 'pagado'>('all')
+  const [earningsDateFrom, setEarningsDateFrom] = useState('')
+  const [earningsDateTo, setEarningsDateTo] = useState('')
+
+  // Estado para conexión MercadoPago - YA NO ES NECESARIO EN SISTEMA CENTRALIZADO
+  // const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null>(null)
+  // const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
   // Shipping management state
   const [shipments, setShipments] = useState<PurchaseWithShipping[]>([])
+  const [centralizedShipments, setCentralizedShipments] = useState<any[]>([])
   const [loadingShipments, setLoadingShipments] = useState(false)
   const [shippingFilter, setShippingFilter] = useState<ShippingStatus | "all">("all")
   const [updatingShipment, setUpdatingShipment] = useState<string | null>(null)
@@ -247,6 +310,111 @@ export default function SellerDashboardPage() {
   // Mobile menu state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
+  // 2. Cambiar el estado de ventas
+  const [sales, setSales] = useState<VentaProductoSeller[]>([])
+  const [usersMap, setUsersMap] = useState<UserMap>({})
+  const [productsMap, setProductsMap] = useState<ProductMap>({})
+  const [loadingSales, setLoadingSales] = useState(true)
+  const [filters, setFilters] = useState({
+    estado: 'all',
+    producto: '',
+    comprador: '',
+    fechaDesde: '',
+    fechaHasta: ''
+  })
+
+  const [page, setPage] = useState(1)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
+
+  useEffect(() => {
+    if (!currentUser) return
+    const fetchData = async () => {
+      setLoadingSales(true)
+      // Fetch users
+      const usersSnap = await getDocs(collection(db, 'users'))
+      const users: UserMap = {}
+      usersSnap.forEach(doc => { users[doc.id] = doc.data() })
+      setUsersMap(users)
+      console.log('USERS:', users)
+      // Fetch products
+      const productsSnap = await getDocs(collection(db, 'products'))
+      const products: ProductMap = {}
+      productsSnap.forEach(doc => { products[doc.id] = doc.data() })
+      setProductsMap(products)
+      console.log('PRODUCTS:', products)
+      // Fetch purchases
+      const purchasesSnap = await getDocs(collection(db, 'purchases'))
+      const purchases: any[] = purchasesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      // Desglosar productos vendidos por el vendedor actual
+      const ventasPorProducto: VentaProductoSeller[] = purchases.flatMap((compra: any) => {
+        if (!Array.isArray(compra.products)) return []
+        return compra.products
+          .filter((prod: any) => prod.vendedorId === currentUser.firebaseUser.uid)
+          .map((prod: any) => ({
+            compraId: compra.id || '',
+            paymentId: compra.paymentId || '',
+            status: compra.status || '',
+            totalAmount: compra.totalAmount || 0,
+            fechaCompra: compra.createdAt?.toDate?.() ? compra.createdAt.toDate().toISOString() : (typeof compra.createdAt === 'string' ? compra.createdAt : ''),
+            buyerId: compra.buyerId || '',
+            compradorNombre: users[compra.buyerId]?.name || '',
+            compradorEmail: users[compra.buyerId]?.email || '',
+            productId: prod?.productId || '',
+            productName: prod?.nombre || products[prod?.productId]?.name || '',
+            productPrice: prod?.precio || products[prod?.productId]?.price || 0,
+            quantity: prod?.quantity || 0,
+            vendedorId: prod?.vendedorId || '',
+            vendedorNombre: users[prod?.vendedorId]?.name || '',
+            vendedorEmail: users[prod?.vendedorId]?.email || '',
+          }))
+      })
+      setSales(ventasPorProducto)
+      setLoadingSales(false)
+      // Debug filteredSales
+      setTimeout(() => {
+        console.log('filteredSales:', filteredSales)
+      }, 2000)
+    }
+    fetchData()
+  }, [currentUser])
+
+  const filteredSales = useMemo(() => sales.filter(sale => {
+    if (filters.estado !== 'all' && sale.status !== filters.estado) return false
+    if (filters.producto && sale.productId !== filters.producto) return false
+    if (filters.comprador && sale.buyerId !== filters.comprador) return false
+    // Filtro de fechas
+    if (filters.fechaDesde) {
+      const desde = new Date(filters.fechaDesde)
+      if (sale.fechaCompra && new Date(sale.fechaCompra) < desde) return false
+    }
+    if (filters.fechaHasta) {
+      const hasta = new Date(filters.fechaHasta)
+      if (sale.fechaCompra && new Date(sale.fechaCompra) > hasta) return false
+    }
+    return true
+  }), [sales, filters])
+
+  // Paginación
+  const totalPages = Math.ceil(filteredSales.length / rowsPerPage)
+  const paginatedSales = filteredSales.slice((page - 1) * rowsPerPage, page * rowsPerPage)
+
+  // Exportar a Excel
+  const handleExportExcel = () => {
+    const data = filteredSales.map(sale => ({
+      Fecha: sale.fechaCompra ? new Date(sale.fechaCompra).toLocaleString() : '',
+      Producto: productsMap[sale.productId]?.name || sale.productName,
+      Precio: sale.productPrice,
+      Comprador: usersMap[sale.buyerId]?.name,
+      EmailComprador: usersMap[sale.buyerId]?.email,
+      Estado: sale.status,
+      Compra: sale.compraId
+    }))
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Ventas")
+    XLSX.writeFile(wb, "ventas_vendedor.xlsx")
+  }
+
   // Function to close mobile menu
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false)
@@ -258,8 +426,16 @@ export default function SellerDashboardPage() {
     
     setLoadingShipments(true)
     try {
+      // Obtener envíos legacy
       const shipmentsData = await getSellerShipments(currentUser.firebaseUser.uid)
       setShipments(shipmentsData)
+      
+      // 🆕 NUEVO: Obtener envíos centralizados
+      const centralizedShipmentsData = await getCentralizedShipmentsByVendor(currentUser.firebaseUser.uid)
+      setCentralizedShipments(centralizedShipmentsData)
+      
+      console.log("Legacy shipments:", shipmentsData.length)
+      console.log("Centralized shipments:", centralizedShipmentsData.length)
       
       // Inicializar envíos para compras aprobadas que no tengan información de envío
       const shipmentsToInitialize = shipmentsData.filter(
@@ -290,6 +466,72 @@ export default function SellerDashboardPage() {
       })
     } finally {
       setLoadingShipments(false)
+    }
+  }
+
+  // 🆕 NUEVO: Función para actualizar envíos centralizados
+  const handleUpdateCentralizedShippingStatus = async (
+    purchaseId: string,
+    itemId: string,
+    newStatus: 'pending' | 'preparing' | 'shipped' | 'delivered' | 'cancelled',
+    trackingNumber?: string,
+    carrierName?: string,
+    notes?: string
+  ) => {
+    if (!currentUser) return
+
+    setUpdatingShipment(`${purchaseId}-${itemId}`)
+      try {
+      const result = await updateCentralizedShippingStatus(
+        purchaseId,
+        currentUser.firebaseUser.uid,
+        itemId,
+        {
+          status: newStatus,
+          trackingNumber,
+          carrierName,
+          notes
+        }
+      )
+
+      if (result.success) {
+        const statusMessages = {
+          pending: "Estado cambiado a pendiente",
+          preparing: "Producto en preparación",
+          shipped: "Producto enviado",
+          delivered: "Producto entregado",
+          cancelled: "Envío cancelado"
+        }
+        
+        toast({
+          title: "Envío actualizado",
+          description: statusMessages[newStatus] || "Estado de envío actualizado correctamente",
+        })
+        
+        if (trackingNumber && newStatus === "shipped") {
+          toast({
+            title: "Número de seguimiento",
+            description: `Tracking: ${trackingNumber}${carrierName ? ` - ${carrierName}` : ''}`,
+          })
+        }
+        
+        await fetchShipments() // Recargar datos
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "No se pudo actualizar el estado de envío",
+          variant: "destructive",
+          })
+        }
+      } catch (error) {
+      console.error("Error updating centralized shipping status:", error)
+        toast({
+          title: "Error",
+        description: "Error al actualizar el estado de envío centralizado",
+        variant: "destructive",
+        })
+      } finally {
+      setUpdatingShipment(null)
     }
   }
 
@@ -467,44 +709,18 @@ export default function SellerDashboardPage() {
     }
   }, [currentUser])
 
+    // Verificar conexión MercadoPago - YA NO ES NECESARIO EN SISTEMA CENTRALIZADO
   useEffect(() => {
     if (authLoading) {
-      // Todavía cargando el usuario, no hacer nada
       return;
     }
     if (!currentUser) {
-      // Si no hay usuario, no intentes chequear conexión
-      setConnectionStatus(null);
       setIsLoading(false);
       return;
     }
-  
-    const checkConnectionStatus = async () => {
-      try {
-        const response = await ApiService.getConnectionStatus(currentUser.firebaseUser.uid)
-        if (response.error) {
-          throw new Error(response.error)
-        }
-        if (response.data) {
-          setConnectionStatus({
-            isConnected: response.data.isConnected,
-            lastChecked: new Date().toISOString()
-          })
-        }
-      } catch (error) {
-        console.error("Error al verificar el estado de conexión:", error)
-        toast({
-          title: "Error",
-          description: "No se pudo verificar el estado de conexión con MercadoPago",
-          variant: "destructive"
-        })
-      } finally {
-        setIsLoading(false)
-      }
-    }
-  
-    checkConnectionStatus()
-  }, [authLoading, currentUser, toast])
+    // Ya no necesitamos verificar conexión con MercadoPago individual
+    setIsLoading(false);
+  }, [authLoading, currentUser])
 
   // Fetch coupons on component mount
   useEffect(() => {
@@ -1211,41 +1427,10 @@ export default function SellerDashboardPage() {
     }
   }
 
-  const handleDisconnect = async () => {
-    if (!currentUser) return
-
-    try {
-      setIsDisconnecting(true)
-      const response = await ApiService.disconnectAccount(currentUser.firebaseUser.uid)
-
-      if (response.error) {
-        throw new Error(response.error)
-      }
-
-      setConnectionStatus({
-        isConnected: false,
-        lastChecked: new Date().toISOString()
-      })
-      // Guardar flag para refrescar al volver
-      if (typeof window !== "undefined") {
-        localStorage.setItem("mp_disconnected", "1");
-      }
-      await refreshUserProfile();
-      toast({
-        title: "Éxito",
-        description: "Tu cuenta de MercadoPago ha sido desconectada exitosamente"
-      })
-    } catch (error) {
-      console.error("Error al desconectar la cuenta:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo desconectar la cuenta de MercadoPago",
-        variant: "destructive"
-      })
-    } finally {
-      setIsDisconnecting(false)
-    }
-  }
+  // Función de desconexión - YA NO ES NECESARIA EN SISTEMA CENTRALIZADO
+  // const handleDisconnect = async () => {
+  //   // Ya no necesitamos desconectar cuentas individuales de MercadoPago
+  // }
 
   // 3. Función para suscribirse
   const handleSubscribe = async () => {
@@ -1257,43 +1442,22 @@ export default function SellerDashboardPage() {
     }
     setSubscribing(true);
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_BASE_URL;
-      if (!backendUrl) {
-        console.error("[handleSubscribe] No se encontró la URL del backend en las variables de entorno");
-        toast({ title: 'Error', description: 'No se encontró la URL del backend', variant: 'destructive' });
-        return;
-      }
-      const user = auth.currentUser;
-      if (!user || typeof user.getIdToken !== 'function') {
-        console.error("[handleSubscribe] No hay usuario de Firebase Auth o getIdToken no está disponible");
-        toast({ title: 'Error', description: 'No hay usuario de Firebase Auth o getIdToken no está disponible', variant: 'destructive' });
-        return;
-      }
-      const token = await user.getIdToken();
-      if (!token) {
-        console.error("[handleSubscribe] No se pudo obtener el token de autenticación");
-        toast({ title: 'Error', description: 'No se pudo obtener el token de autenticación', variant: 'destructive' });
-        return;
-      }
-      console.log("[handleSubscribe] Token obtenido:", token);
-      const res = await fetch(`${backendUrl}/api/mercadopago/subscription/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          userId: currentUser.firebaseUser.uid,
-          planType: 'BASICO',
-        }),
+      // Usar el servicio API actualizado
+      const response = await ApiService.createSubscriptionPreference({
+        userId: currentUser.firebaseUser.uid,
+        planType: 'basic', // Cambiar de 'BASICO' a 'basic' para coincidir con el backend
       });
-      console.log("[handleSubscribe] Respuesta HTTP status:", res.status);
-      const data = await res.json();
-      console.log("[handleSubscribe] Respuesta de la API:", data);
-      if (data.init_point) {
-        window.location.href = data.init_point;
+
+      console.log("[handleSubscribe] Respuesta de la API:", response);
+      
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      if (response.data?.init_point) {
+        window.location.href = response.data.init_point;
       } else {
-        toast({ title: 'Error', description: data.error || 'No se recibió un punto de inicio de suscripción', variant: 'destructive' });
+        toast({ title: 'Error', description: 'No se recibió un punto de inicio de suscripción', variant: 'destructive' });
       }
     } catch (err) {
       console.error("[handleSubscribe] Error en la suscripción:", err);
@@ -1303,13 +1467,14 @@ export default function SellerDashboardPage() {
     }
   };
 
-  useEffect(() => {
-    if (typeof window !== "undefined" && localStorage.getItem("mp_disconnected")) {
-      refreshUserProfile().then(() => {
-        localStorage.removeItem("mp_disconnected");
-      });
-    }
-  }, [refreshUserProfile]);
+  // useEffect para mp_disconnected - YA NO ES NECESARIO EN SISTEMA CENTRALIZADO
+  // useEffect(() => {
+  //   if (typeof window !== "undefined" && localStorage.getItem("mp_disconnected")) {
+  //     refreshUserProfile().then(() => {
+  //       localStorage.removeItem("mp_disconnected");
+  //     });
+  //   }
+  // }, [refreshUserProfile]);
 
   // Nueva función de validación para servicios
   const validateServiceForm = () => {
@@ -1408,6 +1573,90 @@ export default function SellerDashboardPage() {
       )
     } finally {
       setSubmittingProduct(false)
+    }
+  }
+
+  const fetchSellerEarnings = async () => {
+    if (!currentUser) return
+    
+    setLoadingEarnings(true)
+    try {
+      // Obtener ventas del vendedor
+      const sales = await getSellerSales(currentUser.firebaseUser.uid)
+      setSellerSales(sales)
+      
+      // Obtener distribución de comisiones
+      const distribution = await calculateCommissionDistribution()
+      const sellerDistribution = distribution.find(d => d.vendedorId === currentUser.firebaseUser.uid)
+      setCommissionDistribution(sellerDistribution || null)
+      
+    } catch (err) {
+      console.error("Error fetching seller earnings:", err)
+      setError("Error al cargar los datos de ganancias")
+    } finally {
+      setLoadingEarnings(false)
+    }
+  }
+
+  const getFilteredSales = () => {
+    let filtered = sellerSales
+    
+    if (earningsFilter !== 'all') {
+      filtered = filtered.filter(sale => sale.estadoPago === earningsFilter)
+    }
+    
+    if (earningsDateFrom) {
+      filtered = filtered.filter(sale => sale.fechaCompra >= earningsDateFrom)
+    }
+    
+    if (earningsDateTo) {
+      filtered = filtered.filter(sale => sale.fechaCompra <= earningsDateTo)
+    }
+    
+    return filtered.sort((a, b) => new Date(b.fechaCompra).getTime() - new Date(a.fechaCompra).getTime())
+  }
+
+  const downloadInvoice = async (startDate: string, endDate: string) => {
+    if (!currentUser) return
+    
+    try {
+      // Filtrar ventas por rango de fechas
+      let filteredSales = sellerSales
+      if (startDate) {
+        filteredSales = filteredSales.filter(sale => sale.fechaCompra >= startDate)
+      }
+      if (endDate) {
+        filteredSales = filteredSales.filter(sale => sale.fechaCompra <= endDate)
+      }
+      
+      // Crear y descargar archivo CSV
+      const csvContent = [
+        ['Fecha', 'Compra ID', 'Productos', 'Subtotal', 'Comisión', 'Neto', 'Estado'],
+        ...filteredSales.map(sale => [
+          sale.fechaCompra,
+          sale.compraId,
+          sale.items.map(item => `${item.productoNombre} x${item.cantidad}`).join('; '),
+          sale.subtotalVendedor.toFixed(2),
+          sale.comisionApp.toFixed(2),
+          sale.montoAPagar.toFixed(2),
+          sale.estadoPago
+        ])
+      ].map(row => row.join(',')).join('\n')
+      
+      const blob = new Blob([csvContent], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      
+      const vendorName = currentUser.firebaseUser.displayName || 'vendedor'
+      const dateRange = startDate && endDate ? `${startDate}-${endDate}` : 'todas-las-fechas'
+      a.download = `ventas-${vendorName}-${dateRange}.csv`
+      a.click()
+      window.URL.revokeObjectURL(url)
+      
+    } catch (err) {
+      console.error("Error generating invoice:", err)
+      setError("Error al generar la factura")
     }
   }
 
@@ -1530,12 +1779,31 @@ export default function SellerDashboardPage() {
                 Estadísticas
               </Button>
               <Button
+                variant={activeTab === "earnings" ? "secondary" : "ghost"}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
+                onClick={() => {
+                  setActiveTab("earnings")
+                  fetchSellerEarnings()
+                }}
+              >
+                <DollarSign className="h-4 w-4" />
+                Mis Ganancias
+              </Button>
+              <Button
                 variant={activeTab === "profile" ? "secondary" : "ghost"}
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
                 onClick={() => setActiveTab("profile")}
               >
                 <User className="h-4 w-4" />
                 Configuración
+              </Button>
+              <Button
+                variant={activeTab === "bank-config" ? "secondary" : "ghost"}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
+                onClick={() => setActiveTab("bank-config")}
+              >
+                <CreditCard className="h-4 w-4" />
+                Datos Bancarios
               </Button>
             </nav>
           </div>
@@ -1660,6 +1928,17 @@ export default function SellerDashboardPage() {
                 >
                   <UserIcon className="mr-2 h-5 w-5" />
                   Configuración
+                </Button>
+                <Button
+                  variant={activeTab === "bank-config" ? "secondary" : "ghost"}
+                  onClick={() => {
+                    setActiveTab("bank-config")
+                    closeMobileMenu()
+                  }}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
+                >
+                  <CreditCard className="mr-2 h-5 w-5" />
+                  Datos Bancarios
                 </Button>
               </nav>
               <div className="mt-auto p-4">
@@ -1789,8 +2068,8 @@ export default function SellerDashboardPage() {
                             <TableHead>Nombre</TableHead>
                             <TableHead>Precio</TableHead>
                             <TableHead>Tipo</TableHead>
-                            <TableHead>Stock</TableHead>
-                            <TableHead>Acciones</TableHead>
+                            <TableHead className="hidden md:table-cell">Stock</TableHead>
+                            <TableHead className="hidden md:table-cell">Acciones</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1831,10 +2110,8 @@ export default function SellerDashboardPage() {
                               <TableCell className="font-medium">{prod.name}</TableCell>
                               <TableCell>${prod.price.toFixed(2)}</TableCell>
                               <TableCell>{prod.isService ? "Servicio" : "Producto"}</TableCell>
-                              <TableCell className="text-center">
-                                {prod.isService ? "N/A" : (prod.stock ?? 0)}
-                              </TableCell>
-                              <TableCell className="space-x-1">
+                              <TableCell className="text-center hidden md:table-cell">{prod.isService ? "N/A" : (prod.stock ?? 0)}</TableCell>
+                              <TableCell className="space-x-1 hidden md:table-cell">
                                 <div className="flex gap-1">
                                   <Button
                                     variant="outline"
@@ -1873,32 +2150,13 @@ export default function SellerDashboardPage() {
                 <CardDescription>Completa los detalles para agregar un ítem.</CardDescription>
               </CardHeader>
               <CardContent>
-                {/* Notificación de MercadoPago */}
-                {!currentUser?.mercadopagoConnected ? (
-                  <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg mb-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                      <span className="text-sm text-yellow-800">
-                        Conecta MercadoPago para habilitar la publicación
-                      </span>
-                    </div>
-                    <Button
-                      onClick={() => setActiveTab("profile")}
-                      variant="outline"
-                      size="sm"
-                      className="text-yellow-700 border-yellow-300 hover:bg-yellow-100"
-                    >
-                      Ir a Configuración
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="bg-green-50 border border-green-200 p-3 rounded-lg mb-4 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm text-green-800">
-                      MercadoPago conectado - Formulario habilitado
-                    </span>
-                  </div>
-                )}
+                {/* Notificación de sistema centralizado */}
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg mb-4 flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span className="text-sm text-blue-800">
+                    Sistema de pagos centralizado - Formulario habilitado
+                  </span>
+                </div>
                 {/* Resumen de errores */}
                 {productFormTouched && Object.keys(productFormErrors).length > 0 && (
                   <Alert variant="destructive" className="mb-4">
@@ -1908,11 +2166,11 @@ export default function SellerDashboardPage() {
                       <ul className="list-disc list-inside space-y-1 mt-2">
                         {Object.values(productFormErrors).map((err, idx) => <li key={idx}>{err}</li>)}
                       </ul>
-                    </AlertDescription>
-                  </Alert>
+                      </AlertDescription>
+                    </Alert>
                 )}
                 <form onSubmit={handleSubmitProduct} className="space-y-6">
-                  <fieldset disabled={!currentUser?.mercadopagoConnected} style={{ opacity: !currentUser?.mercadopagoConnected ? 0.5 : 1 }}>
+                  <fieldset>
                   {/* Media Upload Section */}
                   <div>
                     <Label htmlFor="productMedia" className="text-base">
@@ -2016,7 +2274,7 @@ export default function SellerDashboardPage() {
                         {/* Error de media */}
                         {productFormTouched && productFormErrors.media && (
                           <p className="text-xs text-red-600 mt-1">{productFormErrors.media}</p>
-                        )}
+                      )}
                     </div>
                   </div>
 
@@ -2180,8 +2438,8 @@ export default function SellerDashboardPage() {
                       <ul className="list-disc list-inside space-y-1 mt-2">
                         {Object.values(serviceFormErrors).map((err, idx) => <li key={idx}>{err}</li>)}
                       </ul>
-                    </AlertDescription>
-                  </Alert>
+                      </AlertDescription>
+                    </Alert>
                 )}
                 <form onSubmit={handleSubmitService} className="space-y-6 relative">
                   <fieldset disabled={!!currentUser && !currentUser.isSubscribed} style={{ opacity: !!currentUser && !currentUser.isSubscribed ? 0.5 : 1 }}>
@@ -2294,7 +2552,7 @@ export default function SellerDashboardPage() {
                                       </div>
                                     )}
                                   </div>
-                                  <Button
+                    <Button
                                     type="button"
                                     variant="destructive"
                                     size="icon"
@@ -2302,19 +2560,19 @@ export default function SellerDashboardPage() {
                                     onClick={() => handleRemoveCurrentMedia(index)}
                                   >
                                     <XCircle className="h-4 w-4" />
-                                  </Button>
+                    </Button>
                                   <Badge variant="secondary" className="absolute bottom-2 left-2 text-xs">
                                     {media.type}
                                   </Badge>
                                 </div>
                               ))}
                             </div>
-                          </div>
-                        )}
+                  </div>
+                )}
 
                         {/* New Media Preview */}
                         {mediaPreviewUrls.length > 0 && (
-                          <div>
+                    <div>
                             <Label className="text-sm font-medium text-gray-700 mb-2 block">
                               Nuevos archivos seleccionados:
                       </Label>
@@ -2590,21 +2848,21 @@ export default function SellerDashboardPage() {
                         </div>
                       ) : (
                         <div className="space-y-4">
-                                                     <Alert variant="destructive">
-                             <AlertTriangle className="h-4 w-4" />
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
                              <AlertTitle>Suscripción Requerida</AlertTitle>
-                             <AlertDescription>
+                    <AlertDescription>
                                Para crear y ofrecer servicios en la plataforma, necesitas activar tu suscripción.
-                             </AlertDescription>
-                           </Alert>
+                    </AlertDescription>
+                  </Alert>
                            
-                           <Card>
-                             <CardHeader>
+                <Card>
+                  <CardHeader>
                                <CardTitle>Suscripción para Servicios</CardTitle>
-                               <CardDescription>
+                    <CardDescription>
                                  Activa tu suscripción para poder crear y ofrecer servicios.
-                               </CardDescription>
-                             </CardHeader>
+                    </CardDescription>
+                  </CardHeader>
                              <CardContent className="space-y-4">
                                <div className="text-sm text-gray-600">
                                  <p className="font-semibold mb-2">¿Para qué necesitas la suscripción?</p>
@@ -2614,19 +2872,19 @@ export default function SellerDashboardPage() {
                                    <li>• <strong>Recibir pagos:</strong> Cobra por tus servicios de forma segura</li>
                                    <li>• <strong>Acceso completo:</strong> Usa todas las herramientas de vendedor</li>
                                  </ul>
-                               </div>
+                      </div>
                                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                                  <p className="text-sm text-blue-800">
                                    <strong>Nota:</strong> Los productos físicos no requieren suscripción, solo los servicios.
                                  </p>
                                </div>
-                               <Button
-                                 onClick={handleSubscribe}
-                                 disabled={subscribing}
+                      <Button
+                        onClick={handleSubscribe}
+                        disabled={subscribing}
                                  className="w-full bg-purple-700 text-white hover:bg-purple-800"
-                               >
+                      >
                                  {subscribing ? "Redirigiendo..." : "Activar Suscripción"}
-                               </Button>
+                      </Button>
                              </CardContent>
                            </Card>
                         </div>
@@ -2636,43 +2894,262 @@ export default function SellerDashboardPage() {
                   
                   <TabsContent value="mercadopago" className="space-y-6 mt-6">
                     <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">Cuenta de MercadoPago</h3>
-                      {currentUser?.mercadopagoConnected ? (
-                        <div className="flex flex-col gap-2">
-                          <div className="bg-green-100 text-green-800 p-3 rounded flex items-center gap-2">
-                            <span className="font-semibold">✅ Cuenta conectada correctamente.</span>
-                            <span className="text-xs">Ya puedes recibir pagos y vender productos.</span>
-                          </div>
-                          <Button
-                            variant="destructive"
-                            disabled={isDisconnecting}
-                            onClick={() => {
-                              if (window.confirm('¿Seguro que quieres desconectar tu cuenta de MercadoPago? No podrás vender productos hasta volver a conectar tu cuenta.')) {
-                                handleDisconnect();
-                              }
-                            }}
-                            className="w-full mt-2"
-                          >
-                            {isDisconnecting ? 'Desconectando...' : 'Desconectar cuenta de MercadoPago'}
-                          </Button>
-                          <div className="text-xs text-orange-700 mt-1">
-                            <AlertTriangle className="inline w-4 h-4 mr-1 align-text-bottom" />
-                            Si desconectas tu cuenta, no podrás vender productos ni recibir pagos hasta volver a conectar.
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col gap-2">
-                          <div className="bg-yellow-100 text-yellow-800 p-3 rounded flex items-center gap-2">
-                            <span className="font-semibold">⚠️ Debes conectar tu cuenta de MercadoPago para vender productos y recibir pagos.</span>
-                          </div>
-                          <ConnectMercadoPagoButton />
-                        </div>
-                      )}
+                      <h3 className="text-lg font-semibold">Configuración de Pagos</h3>
+                      <div className="bg-blue-100 text-blue-800 p-3 rounded flex items-center gap-2">
+                        <span className="font-semibold">ℹ️ Sistema de pagos centralizado activo.</span>
+                        <span className="text-xs">Los pagos se procesan de forma centralizada. Configura tus datos bancarios para recibir pagos.</span>
+                      </div>
+                      <div className="mt-4">
+                        <p className="text-sm text-gray-600">
+                          El nuevo sistema de pagos centralizado permite una mejor gestión de comisiones y distribución de fondos.
+                          Los pagos se procesan a través de nuestra cuenta oficial de MercadoPago.
+                        </p>
+                      </div>
                     </div>
                   </TabsContent>
                 </Tabs>
+                  </CardContent>
+                </Card>
+          )}
+
+          {activeTab === "bank-config" && currentUser && (
+            <BankConfigForm 
+              sellerId={currentUser.firebaseUser.uid}
+              onConfigSaved={() => {
+                toast({
+                  title: "Configuración guardada",
+                  description: "Tus datos bancarios han sido guardados correctamente",
+                })
+              }}
+            />
+          )}
+
+          {/* Earnings Tab */}
+          {activeTab === "earnings" && (
+            <div className="space-y-6">
+              {/* Resumen de Ganancias */}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium">Total Ganado</CardTitle>
+                    <DollarSign className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      ${commissionDistribution?.totalEarned.toFixed(2) || '0.00'}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Ingresos brutos de ventas
+                    </p>
               </CardContent>
             </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium">Pendiente de Pago</CardTitle>
+                    <Clock className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-yellow-600">
+                      ${commissionDistribution?.pendingAmount.toFixed(2) || '0.00'}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Cantidad por recibir
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-sm font-medium">Ya Pagado</CardTitle>
+                    <CheckCircle className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600">
+                      ${commissionDistribution?.paidAmount.toFixed(2) || '0.00'}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Pagos recibidos
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Filtros */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Filtros de Historial</CardTitle>
+                  <CardDescription>
+                    Filtra tu historial de ventas y pagos
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <Label htmlFor="earningsFilter">Estado de Pago</Label>
+                      <Select value={earningsFilter} onValueChange={(value: 'all' | 'pendiente' | 'pagado') => setEarningsFilter(value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="pendiente">Pendiente</SelectItem>
+                          <SelectItem value="pagado">Pagado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="earningsDateFrom">Desde</Label>
+                      <Input
+                        id="earningsDateFrom"
+                        type="date"
+                        value={earningsDateFrom}
+                        onChange={(e) => setEarningsDateFrom(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="earningsDateTo">Hasta</Label>
+                      <Input
+                        id="earningsDateTo"
+                        type="date"
+                        value={earningsDateTo}
+                        onChange={(e) => setEarningsDateTo(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <Button onClick={() => downloadInvoice(earningsDateFrom, earningsDateTo)}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Descargar Factura
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Historial de Ventas */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Historial de Ventas</CardTitle>
+                  <CardDescription>
+                    Detalle de todas tus ventas y comisiones
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loadingEarnings ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
+                      <span className="ml-2">Cargando historial...</span>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Fecha</TableHead>
+                            <TableHead>Comprador</TableHead>
+                            <TableHead>Productos</TableHead>
+                            <TableHead>Subtotal</TableHead>
+                            <TableHead>Comisión (12%)</TableHead>
+                            <TableHead>Neto</TableHead>
+                            <TableHead>Estado</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {getFilteredSales().map((sale) => (
+                            <TableRow key={sale.compraId}>
+                              <TableCell>
+                                <div className="font-medium">
+                                  {new Date(sale.fechaCompra).toLocaleDateString()}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="font-medium">{sale.compradorNombre}</div>
+                              </TableCell>
+                                                             <TableCell>
+                                 <div className="space-y-1">
+                                   {sale.items.map((item, index) => (
+                                     <div key={index} className="text-sm">
+                                       {item.productoNombre} x{item.cantidad}
+                                     </div>
+                                   ))}
+                                 </div>
+                               </TableCell>
+                               <TableCell>
+                                 <div className="font-medium">${sale.subtotalVendedor.toFixed(2)}</div>
+                               </TableCell>
+                               <TableCell>
+                                 <div className="text-red-600">-${sale.comisionApp.toFixed(2)}</div>
+                               </TableCell>
+                               <TableCell>
+                                 <div className="font-bold text-green-600">${sale.montoAPagar.toFixed(2)}</div>
+                               </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={sale.estadoPago === 'pagado' ? 'default' : 'secondary'}
+                                  className={sale.estadoPago === 'pagado' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}
+                                >
+                                  {sale.estadoPago === 'pagado' ? 'Pagado' : 'Pendiente'}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      
+                      {getFilteredSales().length === 0 && (
+                        <div className="text-center py-8 text-gray-500">
+                          No hay ventas que mostrar con los filtros seleccionados
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Información del Sistema de Comisiones */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Información del Sistema</CardTitle>
+                  <CardDescription>
+                    Detalles sobre cómo funciona el sistema de pagos centralizado
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <h4 className="font-medium mb-2">Comisiones</h4>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>• Comisión del 12% sobre cada venta</li>
+                        <li>• Deducción automática del total</li>
+                        <li>• Transparencia total en el cálculo</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-2">Pagos</h4>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>• Pagos semanales automáticos</li>
+                        <li>• Transferencia a tu cuenta bancaria</li>
+                        <li>• Notificaciones por cada pago</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-2">Impuestos</h4>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>• Retención según configuración</li>
+                        <li>• Facturas automáticas disponibles</li>
+                        <li>• Reportes mensuales incluidos</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-2">Soporte</h4>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        <li>• Consultas sobre pagos</li>
+                        <li>• Historial completo disponible</li>
+                        <li>• Descarga de facturas</li>
+                      </ul>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
 
           {activeTab === "coupons" && (
@@ -2932,9 +3409,9 @@ export default function SellerDashboardPage() {
                             {/* Información del producto y compra */}
                             <div className="flex items-start gap-4 flex-1">
                               <div className="w-16 h-16 relative flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
-                                {shipment.productImageUrl ? (
+                                {shipment.productImage ? (
                                   <Image
-                                    src={shipment.productImageUrl}
+                                    src={shipment.productImage}
                                     alt={shipment.productName || "Producto"}
                                     fill
                                     className="object-cover"
@@ -2952,7 +3429,7 @@ export default function SellerDashboardPage() {
                                 </h3>
                                 <div className="space-y-1 text-sm text-gray-600">
                                   <p>Compra #{shipment.paymentId}</p>
-                                  <p>Comprador: {shipment.vendorName || "Usuario"}</p>
+                                  <p>Comprador: {shipment.buyerName || "Usuario"}</p>
                                   <p>Monto: ${shipment.amount.toFixed(2)}</p>
                                   <p>
                                     Fecha: {shipment.createdAt?.toDate ? 
@@ -3086,11 +3563,158 @@ export default function SellerDashboardPage() {
                           )}
                         </CardContent>
                       </Card>
-                    ))}
+                                        ))}
                   </div>
-                                 )}
+                )}
 
-                 {/* Modal de actualización de envío */}
+                {/* 🆕 NUEVO: Sección de envíos centralizados */}
+                {centralizedShipments.length > 0 && (
+                  <div className="mt-8 pt-8 border-t">
+                    <div className="flex items-center gap-2 mb-6">
+                      <h3 className="text-lg font-semibold">Envíos Centralizados</h3>
+                      <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                        {centralizedShipments.length} envío{centralizedShipments.length > 1 ? 's' : ''}
+                      </span>
+                    </div>
+
+                    <div className="space-y-4">
+                      {centralizedShipments.map((shipment) => (
+                        <Card key={shipment.id} className="overflow-hidden border-l-4 border-l-blue-500">
+                          <CardContent className="p-6">
+                            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                              {/* Información del producto y compra */}
+                              <div className="flex items-start gap-4 flex-1">
+                                <div className="w-16 h-16 relative flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <Package className="h-6 w-6 text-gray-400" />
+                                  </div>
+                                </div>
+                                
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-medium text-lg mb-1 truncate">
+                                    {shipment.productName}
+                                  </h3>
+                                  <div className="space-y-1 text-sm text-gray-600">
+                                    <p>Compra #{shipment.purchaseId.slice(-8)}</p>
+                                    <p>Cantidad: {shipment.quantity}</p>
+                                    <p>
+                                      Fecha: {new Date(shipment.createdAt?.seconds * 1000).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Estado actual y acciones */}
+                              <div className="lg:w-80 space-y-4">
+                                {/* Estado actual */}
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium">Estado actual:</span>
+                                  <Badge
+                                    className={`flex items-center gap-1 ${getShippingBadgeClass(shipment.status)}`}
+                                  >
+                                    {getShippingIcon(shipment.status)}
+                                    {getShippingStatusText(shipment.status)}
+                                  </Badge>
+                                </div>
+
+                                {/* Selector de nuevo estado */}
+                                <div className="space-y-2">
+                                  <Label className="text-sm">Actualizar estado:</Label>
+                                  <Select
+                                    onValueChange={(newStatus) => {
+                                      handleUpdateCentralizedShippingStatus(
+                                        shipment.purchaseId,
+                                        shipment.itemId,
+                                        newStatus as any
+                                      )
+                                    }}
+                                    disabled={updatingShipment === `${shipment.purchaseId}-${shipment.itemId}`}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Seleccionar nuevo estado" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="pending">
+                                        <div className="flex items-center gap-2">
+                                          <Clock className="h-4 w-4" />
+                                          Pendiente
+                                        </div>
+                                      </SelectItem>
+                                      <SelectItem value="preparing">
+                                        <div className="flex items-center gap-2">
+                                          <Package className="h-4 w-4" />
+                                          En preparación
+                                        </div>
+                                      </SelectItem>
+                                      <SelectItem value="shipped">
+                                        <div className="flex items-center gap-2">
+                                          <Truck className="h-4 w-4" />
+                                          Enviado
+                                        </div>
+                                      </SelectItem>
+                                      <SelectItem value="delivered">
+                                        <div className="flex items-center gap-2">
+                                          <CheckCircle className="h-4 w-4" />
+                                          Entregado
+                                        </div>
+                                      </SelectItem>
+                                      <SelectItem value="cancelled">
+                                        <div className="flex items-center gap-2">
+                                          <XCircle className="h-4 w-4" />
+                                          Cancelado
+                                        </div>
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                {/* Información adicional de envío */}
+                                {(shipment.trackingNumber || shipment.carrierName || shipment.notes) && (
+                                  <div className="pt-2 border-t space-y-2 text-sm">
+                                    {shipment.trackingNumber && (
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-600">Seguimiento:</span>
+                                        <span className="font-mono text-xs">
+                                          {shipment.trackingNumber}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {shipment.carrierName && (
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-600">Transportista:</span>
+                                        <span>{shipment.carrierName}</span>
+                                      </div>
+                                    )}
+                                    {shipment.notes && (
+                                      <div className="pt-2">
+                                        <span className="text-gray-600">Notas:</span>
+                                        <p className="text-xs mt-1 bg-gray-50 p-2 rounded">
+                                          {shipment.notes}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Indicador de carga */}
+                            {updatingShipment === `${shipment.purchaseId}-${shipment.itemId}` && (
+                              <div className="mt-4 pt-4 border-t">
+                                <div className="flex items-center gap-2 text-sm text-blue-600">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Actualizando estado de envío centralizado...
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Modal de actualización de envío */}
                  <Dialog open={isShippingModalOpen} onOpenChange={setIsShippingModalOpen}>
                    <DialogContent className="sm:max-w-[500px]">
                      <DialogHeader>
@@ -3158,9 +3782,9 @@ export default function SellerDashboardPage() {
                      </DialogFooter>
                    </DialogContent>
                  </Dialog>
-               </CardContent>
-             </Card>
-           )}
+              </CardContent>
+            </Card>
+          )}
         </main>
       </div>
     </div>

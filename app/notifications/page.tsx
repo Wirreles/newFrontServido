@@ -201,27 +201,27 @@ export default function NotificationsPage() {
 
             return (
               <Card key={notification.id} className={`hover:shadow-md transition-shadow ${getCardStyle()} ${notification.isRead === false ? "ring-2 ring-blue-200" : ""}`}>
-                <CardContent className="p-4 flex items-start gap-4">
-                  <div className="flex-shrink-0">
+              <CardContent className="p-4 flex items-start gap-4">
+                <div className="flex-shrink-0">
                     <notification.icon className={`h-6 w-6 ${getIconColor()}`} />
-                  </div>
-                  <div className="flex-grow">
+                </div>
+                <div className="flex-grow">
                     <div className="flex items-start justify-between">
-                      <h3 className="font-semibold text-lg">{notification.title}</h3>
+                  <h3 className="font-semibold text-lg">{notification.title}</h3>
                       {notification.isRead === false && (
                         <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
                       )}
                     </div>
-                    <p className="text-sm text-gray-700 mb-1">{notification.description}</p>
-                    {notification.time && <p className="text-xs text-gray-500">{notification.time}</p>}
-                    {notification.link && (
-                      <Link href={notification.link} className="text-blue-600 hover:underline text-sm mt-2 block">
-                        Ver más
-                      </Link>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                  <p className="text-sm text-gray-700 mb-1">{notification.description}</p>
+                  {notification.time && <p className="text-xs text-gray-500">{notification.time}</p>}
+                  {notification.link && (
+                    <Link href={notification.link} className="text-blue-600 hover:underline text-sm mt-2 block">
+                      Ver más
+                    </Link>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
             )
           })}
         </div>

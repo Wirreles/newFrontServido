@@ -10,7 +10,7 @@ import { ApiService } from "@/lib/services/api"
 
 interface PaymentButtonProps {
   items: PaymentItem[]
-  sellerId: string
+  sellerId?: string // Ya no es necesario para el nuevo sistema
   className?: string
 }
 
@@ -29,13 +29,27 @@ export function PaymentButton({ items, sellerId, className = "" }: PaymentButton
       return
     }
 
+    if (!items || items.length === 0) {
+      toast({
+        title: "Error",
+        description: "No hay productos para comprar",
+        variant: "destructive"
+      })
+      return
+    }
+
     try {
       setLoading(true)
 
-      const response = await ApiService.createPayment({
-        productId: items[0].id,
-        quantity: items[0].quantity,
-        vendedorId: sellerId,
+      // Convertir items a formato del backend
+      const products = items.map(item => ({
+        productId: item.id,
+        quantity: item.quantity
+      }))
+
+      // Usar el nuevo sistema centralizado con múltiples productos
+      const response = await ApiService.createProductPreference({
+        products,
         buyerId: currentUser.firebaseUser.uid
       })
 
@@ -47,6 +61,17 @@ export function PaymentButton({ items, sellerId, className = "" }: PaymentButton
         throw new Error("No se recibió el punto de inicio del pago")
       }
 
+      // Mostrar resumen de la compra
+      const totalProducts = items.length
+      const totalAmount = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0)
+      
+      toast({
+        title: "✅ Compra creada",
+        description: `${totalProducts} producto${totalProducts > 1 ? 's' : ''} - $${totalAmount.toFixed(2)}`,
+        duration: 3000,
+      })
+
+      // Redirigir a MercadoPago
       window.location.href = response.data.init_point
     } catch (error) {
       console.error("Error al procesar el pago:", error)

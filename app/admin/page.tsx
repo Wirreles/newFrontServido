@@ -23,6 +23,14 @@ import {
   Eye,
   EyeOff,
   Edit,
+  DollarSign,
+  CreditCard,
+  TrendingUp,
+  Filter,
+  Download,
+  CheckCircle,
+  Clock,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -34,13 +42,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Menu } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
 
-import { useState, useEffect, type ChangeEvent, useMemo } from "react"
+import { useState, useEffect, type ChangeEvent, useMemo, useRef } from "react"
 import { db, storage } from "@/lib/firebase"
 import {
   collection,
@@ -53,11 +64,32 @@ import {
   serverTimestamp,
   deleteDoc,
   where,
+  getDoc,
 } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"
 import { Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
+import type { 
+  AdminSaleRecord, 
+  AdminSalesSummary, 
+  SalesFilters, 
+  SalesSorting,
+  CentralizedPurchase,
+  PurchaseItem,
+  SellerBankConfig,
+  COMMISSION_RATE 
+} from "@/types/centralized-payments"
+import { 
+  calculateCommissionReport, 
+  calculateCommissionDistribution, 
+  generateCommissionInvoice, 
+  processCommissionPayments,
+  getAdminSalesData,
+  updatePurchasePaymentStatus,
+  type CommissionDistribution
+} from "@/lib/centralized-payments-api"
+import * as XLSX from "xlsx"
 
 interface UserData {
   id: string
@@ -148,6 +180,42 @@ interface Coupon {
   updatedAt?: any
 }
 
+// Tipos para los datos enriquecidos
+interface Purchase {
+  id: string
+  buyerId: string
+  createdAt: any
+  paymentId: string
+  productIds: string[]
+  status: string
+  totalAmount: number
+  type: string
+  vendedorIds: string[]
+  products: any[] // <-- Añadido para reflejar el modelo real de Firestore
+}
+interface UserMap { [key: string]: any }
+interface ProductMap { [key: string]: any }
+
+// 1. Definir el tipo para la venta por producto
+interface VentaProductoAdmin {
+  compraId: string;
+  paymentId: string;
+  status: string;
+  totalAmount: number;
+  fechaCompra: string;
+  buyerId: string;
+  compradorNombre: string;
+  compradorEmail: string;
+  productId: string;
+  productName: string;
+  productPrice: number;
+  quantity: number;
+  vendedorId: string;
+  vendedorNombre: string;
+  vendedorEmail: string;
+  pagado: boolean; // <-- nuevo campo
+}
+
 export default function AdminDashboard() {
   const { currentUser, authLoading } = useAuth()
   const router = useRouter()
@@ -220,6 +288,129 @@ export default function AdminDashboard() {
   const [newCouponEndDate, setNewCouponEndDate] = useState("")
   const [addingCoupon, setAddingCoupon] = useState(false)
 
+  // Estados para la pestaña de Ventas
+  const [salesData, setSalesData] = useState<VentaProductoAdmin[]>([])
+  const [salesSummary, setSalesSummary] = useState({
+    totalVentas: 0,
+    totalComisiones: 0,
+    totalPendientePago: 0,
+    totalPagado: 0,
+    ventasPorVendedor: [] as {
+      vendedorId: string;
+      vendedorNombre: string;
+      totalVentas: number;
+      totalComisiones: number;
+    }[]
+  })
+  const [salesFilters, setSalesFilters] = useState<SalesFilters>({
+    estadoPago: 'all',
+    estadoEnvio: 'all'
+  })
+  const [salesSorting, setSalesSorting] = useState<SalesSorting>({
+    field: 'fecha',
+    order: 'desc'
+  })
+  const [loadingSales, setLoadingSales] = useState(false)
+  const [markingPayment, setMarkingPayment] = useState<string | null>(null)
+  const [updatingShipping, setUpdatingShipping] = useState<string | null>(null)
+  
+  // Estados para modal de marcado manual de pagos
+  const [paymentMarkingModal, setPaymentMarkingModal] = useState<{
+    isOpen: boolean
+    compraId: string
+    vendedorId: string
+    vendedorNombre: string
+    monto: number
+  }>({
+    isOpen: false,
+    compraId: '',
+    vendedorId: '',
+    vendedorNombre: '',
+    monto: 0
+  })
+  const [paymentNotes, setPaymentNotes] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<'bank_transfer' | 'mercadopago' | 'cash'>('bank_transfer')
+  
+  // Estados para historial de pagos manuales
+  const [manualPayments, setManualPayments] = useState<any[]>([])
+  const [loadingManualPayments, setLoadingManualPayments] = useState(false)
+  
+  // Estados para notificaciones
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [loadingNotifications, setLoadingNotifications] = useState(false)
+  
+  // Estados para acciones masivas
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([])
+  const [selectedSales, setSelectedSales] = useState<string[]>([])
+  const [bulkActionLoading, setBulkActionLoading] = useState(false)
+
+  // Estados para reportes de comisiones
+  const [commissionReport, setCommissionReport] = useState<any>(null)
+  const [commissionDistribution, setCommissionDistribution] = useState<CommissionDistribution[]>([])
+  const [loadingCommissions, setLoadingCommissions] = useState(false)
+  const [reportStartDate, setReportStartDate] = useState(() => {
+    const date = new Date()
+    date.setMonth(date.getMonth() - 1)
+    return date.toISOString().split('T')[0]
+  })
+  const [reportEndDate, setReportEndDate] = useState(() => {
+    return new Date().toISOString().split('T')[0]
+  })
+
+  const [viewByPurchase, setViewByPurchase] = useState(false)
+  const [purchases, setPurchases] = useState<Purchase[]>([])
+  const [usersMap, setUsersMap] = useState<UserMap>({})
+  const [productsMap, setProductsMap] = useState<ProductMap>({})
+  const [loadingAdmin, setLoadingAdmin] = useState(true)
+  const [filters, setFilters] = useState({
+    estado: 'all',
+    vendedor: '',
+    comprador: '',
+    producto: '',
+    compra: '',
+    fechaDesde: '',
+    fechaHasta: ''
+  })
+
+  const [page, setPage] = useState(1)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  const searchTimeout = useRef<NodeJS.Timeout | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
+
+  // Justo después de los useState
+  const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [selectedSellerId, setSelectedSellerId] = useState<string | null>(null);
+  const [showSellerModal, setShowSellerModal] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoadingAdmin(true)
+      // Fetch users
+      const usersSnap = await getDocs(collection(db, 'users'))
+      const users: UserMap = {}
+      usersSnap.forEach(doc => { users[doc.id] = doc.data() })
+      setUsersMap(users)
+      console.log('USERS:', users)
+      // Fetch products
+      const productsSnap = await getDocs(collection(db, 'products'))
+      const products: ProductMap = {}
+      productsSnap.forEach(doc => { products[doc.id] = doc.data() })
+      setProductsMap(products)
+      console.log('PRODUCTS:', products)
+      // Fetch purchases
+      const purchasesSnap = await getDocs(collection(db, 'purchases'))
+      const purchases: Purchase[] = purchasesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Purchase)
+      console.log('PURCHASES:', purchases)
+      setPurchases(purchases)
+      setLoadingAdmin(false)
+    }
+    fetchData()
+  }, [])
+
   useEffect(() => {
     if (!authLoading && !currentUser) {
       router.push("/login")
@@ -233,6 +424,21 @@ export default function AdminDashboard() {
       fetchAdminData()
     }
   }, [currentUser, authLoading, router])
+
+  useEffect(() => {
+    if (activeTab === "sales" && currentUser) {
+      fetchSalesData()
+    }
+    if (activeTab === "manual-payments" && currentUser) {
+      fetchManualPayments()
+    }
+    if (activeTab === "notifications" && currentUser) {
+      fetchNotifications()
+    }
+    if (activeTab === "commissions" && currentUser) {
+      fetchCommissionReport()
+    }
+  }, [activeTab, currentUser])
 
   const fetchAdminData = async () => {
     setLoading(true)
@@ -293,11 +499,331 @@ export default function AdminDashboard() {
       const couponsQuery = query(collection(db, "coupons"), orderBy("createdAt", "desc"))
       const couponSnapshot = await getDocs(couponsQuery)
       setCoupons(couponSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Coupon))
+
+      // Cargar datos de ventas si está en la pestaña de ventas
+      if (activeTab === "sales") {
+        await fetchSalesData()
+      }
     } catch (err) {
       console.error("Error fetching admin data:", err)
       setError("Error al cargar los datos del panel. Verifica tu conexión y permisos.")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchSalesData = async () => {
+    setLoadingSales(true)
+    try {
+      // Obtener todas las compras
+      const purchasesSnap = await getDocs(collection(db, 'purchases'))
+      const purchases = purchasesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Purchase[]
+      // Desglosar productos de cada compra
+      const usersMap: { [key: string]: any } = users.reduce((acc, u) => { acc[u.id] = u; return acc }, {} as { [key: string]: any })
+      const productsMap: { [key: string]: any } = products.reduce((acc, p) => { acc[p.id] = p; return acc }, {} as { [key: string]: any })
+      const ventasPorProducto: VentaProductoAdmin[] = purchases.flatMap(compra => {
+        if (!Array.isArray(compra.products)) return []
+        return compra.products.map((prod: any) => ({
+          compraId: compra.id || '',
+          paymentId: compra.paymentId || '',
+          status: compra.status || '',
+          totalAmount: compra.totalAmount || 0,
+          fechaCompra: compra.createdAt?.toDate?.() ? compra.createdAt.toDate().toISOString() : (typeof compra.createdAt === 'string' ? compra.createdAt : ''),
+          buyerId: compra.buyerId || '',
+          compradorNombre: usersMap?.[compra.buyerId]?.name || '',
+          compradorEmail: usersMap?.[compra.buyerId]?.email || '',
+          productId: prod?.productId || '',
+          productName: prod?.nombre || productsMap?.[prod?.productId]?.name || '',
+          productPrice: prod?.precio || productsMap?.[prod?.productId]?.price || 0,
+          quantity: prod?.quantity || 0,
+          vendedorId: prod?.vendedorId || '',
+          vendedorNombre: usersMap?.[prod?.vendedorId]?.name || '',
+          vendedorEmail: usersMap?.[prod?.vendedorId]?.email || '',
+          pagado: typeof prod?.pagado === 'boolean' ? prod.pagado : false,
+        }))
+      })
+      setSalesData(ventasPorProducto)
+      setPurchases(purchases)
+
+      // Calcular métricas de ventas
+      const COMMISSION_RATE = 0.12;
+      const approvedPurchases = purchases.filter(p => p.status === 'approved');
+      const totalVentas = approvedPurchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+      const totalComisiones = totalVentas * COMMISSION_RATE;
+      let totalPagado = 0;
+      let totalPendiente = 0;
+      approvedPurchases.forEach(p => {
+        if (Array.isArray(p.products)) {
+          p.products.forEach(prod => {
+            const monto = (prod.precio || prod.price || 0) * (prod.quantity || 1);
+            if (prod.pagado) {
+              totalPagado += monto * (1 - COMMISSION_RATE);
+            } else {
+              totalPendiente += monto * (1 - COMMISSION_RATE);
+            }
+          });
+        }
+      });
+      if (totalPagado === 0 && totalPendiente === 0) {
+        totalPendiente = totalVentas - totalComisiones;
+      }
+
+      // Calcular ventas por vendedor
+      const ventasPorVendedorMap: { [vendedorId: string]: { vendedorNombre: string, totalVentas: number, totalComisiones: number } } = {};
+      ventasPorProducto.forEach(vp => {
+        if (!vp.vendedorId) return;
+        if (!ventasPorVendedorMap[vp.vendedorId]) {
+          ventasPorVendedorMap[vp.vendedorId] = {
+            vendedorNombre: vp.vendedorNombre || 'Desconocido',
+            totalVentas: 0,
+            totalComisiones: 0,
+          };
+        }
+        ventasPorVendedorMap[vp.vendedorId].totalVentas += vp.productPrice * vp.quantity;
+        ventasPorVendedorMap[vp.vendedorId].totalComisiones += vp.productPrice * vp.quantity * COMMISSION_RATE;
+      });
+      
+      const ventasPorVendedor = Object.entries(ventasPorVendedorMap).map(([vendedorId, data]) => ({
+        vendedorId,
+        vendedorNombre: data.vendedorNombre,
+        totalVentas: data.totalVentas,
+        totalComisiones: data.totalComisiones,
+      }));
+
+      setSalesSummary({
+        totalVentas,
+        totalComisiones,
+        totalPendientePago: totalPendiente,
+        totalPagado,
+        ventasPorVendedor
+      });
+    } catch (err) {
+      console.error('Error fetching sales data:', err)
+      setError('Error al cargar los datos de ventas')
+    } finally {
+      setLoadingSales(false)
+    }
+  }
+
+  // Función para abrir el modal de marcado de pago
+  const openPaymentMarkingModal = (sale: VentaProductoAdmin) => {
+    setPaymentMarkingModal({
+      isOpen: true,
+      compraId: sale.compraId,
+      vendedorId: sale.vendedorId,
+      vendedorNombre: sale.vendedorNombre,
+      monto: sale.totalAmount
+    })
+    setPaymentNotes('')
+    setPaymentMethod('bank_transfer')
+  }
+
+  // Función para cerrar el modal de marcado de pago
+  const closePaymentMarkingModal = () => {
+    setPaymentMarkingModal({
+      isOpen: false,
+      compraId: '',
+      vendedorId: '',
+      vendedorNombre: '',
+      monto: 0
+    })
+    setPaymentNotes('')
+  }
+
+  // Función mejorada para marcar pago como pagado
+  const handleMarkPaymentAsPaid = async () => {
+    if (!currentUser || !paymentMarkingModal.isOpen) return
+    
+    const { compraId, vendedorId } = paymentMarkingModal
+    setMarkingPayment(`${compraId}-${vendedorId}`)
+    
+    try {
+      // Usar la función de la API centralizada
+      await updatePurchasePaymentStatus(
+        compraId,
+        vendedorId,
+        'pagado',
+        currentUser.firebaseUser.uid
+      )
+
+      // Crear registro de pago manual en Firebase
+      const paymentRecord = {
+        compraId,
+        vendedorId,
+        vendedorNombre: paymentMarkingModal.vendedorNombre,
+        monto: paymentMarkingModal.monto,
+        metodoPago: paymentMethod,
+        notas: paymentNotes.trim() || 'Pago marcado manualmente por administrador',
+        administradorId: currentUser.firebaseUser.uid,
+        administradorNombre: currentUser.firebaseUser.displayName || 'Administrador',
+        fechaPago: new Date().toISOString(),
+        createdAt: serverTimestamp()
+      }
+
+      await addDoc(collection(db, "manualPayments"), paymentRecord)
+
+      // Crear notificación para el vendedor
+      const notificationData = {
+        userId: vendedorId,
+        type: "payment_completed",
+        title: "Pago Procesado",
+        description: `Se ha procesado tu pago de $${paymentMarkingModal.monto.toFixed(2)} por ${paymentMethod === 'bank_transfer' ? 'transferencia bancaria' : paymentMethod === 'mercadopago' ? 'MercadoPago' : 'efectivo'}`,
+        compraId,
+        monto: paymentMarkingModal.monto,
+        metodoPago: paymentMethod,
+        isRead: false,
+        createdAt: serverTimestamp()
+      }
+
+      await addDoc(collection(db, "notifications"), notificationData)
+
+      // Actualizar datos locales
+      await fetchSalesData()
+      await fetchManualPayments()
+      
+      setError(null)
+      closePaymentMarkingModal()
+      
+    } catch (err) {
+      console.error("Error marking payment as paid:", err)
+      setError("Error al marcar el pago como realizado")
+    } finally {
+      setMarkingPayment(null)
+    }
+  }
+
+  const fetchCommissionReport = async () => {
+    setLoadingCommissions(true)
+    try {
+      const startDate = new Date(reportStartDate)
+      const endDate = new Date(reportEndDate)
+      
+      const report = await calculateCommissionReport(startDate, endDate)
+      setCommissionReport(report)
+      
+      const distribution = await calculateCommissionDistribution()
+      setCommissionDistribution(distribution)
+      
+    } catch (err) {
+      console.error("Error fetching commission report:", err)
+      setError("Error al cargar el reporte de comisiones")
+    } finally {
+      setLoadingCommissions(false)
+    }
+  }
+
+  // Función para cargar historial de pagos manuales
+  const fetchManualPayments = async () => {
+    setLoadingManualPayments(true)
+    try {
+      const q = query(
+        collection(db, "manualPayments"),
+        orderBy("fechaPago", "desc")
+      )
+      const querySnapshot = await getDocs(q)
+      const payments = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      setManualPayments(payments)
+    } catch (err) {
+      console.error("Error fetching manual payments:", err)
+      setError("Error al cargar el historial de pagos manuales")
+    } finally {
+      setLoadingManualPayments(false)
+    }
+  }
+
+  // Función para cargar notificaciones del sistema
+  const fetchNotifications = async () => {
+    setLoadingNotifications(true)
+    try {
+      const q = query(
+        collection(db, "notifications"),
+        orderBy("createdAt", "desc")
+      )
+      const querySnapshot = await getDocs(q)
+      const notificationsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      setNotifications(notificationsData)
+    } catch (err) {
+      console.error("Error fetching notifications:", err)
+      setError("Error al cargar las notificaciones")
+    } finally {
+      setLoadingNotifications(false)
+    }
+  }
+
+  const handleProcessPayment = async (vendedorId: string, paymentMethod: 'bank_transfer' | 'mercadopago' | 'cash') => {
+    if (!currentUser) return
+    
+    setMarkingPayment(vendedorId)
+    try {
+      const result = await processCommissionPayments(vendedorId, currentUser.firebaseUser.uid, paymentMethod)
+      
+      if (result.success) {
+        setError(null)
+        // Actualizar datos
+        await fetchSalesData()
+        await fetchCommissionReport()
+      } else {
+        setError(result.message)
+      }
+    } catch (err) {
+      console.error("Error processing payment:", err)
+      setError("Error al procesar el pago")
+    } finally {
+      setMarkingPayment(null)
+    }
+  }
+
+  // Función para actualizar el estado de envío
+  const handleUpdateShippingStatus = async (compraId: string, newStatus: 'pendiente' | 'en_preparacion' | 'enviado' | 'entregado' | 'cancelado') => {
+    if (!currentUser) return
+    
+    setUpdatingShipping(compraId)
+    try {
+      // Actualizar en Firebase
+      const purchaseRef = doc(db, 'centralizedPurchases', compraId)
+      await updateDoc(purchaseRef, {
+        estadoEnvio: newStatus,
+        updatedAt: serverTimestamp()
+      })
+
+      // Crear notificación para el comprador
+      const sale = salesData.find(s => s.compraId === compraId)
+      if (sale) {
+        const notificationData = {
+          userId: sale.compradorEmail,
+          type: "shipping_update",
+          title: "Actualización de Envío",
+          description: `El estado de tu pedido ha cambiado a: ${
+            newStatus === 'pendiente' ? 'Pendiente' :
+            newStatus === 'en_preparacion' ? 'En Preparación' :
+            newStatus === 'enviado' ? 'Enviado' :
+            newStatus === 'entregado' ? 'Entregado' :
+            'Cancelado'
+          }`,
+          compraId,
+          estadoEnvio: newStatus,
+          isRead: false,
+          createdAt: serverTimestamp()
+        }
+
+        await addDoc(collection(db, "notifications"), notificationData)
+      }
+
+      // Actualizar datos locales
+      await fetchSalesData()
+      setError(null)
+      
+    } catch (err) {
+      console.error("Error updating shipping status:", err)
+      setError("Error al actualizar el estado de envío")
+    } finally {
+      setUpdatingShipping(null)
     }
   }
 
@@ -784,6 +1310,109 @@ export default function AdminDashboard() {
     }
   }
 
+  // Funciones para acciones masivas
+  const handleSelectAllUsers = (checked: boolean) => {
+    if (checked) {
+      setSelectedUsers(users.map(u => u.id))
+    } else {
+      setSelectedUsers([])
+    }
+  }
+
+  const handleSelectUser = (userId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedUsers([...selectedUsers, userId])
+    } else {
+      setSelectedUsers(selectedUsers.filter(id => id !== userId))
+    }
+  }
+
+  const handleBulkUserAction = async (action: 'activate' | 'deactivate' | 'delete') => {
+    if (selectedUsers.length === 0) {
+      setError("No hay usuarios seleccionados")
+      return
+    }
+
+    const confirmMessage = 
+      action === 'activate' ? `¿Activar ${selectedUsers.length} usuarios?` :
+      action === 'deactivate' ? `¿Desactivar ${selectedUsers.length} usuarios?` :
+      `¿Eliminar ${selectedUsers.length} usuarios? Esta acción no se puede deshacer.`
+
+    if (!window.confirm(confirmMessage)) return
+
+    setBulkActionLoading(true)
+    try {
+      for (const userId of selectedUsers) {
+        if (action === 'delete') {
+          await deleteDoc(doc(db, "users", userId))
+        } else {
+          await updateDoc(doc(db, "users", userId), {
+            isActive: action === 'activate'
+          })
+        }
+      }
+
+      if (action === 'delete') {
+        setUsers(users.filter(u => !selectedUsers.includes(u.id)))
+      } else {
+        setUsers(users.map(u => 
+          selectedUsers.includes(u.id) 
+            ? { ...u, isActive: action === 'activate' }
+            : u
+        ))
+      }
+
+      setSelectedUsers([])
+      setError(null)
+    } catch (err) {
+      console.error("Error in bulk action:", err)
+      setError("Error al realizar la acción masiva")
+    } finally {
+      setBulkActionLoading(false)
+    }
+  }
+
+  const handleSelectAllProducts = (checked: boolean) => {
+    if (checked) {
+      setSelectedProducts(filteredAllProducts.map(p => p.id))
+    } else {
+      setSelectedProducts([])
+    }
+  }
+
+  const handleSelectProduct = (productId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedProducts([...selectedProducts, productId])
+    } else {
+      setSelectedProducts(selectedProducts.filter(id => id !== productId))
+    }
+  }
+
+  const handleBulkProductAction = async (action: 'delete') => {
+    if (selectedProducts.length === 0) {
+      setError("No hay productos seleccionados")
+      return
+    }
+
+    if (!window.confirm(`¿Eliminar ${selectedProducts.length} productos? Esta acción no se puede deshacer.`)) return
+
+    setBulkActionLoading(true)
+    try {
+      for (const productId of selectedProducts) {
+        await deleteDoc(doc(db, "products", productId))
+      }
+
+      setAllProducts(allProducts.filter(p => !selectedProducts.includes(p.id)))
+      setSelectedProducts([])
+      setError(null)
+    } catch (err) {
+      console.error("Error in bulk product action:", err)
+      setError("Error al realizar la acción masiva")
+    } finally {
+      setBulkActionLoading(false)
+    }
+  }
+
   // Lógica de filtrado y ordenamiento para todos los productos
   const filteredAllProducts = useMemo(() => {
     const tempProducts = allProducts.filter((product) => {
@@ -827,6 +1456,93 @@ export default function AdminDashboard() {
     allProductsSortOrder,
   ])
 
+  // Filtros visuales robustos sobre salesData
+  const getFilteredSales = () => {
+    return salesData.filter(sale => {
+      // Filtro por estado de pago
+      if (salesFilters.estadoPago && salesFilters.estadoPago !== 'all') {
+        if (salesFilters.estadoPago === 'pendiente' && sale.pagado) return false
+        if (salesFilters.estadoPago === 'pagado' && !sale.pagado) return false
+      }
+      
+      // Filtro por estado de envío
+      if (salesFilters.estadoEnvio && salesFilters.estadoEnvio !== 'all' && sale.status !== salesFilters.estadoEnvio) return false
+      
+      // Filtro por vendedor
+      if (salesFilters.vendedorId && sale.vendedorId !== salesFilters.vendedorId) return false
+      
+      // Filtro por fecha
+      if (salesFilters.fechaDesde) {
+        const fechaCompra = new Date(sale.fechaCompra)
+        const desde = new Date(salesFilters.fechaDesde)
+        if (fechaCompra < desde) return false
+      }
+      if (salesFilters.fechaHasta) {
+        const fechaCompra = new Date(sale.fechaCompra)
+        const hasta = new Date(salesFilters.fechaHasta)
+        if (fechaCompra > hasta) return false
+      }
+      
+      // Filtro por monto
+      if (salesFilters.montoMinimo && sale.productPrice < salesFilters.montoMinimo) return false
+      if (salesFilters.montoMaximo && sale.productPrice > salesFilters.montoMaximo) return false
+      
+      return true
+    })
+  }
+  
+  const filteredSales = getFilteredSales()
+
+  // Paginación
+  const totalPages = Math.ceil(filteredSales.length / rowsPerPage)
+  const paginatedSales = filteredSales.slice((page - 1) * rowsPerPage, page * rowsPerPage)
+  
+  // Exportar a Excel solo lo filtrado y robusto
+  const handleExportExcel = () => {
+    const exportData = filteredSales.map(sale => ({
+      compraId: sale.compraId || 'N/A',
+      paymentId: sale.paymentId || 'N/A',
+      estado: sale.status || 'N/A',
+      fechaCompra: sale.fechaCompra || 'N/A',
+      buyerId: sale.buyerId || 'N/A',
+      comprador: sale.compradorNombre || sale.buyerId || 'N/A',
+      productId: sale.productId || 'N/A',
+      producto: sale.productName || 'N/A',
+      precio: sale.productPrice ?? 'N/A',
+      cantidad: sale.quantity ?? 'N/A',
+      vendedorId: sale.vendedorId || 'N/A',
+      vendedor: sale.vendedorNombre || sale.vendedorId || 'N/A',
+      totalCompra: sale.totalAmount ?? 'N/A'
+    }))
+    const ws = XLSX.utils.json_to_sheet(exportData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Ventas')
+    XLSX.writeFile(wb, 'ventas_admin.xlsx')
+  }
+
+  // 1. Agrupar ventas por compraId
+  const comprasAgrupadas = useMemo(() => {
+    const agrupadas: { [compraId: string]: { compra: Purchase, productos: VentaProductoAdmin[] } } = {}
+    purchases.forEach(compra => {
+      const productos = salesData.filter(s => s.compraId === compra.id)
+      if (productos.length > 0) {
+        agrupadas[compra.id] = { compra, productos }
+      }
+    })
+    return agrupadas
+  }, [purchases, salesData])
+
+  // Handler temporal para el botón (al inicio del componente AdminDashboard)
+  const handleViewDetails = (purchase: Purchase) => {
+    setSelectedPurchase(purchase);
+    setShowPurchaseModal(true);
+  }
+
+  const handleViewSeller = (vendedorId: string) => {
+    setSelectedSellerId(vendedorId);
+    setShowSellerModal(true);
+  }
+
   if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -853,7 +1569,7 @@ export default function AdminDashboard() {
     )
   }
 
-  if (loading) {
+  if (loadingAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
         <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
@@ -863,7 +1579,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="grid min-h-screen w-full lg:grid-cols-[280px_1fr] bg-gray-100">
+    <div className="grid min-h-screen w-full overflow-x-hidden max-w-full lg:grid-cols-[280px_1fr] bg-gray-100">
       {/* Sidebar */}
       <div className="hidden border-r bg-white lg:block">
         <div className="flex h-full max-h-screen flex-col gap-2">
@@ -881,6 +1597,9 @@ export default function AdminDashboard() {
                 { tab: "categories", label: "Categorías", icon: List },
                 { tab: "brands", label: "Marcas", icon: Tag },
                 { tab: "allProducts", label: "Todos los Productos", icon: ShoppingCart },
+                { tab: "sales", label: "Ventas", icon: DollarSign },
+                { tab: "manual-payments", label: "Pagos Manuales", icon: TrendingUp },
+                { tab: "notifications", label: "Notificaciones", icon: AlertTriangle },
                 { tab: "banners", label: "Banners", icon: ImageIcon },
                 { tab: "alerts", label: "Alertas", icon: Megaphone },
                 { tab: "coupons", label: "Cupones", icon: Percent },
@@ -904,7 +1623,7 @@ export default function AdminDashboard() {
       <div className="flex flex-col">
         {/* Header for mobile sidebar */}
         <header className="flex h-14 lg:h-[60px] items-center gap-4 border-b bg-white px-6 lg:hidden">
-          <Sheet>
+          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" className="lg:hidden">
                 <Menu className="h-6 w-6" />
@@ -925,6 +1644,9 @@ export default function AdminDashboard() {
                   { tab: "categories", label: "Categorías", icon: List },
                   { tab: "brands", label: "Marcas", icon: Tag },
                   { tab: "allProducts", label: "Todos los Productos", icon: ShoppingCart },
+                  { tab: "sales", label: "Ventas", icon: DollarSign },
+                  { tab: "manual-payments", label: "Pagos Manuales", icon: TrendingUp },
+                  { tab: "notifications", label: "Notificaciones", icon: AlertTriangle },
                   { tab: "banners", label: "Banners", icon: ImageIcon },
                   { tab: "alerts", label: "Alertas", icon: Megaphone },
                   { tab: "coupons", label: "Cupones", icon: Percent },
@@ -934,7 +1656,8 @@ export default function AdminDashboard() {
                     variant={activeTab === item.tab ? "secondary" : "ghost"}
                     className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-purple-600 justify-start"
                     onClick={() => {
-                      setActiveTab(item.tab) /* Consider closing sheet here */
+                      setActiveTab(item.tab)
+                      setIsMobileMenuOpen(false)
                     }}
                   >
                     <item.icon className="h-5 w-5" />
@@ -961,12 +1684,15 @@ export default function AdminDashboard() {
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             {/* Responsive TabsList */}
-            <TabsList className="flex w-full overflow-x-auto justify-start sm:justify-center md:justify-start bg-white border-b pb-2">
+            <TabsList className="flex w-full overflow-x-auto justify-start sm:justify-center md:justify-start bg-white border-b pb-2 hidden lg:flex">
               <TabsTrigger value="overview">Resumen</TabsTrigger>
               <TabsTrigger value="users">Usuarios</TabsTrigger>
               <TabsTrigger value="categories">Categorías</TabsTrigger>
               <TabsTrigger value="brands">Marcas</TabsTrigger>
               <TabsTrigger value="allProducts">Todos los Productos</TabsTrigger>
+              <TabsTrigger value="sales">Ventas y Comisiones</TabsTrigger>
+              <TabsTrigger value="manual-payments">Pagos Manuales</TabsTrigger>
+              <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
               <TabsTrigger value="banners">Banners</TabsTrigger>
               <TabsTrigger value="alerts">Alertas</TabsTrigger>
               <TabsTrigger value="coupons">Cupones</TabsTrigger>
@@ -974,6 +1700,8 @@ export default function AdminDashboard() {
 
             {/* Overview Tab */}
             <TabsContent value="overview" className="mt-4">
+              <div className="space-y-6">
+                {/* Métricas principales */}
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -982,53 +1710,114 @@ export default function AdminDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">{users.length}</div>
+                      <p className="text-xs text-muted-foreground">
+                        {users.filter(u => u.isActive).length} activos
+                      </p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-medium">Total Categorías</CardTitle>
-                    <List className="w-4 h-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium">Total Productos</CardTitle>
+                      <ShoppingBag className="w-4 h-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{categories.length}</div>
+                      <div className="text-2xl font-bold">{products.length}</div>
+                      <p className="text-xs text-muted-foreground">
+                        {products.filter(p => !p.isService).length} productos, {products.filter(p => p.isService).length} servicios
+                      </p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-medium">Total Marcas</CardTitle>
-                    <Tag className="w-4 h-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium">Ventas Totales</CardTitle>
+                      <TrendingUp className="w-4 h-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{brands.length}</div>
+                      <div className="text-2xl font-bold">${salesSummary.totalVentas.toFixed(2)}</div>
+                      <p className="text-xs text-muted-foreground">
+                        ${salesSummary.totalComisiones.toFixed(2)} en comisiones
+                      </p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-medium">Total Productos</CardTitle>
-                    <ShoppingBag className="w-4 h-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium">Notificaciones</CardTitle>
+                      <AlertTriangle className="w-4 h-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{products.length}</div>
+                      <div className="text-2xl font-bold">{notifications.filter(n => !n.isRead).length}</div>
+                      <p className="text-xs text-muted-foreground">
+                        {notifications.length} total
+                      </p>
+                  </CardContent>
+                </Card>
+                </div>
+
+                {/* Distribución por categorías */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Distribución de Productos por Categoría</CardTitle>
+                    <CardDescription>
+                      Análisis de la distribución de productos en el marketplace
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {categories.map((category) => {
+                        const categoryProducts = products.filter(p => p.category === category.name)
+                        const percentage = products.length > 0 ? (categoryProducts.length / products.length) * 100 : 0
+                        return (
+                          <div key={category.id} className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-4 h-4 bg-blue-500 rounded"></div>
+                              <span className="text-sm font-medium">{category.name}</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-24 bg-gray-200 rounded-full h-2">
+                                <div 
+                                  className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                  style={{ width: `${percentage}%` }}
+                                ></div>
+                              </div>
+                              <span className="text-sm text-gray-600 w-16 text-right">
+                                {categoryProducts.length} ({percentage.toFixed(1)}%)
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Estadísticas adicionales */}
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                      <CardTitle className="text-sm font-medium">Categorías</CardTitle>
+                      <List className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                      <div className="text-2xl font-bold">{categories.length}</div>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-medium">Banners Activos</CardTitle>
-                    <ImageIcon className="w-4 h-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium">Marcas</CardTitle>
+                      <Tag className="w-4 h-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{banners.filter(b => b.isActive).length}</div>
-                    <p className="text-xs text-muted-foreground">de {banners.length} total</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-medium">Alertas Activas</CardTitle>
-                    <Megaphone className="w-4 h-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{offerAlerts.filter(a => a.isActive).length}</div>
-                    <p className="text-xs text-muted-foreground">de {offerAlerts.length} total</p>
+                      <div className="text-2xl font-bold">{brands.length}</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                      <CardTitle className="text-sm font-medium">Banners Activos</CardTitle>
+                      <ImageIcon className="w-4 h-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{banners.filter(b => b.isActive).length}</div>
+                      <p className="text-xs text-muted-foreground">de {banners.length} total</p>
                   </CardContent>
                 </Card>
                 <Card>
@@ -1038,17 +1827,50 @@ export default function AdminDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">{coupons.filter(c => c.isActive).length}</div>
-                    <p className="text-xs text-muted-foreground">de {coupons.length} total</p>
+                      <p className="text-xs text-muted-foreground">
+                        {coupons.reduce((total, coupon) => total + coupon.usedCount, 0)} usos totales
+                      </p>
                   </CardContent>
                 </Card>
+                </div>
+
+                {/* Top vendedores */}
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-medium">Usos de Cupones</CardTitle>
-                    <Percent className="w-4 h-4 text-muted-foreground" />
+                  <CardHeader>
+                    <CardTitle>Top Vendedores</CardTitle>
+                    <CardDescription>
+                      Vendedores con más ventas en el período actual
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{coupons.reduce((total, coupon) => total + coupon.usedCount, 0)}</div>
-                    <p className="text-xs text-muted-foreground">total de usos</p>
+                    <div className="space-y-4">
+                      {salesSummary.ventasPorVendedor && salesSummary.ventasPorVendedor.length > 0 ? (
+                        salesSummary.ventasPorVendedor
+                          .sort((a, b) => b.totalVentas - a.totalVentas)
+                          .slice(0, 5)
+                          .map((vendedor, index) => (
+                            <div key={vendedor.vendedorId} className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                  {index + 1}
+                                </div>
+                                <div>
+                                  <div className="font-medium">{vendedor.vendedorNombre}</div>
+                                  <div className="text-sm text-gray-500">${vendedor.totalVentas.toFixed(2)} en ventas</div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-semibold text-green-600">${vendedor.totalComisiones.toFixed(2)}</div>
+                                <div className="text-sm text-gray-500">comisiones</div>
+                              </div>
+                            </div>
+                          ))
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          No hay datos de ventas disponibles
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -1061,34 +1883,87 @@ export default function AdminDashboard() {
                   <CardTitle>Gestión de Usuarios</CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {/* Acciones masivas */}
+                  {selectedUsers.length > 0 && (
+                    <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-blue-900">
+                          {selectedUsers.length} usuario(s) seleccionado(s)
+                        </span>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleBulkUserAction('activate')}
+                            disabled={bulkActionLoading}
+                          >
+                            {bulkActionLoading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <CheckCircle className="h-4 w-4" />
+                            )}
+                            <span className="ml-2">Activar</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleBulkUserAction('deactivate')}
+                            disabled={bulkActionLoading}
+                          >
+                            <X className="h-4 w-4" />
+                            <span className="ml-2">Desactivar</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleBulkUserAction('delete')}
+                            disabled={bulkActionLoading}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="ml-2">Eliminar</span>
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="overflow-x-auto">
-                    {" "}
-                    {/* Added for responsiveness */}
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Perfil</TableHead>
-                          <TableHead>Nombre</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Rol</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead>Acciones</TableHead>
+                          <TableHead className="w-[40px] p-1 md:p-2">
+                            <Checkbox
+                              checked={selectedUsers.length === users.length && users.length > 0}
+                              onCheckedChange={handleSelectAllUsers}
+                            />
+                          </TableHead>
+                          <TableHead className="w-[50px] p-1 md:p-2">Perfil</TableHead>
+                          <TableHead className="p-1 md:p-2">Nombre</TableHead>
+                          <TableHead className="p-1 md:p-2 max-w-[100px] truncate">Email</TableHead>
+                          <TableHead className="hidden md:table-cell p-1 md:p-2">Rol</TableHead>
+                          <TableHead className="hidden md:table-cell p-1 md:p-2">Estado</TableHead>
+                          <TableHead className="hidden md:table-cell p-1 md:p-2">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {users.map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell>
-                              <Avatar className="h-10 w-10">
+                          <TableRow key={user.id} className="text-xs md:text-sm">
+                            <TableCell className="p-1 md:p-2">
+                              <Checkbox
+                                checked={selectedUsers.includes(user.id)}
+                                onCheckedChange={(checked) => handleSelectUser(user.id, checked as boolean)}
+                              />
+                            </TableCell>
+                            <TableCell className="p-1 md:p-2">
+                              <Avatar className="h-8 w-8 md:h-10 md:w-10">
                                 <AvatarImage src={user.photoURL || "/placeholder.svg"} alt={user.name} />
                                 <AvatarFallback>
-                                  <User className="h-5 w-5" />
+                                  <User className="h-4 w-4 md:h-5 md:w-5" />
                                 </AvatarFallback>
                               </Avatar>
                             </TableCell>
-                            <TableCell>{user.name}</TableCell>
-                            <TableCell>{user.email}</TableCell>
-                            <TableCell>
+                            <TableCell className="p-1 md:p-2 max-w-[80px] truncate">{user.name}</TableCell>
+                            <TableCell className="p-1 md:p-2 max-w-[100px] truncate">{user.email}</TableCell>
+                            <TableCell className="hidden md:table-cell p-1 md:p-2">
                               <Badge
                                 variant={
                                   user.role === "admin"
@@ -1101,14 +1976,14 @@ export default function AdminDashboard() {
                                 {user.role || "user"}
                               </Badge>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="hidden md:table-cell p-1 md:p-2">
                               <span
                                 className={`px-2 py-1 rounded-full text-xs font-medium ${user.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
                               >
                                 {user.isActive ? "Activo" : "Inactivo"}
                               </span>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="hidden md:table-cell p-1 md:p-2">
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1221,35 +2096,33 @@ export default function AdminDashboard() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[80px]">Imagen</TableHead>
-                          <TableHead>Nombre</TableHead>
-                          <TableHead>Descripción</TableHead>
-                          <TableHead>Acciones</TableHead>
+                          <TableHead className="w-[40px] p-1 md:p-2">Imagen</TableHead>
+                          <TableHead className="p-1 md:p-2">Nombre</TableHead>
+                          <TableHead className="hidden md:table-cell p-1 md:p-2">Descripción</TableHead>
+                          <TableHead className="p-1 md:p-2">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {categories.map((cat) => (
-                          <TableRow key={cat.id}>
-                            <TableCell>
+                          <TableRow key={cat.id} className="text-xs md:text-sm">
+                            <TableCell className="p-1 md:p-2">
                               {cat.imageUrl ? (
                                 <Image
                                   src={cat.imageUrl || "/placeholder.svg"}
                                   alt={cat.name}
-                                  width={50}
-                                  height={50}
-                                  className="rounded object-cover aspect-square"
+                                  width={36}
+                                  height={36}
+                                  className="rounded object-cover aspect-square md:w-[50px] md:h-[50px]"
                                 />
                               ) : (
-                                <div className="w-[50px] h-[50px] bg-gray-200 rounded flex items-center justify-center">
-                                  <ImageIcon className="h-6 w-6 text-gray-400" />
+                                <div className="w-[36px] h-[36px] md:w-[50px] md:h-[50px] bg-gray-200 rounded flex items-center justify-center">
+                                  <ImageIcon className="h-5 w-5 md:h-6 md:w-6 text-gray-400" />
                                 </div>
                               )}
                             </TableCell>
-                            <TableCell className="font-medium">{cat.name}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground truncate max-w-xs">
-                              {cat.description || "-"}
-                            </TableCell>
-                            <TableCell>
+                            <TableCell className="p-1 md:p-2 font-medium">{cat.name}</TableCell>
+                            <TableCell className="hidden md:table-cell p-1 md:p-2 text-sm text-muted-foreground truncate max-w-xs">{cat.description || "-"}</TableCell>
+                            <TableCell className="p-1 md:p-2">
                               <Button
                                 variant="destructive"
                                 size="icon"
@@ -1489,12 +2362,12 @@ export default function AdminDashboard() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Producto</TableHead>
-                            <TableHead>Precio</TableHead>
-                            <TableHead>Tipo</TableHead>
-                            <TableHead>Vendedor</TableHead>
-                            <TableHead>Reseñas</TableHead> {/* New column for reviews */}
-                            <TableHead>Acciones</TableHead>
+                            <TableHead className="p-1 md:p-2">Producto</TableHead>
+                            <TableHead className="p-1 md:p-2">Precio</TableHead>
+                            <TableHead className="hidden md:table-cell p-1 md:p-2">Tipo</TableHead>
+                            <TableHead className="p-1 md:p-2">Vendedor</TableHead>
+                            <TableHead className="hidden md:table-cell p-1 md:p-2">Reseñas</TableHead>
+                            <TableHead className="hidden md:table-cell p-1 md:p-2">Acciones</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1506,54 +2379,52 @@ export default function AdminDashboard() {
                             </TableRow>
                           ) : (
                             filteredAllProducts.map((product) => (
-                              <TableRow key={product.id}>
-                                <TableCell>
-                                  <div className="flex items-center space-x-3">
-                                    <div className="h-10 w-10 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
+                              <TableRow key={product.id} className="text-xs md:text-sm">
+                                <TableCell className="p-1 md:p-2">
+                                  <div className="flex items-center space-x-2 md:space-x-3">
+                                    <div className="h-8 w-8 md:h-10 md:w-10 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
                                       {product.imageUrl ? (
                                         <Image
                                           src={product.imageUrl || "/placeholder.svg"}
                                           alt={product.name}
-                                          width={40}
-                                          height={40}
-                                          className="object-cover"
+                                          width={32}
+                                          height={32}
+                                          className="object-cover md:w-[40px] md:h-[40px]"
                                         />
                                       ) : (
-                                        <ShoppingBag className="h-5 w-5 text-gray-400" />
+                                        <ShoppingBag className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
                                       )}
                                     </div>
                                     <div>
-                                      <div className="font-medium">{product.name}</div>
-                                      <div className="text-xs text-gray-500 truncate max-w-[200px]">
-                                        {product.description}
-                                      </div>
+                                      <div className="font-medium max-w-[80px] truncate">{product.name}</div>
+                                      <div className="text-xs text-gray-500 truncate max-w-[100px]">{product.description}</div>
                                     </div>
                                   </div>
                                 </TableCell>
-                                <TableCell>${product.price.toFixed(2)}</TableCell>
-                                <TableCell>
+                                <TableCell className="p-1 md:p-2">${product.price.toFixed(2)}</TableCell>
+                                <TableCell className="hidden md:table-cell p-1 md:p-2">
                                   <Badge variant={product.isService ? "outline" : "secondary"}>
                                     {product.isService ? "Servicio" : "Producto"}
                                   </Badge>
                                 </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center space-x-2">
-                                    <Avatar className="h-8 w-8">
+                                <TableCell className="p-1 md:p-2">
+                                  <div className="flex items-center space-x-1 md:space-x-2">
+                                    <Avatar className="h-6 w-6 md:h-8 md:w-8">
                                       <AvatarImage src={product.seller?.photoURL || "/placeholder.svg"} />
                                       <AvatarFallback>
-                                        <User className="h-4 w-4" />
+                                        <User className="h-3 w-3 md:h-4 md:w-4" />
                                       </AvatarFallback>
                                     </Avatar>
-                                    <div className="text-sm">{product.seller?.name || "Vendedor desconocido"}</div>
+                                    <div className="text-xs md:text-sm max-w-[80px] truncate">{product.seller?.name || "Vendedor desconocido"}</div>
                                   </div>
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="hidden md:table-cell p-1 md:p-2">
                                   <div className="flex items-center gap-1">
                                     <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                                     <span>{product.averageRating?.toFixed(1) || "N/A"}</span>
                                   </div>
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="hidden md:table-cell p-1 md:p-2">
                                   <Button
                                     variant="destructive"
                                     size="sm"
@@ -1595,7 +2466,7 @@ export default function AdminDashboard() {
                       e.preventDefault()
                       handleAddBanner()
                     }}
-                    className="mb-6 p-4 border rounded-lg space-y-3"
+                    className="mb-6 flex flex-col gap-2 md:p-4 border rounded-lg"
                   >
                     <h3 className="text-lg font-medium">Añadir Nuevo Banner</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1699,52 +2570,34 @@ export default function AdminDashboard() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Imagen</TableHead>
-                          <TableHead>Título</TableHead>
-                          <TableHead>Orden</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead>Acciones</TableHead>
+                          <TableHead className="p-1 md:p-2">Imagen</TableHead>
+                          <TableHead className="p-1 md:p-2">Título</TableHead>
+                          <TableHead className="hidden md:table-cell p-1 md:p-2">Orden</TableHead>
+                          <TableHead className="hidden md:table-cell p-1 md:p-2">Estado</TableHead>
+                          <TableHead className="p-1 md:p-2">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {banners.map((banner) => (
-                          <TableRow key={banner.id}>
-                            <TableCell>
-                              <div className="w-32 h-16 relative rounded-md overflow-hidden">
-                                <Image
-                                  src={banner.imageUrl}
-                                  alt={banner.title}
-                                  layout="fill"
-                                  objectFit="cover"
-                                />
+                          <TableRow key={banner.id} className="text-xs md:text-sm">
+                            <TableCell className="p-1 md:p-2">
+                              <div className="w-20 h-10 md:w-32 md:h-16 relative rounded-md overflow-hidden">
+                                <Image src={banner.imageUrl} alt={banner.title} layout="fill" objectFit="cover" />
                               </div>
                             </TableCell>
-                            <TableCell>
-                              <div>
+                            <TableCell className="p-1 md:p-2 max-w-[100px] truncate">
                                 <div className="font-medium">{banner.title}</div>
-                                {banner.description && (
-                                  <div className="text-sm text-gray-500">{banner.description}</div>
-                                )}
-                              </div>
+                              {banner.description && <div className="text-xs text-gray-500 truncate">{banner.description}</div>}
                             </TableCell>
-                            <TableCell>{banner.order}</TableCell>
-                            <TableCell>
+                            <TableCell className="hidden md:table-cell p-1 md:p-2">{banner.order}</TableCell>
+                            <TableCell className="hidden md:table-cell p-1 md:p-2">
                               <div className="flex items-center gap-2">
-                                <Switch
-                                  checked={banner.isActive}
-                                  onCheckedChange={() => handleToggleBannerActive(banner.id, banner.isActive)}
-                                />
-                                <Badge variant={banner.isActive ? "default" : "secondary"}>
-                                  {banner.isActive ? "Activo" : "Inactivo"}
-                                </Badge>
+                                <Switch checked={banner.isActive} onCheckedChange={() => handleToggleBannerActive(banner.id, banner.isActive)} />
+                                <Badge variant={banner.isActive ? "default" : "secondary"}>{banner.isActive ? "Activo" : "Inactivo"}</Badge>
                               </div>
                             </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleDeleteBanner(banner.id, banner.title, banner.imagePath)}
-                              >
+                            <TableCell className="p-1 md:p-2">
+                              <Button variant="destructive" size="sm" onClick={() => handleDeleteBanner(banner.id, banner.title, banner.imagePath)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </TableCell>
@@ -1772,7 +2625,7 @@ export default function AdminDashboard() {
                       e.preventDefault()
                       handleAddAlert()
                     }}
-                    className="mb-6 p-4 border rounded-lg space-y-3"
+                    className="mb-6 flex flex-col gap-2 md:p-4 border rounded-lg"
                   >
                     <h3 className="text-lg font-medium">Crear Nueva Alerta</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1844,64 +2697,39 @@ export default function AdminDashboard() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Tipo</TableHead>
-                          <TableHead>Título</TableHead>
-                          <TableHead>Mensaje</TableHead>
-                          <TableHead>Fechas</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead>Acciones</TableHead>
+                          <TableHead className="p-1 md:p-2">Tipo</TableHead>
+                          <TableHead className="p-1 md:p-2">Título</TableHead>
+                          <TableHead className="hidden md:table-cell p-1 md:p-2">Mensaje</TableHead>
+                          <TableHead className="hidden md:table-cell p-1 md:p-2">Fechas</TableHead>
+                          <TableHead className="hidden md:table-cell p-1 md:p-2">Estado</TableHead>
+                          <TableHead className="p-1 md:p-2">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {offerAlerts.map((alert) => (
-                          <TableRow key={alert.id}>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  alert.type === "info"
-                                    ? "default"
-                                    : alert.type === "warning"
-                                    ? "secondary"
-                                    : alert.type === "success"
-                                    ? "default"
-                                    : "destructive"
-                                }
-                              >
+                          <TableRow key={alert.id} className="text-xs md:text-sm">
+                            <TableCell className="p-1 md:p-2">
+                              <Badge variant={alert.type === "info" ? "default" : alert.type === "warning" ? "secondary" : alert.type === "success" ? "default" : "destructive"}>
                                 {alert.type === "info" && "Info"}
                                 {alert.type === "warning" && "Advertencia"}
                                 {alert.type === "success" && "Éxito"}
                                 {alert.type === "error" && "Error"}
                               </Badge>
                             </TableCell>
-                            <TableCell className="font-medium">{alert.title}</TableCell>
-                            <TableCell>
-                              <div className="max-w-xs truncate">{alert.message}</div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm">
+                            <TableCell className="p-1 md:p-2 max-w-[80px] truncate font-medium">{alert.title}</TableCell>
+                            <TableCell className="hidden md:table-cell p-1 md:p-2 max-w-[120px] truncate">{alert.message}</TableCell>
+                            <TableCell className="hidden md:table-cell p-1 md:p-2 text-xs">
                                 <div>Inicio: {alert.startDate?.toDate?.()?.toLocaleDateString() || "Ahora"}</div>
-                                {alert.endDate && (
-                                  <div>Fin: {alert.endDate?.toDate?.()?.toLocaleDateString()}</div>
-                                )}
-                              </div>
+                              {alert.endDate && <div>Fin: {alert.endDate?.toDate?.()?.toLocaleDateString()}</div>}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="hidden md:table-cell p-1 md:p-2">
                               <div className="flex items-center gap-2">
-                                <Switch
-                                  checked={alert.isActive}
-                                  onCheckedChange={() => handleToggleAlertActive(alert.id, alert.isActive)}
-                                />
-                                <Badge variant={alert.isActive ? "default" : "secondary"}>
-                                  {alert.isActive ? "Activa" : "Inactiva"}
-                                </Badge>
+                                <Switch checked={alert.isActive} onCheckedChange={() => handleToggleAlertActive(alert.id, alert.isActive)} />
+                                <Badge variant={alert.isActive ? "default" : "secondary"}>{alert.isActive ? "Activa" : "Inactiva"}</Badge>
                               </div>
                             </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleDeleteAlert(alert.id, alert.title)}
-                              >
+                            <TableCell className="p-1 md:p-2">
+                              <Button variant="destructive" size="sm" onClick={() => handleDeleteAlert(alert.id, alert.title)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </TableCell>
@@ -1929,7 +2757,7 @@ export default function AdminDashboard() {
                       e.preventDefault()
                       handleAddCoupon()
                     }}
-                    className="mb-6 p-4 border rounded-lg space-y-3"
+                    className="mb-6 flex flex-col gap-2 md:p-4 border rounded-lg"
                   >
                     <h3 className="text-lg font-medium">Crear Nuevo Cupón</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2074,75 +2902,46 @@ export default function AdminDashboard() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Código</TableHead>
-                          <TableHead>Nombre</TableHead>
-                          <TableHead>Descuento</TableHead>
-                          <TableHead>Uso</TableHead>
-                          <TableHead>Fechas</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead>Acciones</TableHead>
+                          <TableHead className="p-1 md:p-2">Código</TableHead>
+                          <TableHead className="p-1 md:p-2">Nombre</TableHead>
+                          <TableHead className="hidden md:table-cell p-1 md:p-2">Descuento</TableHead>
+                          <TableHead className="hidden md:table-cell p-1 md:p-2">Uso</TableHead>
+                          <TableHead className="hidden md:table-cell p-1 md:p-2">Fechas</TableHead>
+                          <TableHead className="hidden md:table-cell p-1 md:p-2">Estado</TableHead>
+                          <TableHead className="p-1 md:p-2">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {coupons.map((coupon) => (
-                          <TableRow key={coupon.id}>
-                            <TableCell>
-                              <div className="font-mono font-bold">{coupon.code}</div>
-                            </TableCell>
-                            <TableCell>
-                              <div>
+                          <TableRow key={coupon.id} className="text-xs md:text-sm">
+                            <TableCell className="p-1 md:p-2 font-mono font-bold max-w-[60px] truncate">{coupon.code}</TableCell>
+                            <TableCell className="p-1 md:p-2 max-w-[80px] truncate">
                                 <div className="font-medium">{coupon.name}</div>
-                                {coupon.description && (
-                                  <div className="text-sm text-gray-500">{coupon.description}</div>
-                                )}
-                              </div>
+                              {coupon.description && <div className="text-xs text-gray-500 truncate">{coupon.description}</div>}
                             </TableCell>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">
-                                  {coupon.discountType === "percentage" ? `${coupon.discountValue}%` : `$${coupon.discountValue.toFixed(2)}`}
-                                </div>
-                                {coupon.minPurchase && (
-                                  <div className="text-sm text-gray-500">Mín: ${coupon.minPurchase.toFixed(2)}</div>
-                                )}
-                                {coupon.maxDiscount && (
-                                  <div className="text-sm text-gray-500">Máx: ${coupon.maxDiscount.toFixed(2)}</div>
-                                )}
-                              </div>
+                            <TableCell className="hidden md:table-cell p-1 md:p-2">
+                              <div className="font-medium">{coupon.discountType === "percentage" ? `${coupon.discountValue}%` : `$${coupon.discountValue.toFixed(2)}`}</div>
+                              {coupon.minPurchase && <div className="text-xs text-gray-500">Mín: ${coupon.minPurchase.toFixed(2)}</div>}
+                              {coupon.maxDiscount && <div className="text-xs text-gray-500">Máx: ${coupon.maxDiscount.toFixed(2)}</div>}
                             </TableCell>
-                            <TableCell>
-                              <div>
-                                <div>{coupon.usedCount} usos</div>
-                                {coupon.usageLimit && (
-                                  <div className="text-sm text-gray-500">de {coupon.usageLimit}</div>
-                                )}
-                              </div>
+                            <TableCell className="hidden md:table-cell p-1 md:p-2">
+                              <div>{coupon.usedCount} usos</div>
+                              {coupon.usageLimit && <div className="text-xs text-gray-500">de {coupon.usageLimit}</div>}
                             </TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                <div>Inicio: {coupon.startDate?.toDate?.()?.toLocaleDateString() || "Ahora"}</div>
-                                {coupon.endDate && (
-                                  <div>Fin: {coupon.endDate?.toDate?.()?.toLocaleDateString()}</div>
-                                )}
-                              </div>
+                            <TableCell className="hidden md:table-cell p-1 md:p-2 text-xs">
+                              <div>Inicio: {coupon.startDate?.toDate?.()?.toLocaleDateString() || "Ahora"}</div>
+                              {coupon.endDate && (
+                                <div>Fin: {coupon.endDate?.toDate?.()?.toLocaleDateString()}</div>
+                              )}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="hidden md:table-cell p-1 md:p-2">
                               <div className="flex items-center gap-2">
-                                <Switch
-                                  checked={coupon.isActive}
-                                  onCheckedChange={() => handleToggleCouponActive(coupon.id, coupon.isActive)}
-                                />
-                                <Badge variant={coupon.isActive ? "default" : "secondary"}>
-                                  {coupon.isActive ? "Activo" : "Inactivo"}
-                                </Badge>
+                                <Switch checked={coupon.isActive} onCheckedChange={() => handleToggleCouponActive(coupon.id, coupon.isActive)} />
+                                <Badge variant={coupon.isActive ? "default" : "secondary"}>{coupon.isActive ? "Activo" : "Inactivo"}</Badge>
                               </div>
                             </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleDeleteCoupon(coupon.id, coupon.name)}
-                              >
+                            <TableCell className="p-1 md:p-2">
+                              <Button variant="destructive" size="sm" onClick={() => handleDeleteCoupon(coupon.id, coupon.name)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </TableCell>
@@ -2154,9 +2953,705 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {/* Ventas y Comisiones Tab */}
+            <TabsContent value="sales" className="mt-4">
+              <div className="space-y-6">
+                {/* Resumen de Ventas */}
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                      <CardTitle className="text-sm font-medium">Total Ventas</CardTitle>
+                      <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">${salesSummary.totalVentas.toFixed(2)}</div>
+                      <p className="text-xs text-muted-foreground">Valor bruto de todas las ventas</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                      <CardTitle className="text-sm font-medium">Comisiones</CardTitle>
+                      <DollarSign className="w-4 h-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">${salesSummary.totalComisiones.toFixed(2)}</div>
+                      <p className="text-xs text-muted-foreground">12% de comisión total</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                      <CardTitle className="text-sm font-medium">Pendiente de Pago</CardTitle>
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">${salesSummary.totalPendientePago.toFixed(2)}</div>
+                      <p className="text-xs text-muted-foreground">A pagar a vendedores</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                      <CardTitle className="text-sm font-medium">Pagado</CardTitle>
+                      <CheckCircle className="w-4 h-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">${salesSummary.totalPagado.toFixed(2)}</div>
+                      <p className="text-xs text-muted-foreground">Ya pagado a vendedores</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Filtros y Ordenamiento */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Filtros y Ordenamiento</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Primera fila de filtros */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                              <div>
+                          <Label htmlFor="filterEstadoPago">Estado de Pago</Label>
+                          <Select 
+                            value={salesFilters.estadoPago} 
+                            onValueChange={(value) => setSalesFilters({...salesFilters, estadoPago: value as any})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Todos</SelectItem>
+                              <SelectItem value="pendiente">Pendiente</SelectItem>
+                              <SelectItem value="pagado">Pagado</SelectItem>
+                              <SelectItem value="cancelado">Cancelado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                                </div>
+                        <div>
+                          <Label htmlFor="filterEstadoEnvio">Estado de Envío</Label>
+                          <Select 
+                            value={salesFilters.estadoEnvio || "all"} 
+                            onValueChange={(value) => setSalesFilters({...salesFilters, estadoEnvio: value === "all" ? undefined : value as any})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Todos</SelectItem>
+                              <SelectItem value="pendiente">Pendiente</SelectItem>
+                              <SelectItem value="en_preparacion">En Preparación</SelectItem>
+                              <SelectItem value="enviado">Enviado</SelectItem>
+                              <SelectItem value="entregado">Entregado</SelectItem>
+                              <SelectItem value="cancelado">Cancelado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="filterVendedor">Vendedor</Label>
+                          <Select 
+                            value={salesFilters.vendedorId || "all"} 
+                            onValueChange={(value) => setSalesFilters({...salesFilters, vendedorId: value === "all" ? undefined : value})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Todos</SelectItem>
+                              {salesSummary.ventasPorVendedor.map((vendedor) => (
+                                <SelectItem key={vendedor.vendedorId} value={vendedor.vendedorId}>
+                                  {vendedor.vendedorNombre}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="filterFechaDesde">Fecha Desde</Label>
+                          <Input
+                            id="filterFechaDesde"
+                            type="date"
+                            value={salesFilters.fechaDesde || ""}
+                            onChange={(e) => setSalesFilters({...salesFilters, fechaDesde: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="filterFechaHasta">Fecha Hasta</Label>
+                          <Input
+                            id="filterFechaHasta"
+                            type="date"
+                            value={salesFilters.fechaHasta || ""}
+                            onChange={(e) => setSalesFilters({...salesFilters, fechaHasta: e.target.value})}
+                          />
+                        </div>
+                      </div>
+                      
+                      {/* Segunda fila de filtros */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        <div>
+                          <Label htmlFor="filterMontoMinimo">Monto Mínimo</Label>
+                          <Input
+                            id="filterMontoMinimo"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={salesFilters.montoMinimo || ""}
+                            onChange={(e) => setSalesFilters({...salesFilters, montoMinimo: e.target.value ? parseFloat(e.target.value) : undefined})}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="filterMontoMaximo">Monto Máximo</Label>
+                          <Input
+                            id="filterMontoMaximo"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="999999.99"
+                            value={salesFilters.montoMaximo || ""}
+                            onChange={(e) => setSalesFilters({...salesFilters, montoMaximo: e.target.value ? parseFloat(e.target.value) : undefined})}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="sortField">Ordenar por</Label>
+                          <Select 
+                            value={salesSorting.field} 
+                            onValueChange={(value) => setSalesSorting({...salesSorting, field: value as any})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="fecha">Fecha</SelectItem>
+                              <SelectItem value="monto">Monto</SelectItem>
+                              <SelectItem value="vendedor">Vendedor</SelectItem>
+                              <SelectItem value="comprador">Comprador</SelectItem>
+                              <SelectItem value="estado">Estado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="sortOrder">Orden</Label>
+                          <Select 
+                            value={salesSorting.order} 
+                            onValueChange={(value) => setSalesSorting({...salesSorting, order: value as any})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="desc">Descendente</SelectItem>
+                              <SelectItem value="asc">Ascendente</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-end">
+                          <Button 
+                            variant="outline" 
+                            onClick={() => {
+                              setSalesFilters({estadoPago: 'all', estadoEnvio: 'all'})
+                              setSalesSorting({field: 'fecha', order: 'desc'})
+                            }}
+                          >
+                            <X className="mr-2 h-4 w-4" />
+                            Limpiar
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      {/* Estadísticas de filtros */}
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span>Mostrando {salesData.length} de {salesData.length} ventas</span>
+                        {(salesFilters.estadoPago !== 'all' || salesFilters.estadoEnvio !== 'all' || salesFilters.vendedorId || salesFilters.fechaDesde || salesFilters.fechaHasta || salesFilters.montoMinimo || salesFilters.montoMaximo) && (
+                          <Badge variant="outline">
+                            Filtros aplicados
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Tabla de Ventas */}
+                {/* <Card>
+                  <CardHeader>
+                    <CardTitle>Gestión de Pagos a Vendedores</CardTitle>
+                    <CardDescription>
+                      Administra los pagos pendientes y realizados a los vendedores
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingSales ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                        <span className="ml-2">Cargando ventas...</span>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="p-1 md:p-2">Fecha</TableHead>
+                              <TableHead className="p-1 md:p-2">Producto</TableHead>
+                              <TableHead className="p-1 md:p-2">Vendedor</TableHead>
+                              <TableHead className="hidden md:table-cell p-1 md:p-2">Comprador</TableHead>
+                              <TableHead className="p-1 md:p-2">Precio</TableHead>
+                              <TableHead className="p-1 md:p-2">Neto</TableHead>
+                              <TableHead className="hidden md:table-cell p-1 md:p-2">Estado</TableHead>
+                              <TableHead className="hidden md:table-cell p-1 md:p-2">Acciones</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {paginatedSales.map((sale) => {
+                              const neto = sale.productPrice * (1 - 0.12)
+                              return (
+                                <TableRow key={`${sale.compraId}-${sale.productId}`} className="text-xs md:text-sm">
+                                  <TableCell className="p-1 md:p-2 max-w-[80px] truncate">
+                                    {new Date(sale.fechaCompra).toLocaleDateString('es-ES')}
+                                  </TableCell>
+                                  <TableCell className="p-1 md:p-2 max-w-[100px] truncate">{sale.productName}</TableCell>
+                                  <TableCell className="p-1 md:p-2 max-w-[80px] truncate">{sale.vendedorNombre}</TableCell>
+                                  <TableCell className="hidden md:table-cell p-1 md:p-2 max-w-[80px] truncate">{sale.compradorNombre}</TableCell>
+                                  <TableCell className="p-1 md:p-2">${sale.productPrice.toFixed(2)}</TableCell>
+                                  <TableCell className="p-1 md:p-2 text-green-700 font-semibold">${neto.toFixed(2)}</TableCell>
+                                  <TableCell className="hidden md:table-cell p-1 md:p-2">
+                                    {sale.pagado ? (
+                                      <Badge variant="default">Pagado</Badge>
+                                    ) : (
+                                      <Badge variant="secondary">Pendiente</Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="hidden md:table-cell p-1 md:p-2">
+                                    {!sale.pagado && (
+                                      <Button size="sm" variant="default" onClick={() => openPaymentMarkingModal(sale)}>
+                                        Marcar como Pagado
+                                      </Button>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
+                          </TableBody>
+                        </Table>
+                        
+                        {salesData.length === 0 && (
+                          <div className="text-center py-8 text-gray-500">
+                            No se encontraron ventas con los filtros aplicados
+                              </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card> */}
+
+                {/* Ventas y Comisiones Tab */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Gestión de Compras (por compra)</CardTitle>
+                    <CardDescription>
+                      Administra las compras agrupadas por documento de la colección purchases
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingSales ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                        <span className="ml-2">Cargando compras...</span>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="p-1 md:p-2">Fecha</TableHead>
+                              <TableHead className="p-1 md:p-2">Productos</TableHead>
+                              <TableHead className="p-1 md:p-2">Comprador</TableHead>
+                              <TableHead className="p-1 md:p-2">Total</TableHead>
+                              <TableHead className="p-1 md:p-2">Estado</TableHead>
+                              <TableHead className="p-1 md:p-2">Acciones</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {purchases.map((compra) => (
+                              <TableRow key={compra.id}>
+                                <TableCell>{new Date(compra.createdAt?.toDate?.() || compra.createdAt).toLocaleDateString('es-ES')}</TableCell>
+                                <TableCell>
+                                  <ul className="list-disc pl-4">
+                                    {Array.isArray(compra.products) && compra.products.map((p, idx) => (
+                                      <li key={idx}>{p.nombre || p.productName || p.productoNombre || 'Producto'} (x{p.quantity || p.cantidad || 1})</li>
+                                    ))}
+                                  </ul>
+                            </TableCell>
+                                <TableCell>{usersMap[compra.buyerId]?.name || compra.buyerId}</TableCell>
+                                <TableCell>${compra.totalAmount?.toFixed(2)}</TableCell>
+                            <TableCell>
+                                  <Badge variant={compra.status === 'approved' ? 'default' : 'secondary'}>
+                                    {compra.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Button variant="outline" size="sm" onClick={() => handleViewDetails(compra)}>
+                                    Ver Detalles
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                        {purchases.length === 0 && (
+                          <div className="text-center py-8 text-gray-500">
+                            No se encontraron compras
+                          </div>
+                                )}
+                              </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* Pagos Manuales Tab */}
+            <TabsContent value="manual-payments" className="mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Historial de Pagos Manuales</CardTitle>
+                  <CardDescription>
+                    Registro de todos los pagos marcados manualmente por administradores
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loadingManualPayments ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                      <span className="ml-2">Cargando historial de pagos...</span>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Fecha</TableHead>
+                            <TableHead>Vendedor</TableHead>
+                            <TableHead>Compra ID</TableHead>
+                            <TableHead>Monto</TableHead>
+                            <TableHead>Método</TableHead>
+                            <TableHead>Administrador</TableHead>
+                            <TableHead>Notas</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {manualPayments.map((payment) => (
+                            <TableRow key={payment.id}>
+                            <TableCell>
+                              <div className="text-sm">
+                                  {new Date(payment.fechaPago).toLocaleDateString('es-ES', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                                <div className="font-medium">{payment.vendedorNombre}</div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="font-mono text-sm">{payment.compraId}</div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="font-semibold text-green-600">
+                                  ${payment.monto.toFixed(2)}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                                <Badge variant={
+                                  payment.metodoPago === 'bank_transfer' ? 'default' :
+                                  payment.metodoPago === 'mercadopago' ? 'secondary' : 'outline'
+                                }>
+                                  {payment.metodoPago === 'bank_transfer' ? 'Transferencia' :
+                                   payment.metodoPago === 'mercadopago' ? 'MercadoPago' : 'Efectivo'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="text-sm">{payment.administradorNombre}</div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="text-sm text-gray-600 max-w-xs truncate">
+                                  {payment.notas}
+                                </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                      
+                      {manualPayments.length === 0 && (
+                        <div className="text-center py-8 text-gray-500">
+                          No hay pagos manuales registrados
+                  </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Notificaciones Tab */}
+            <TabsContent value="notifications" className="mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Sistema de Notificaciones</CardTitle>
+                  <CardDescription>
+                    Monitorea todas las notificaciones enviadas a los usuarios
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loadingNotifications ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                      <span className="ml-2">Cargando notificaciones...</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Estadísticas de notificaciones */}
+                      <div className="grid gap-4 md:grid-cols-3">
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Total Notificaciones</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold">{notifications.length}</div>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">No Leídas</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-red-600">
+                              {notifications.filter(n => !n.isRead).length}
+                            </div>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Últimas 24h</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-green-600">
+                              {notifications.filter(n => {
+                                const notificationDate = n.createdAt?.toDate?.() || new Date(n.createdAt)
+                                const yesterday = new Date()
+                                yesterday.setDate(yesterday.getDate() - 1)
+                                return notificationDate > yesterday
+                              }).length}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+
+                      {/* Tabla de notificaciones */}
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="p-1 md:p-2">Fecha</TableHead>
+                              <TableHead className="p-1 md:p-2">Usuario</TableHead>
+                              <TableHead className="hidden md:table-cell p-1 md:p-2">Tipo</TableHead>
+                              <TableHead className="p-1 md:p-2">Título</TableHead>
+                              <TableHead className="hidden md:table-cell p-1 md:p-2">Descripción</TableHead>
+                              <TableHead className="hidden md:table-cell p-1 md:p-2">Estado</TableHead>
+                              <TableHead className="hidden md:table-cell p-1 md:p-2">Detalles</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {notifications.map((notification) => (
+                              <TableRow key={notification.id} className="text-xs md:text-sm">
+                                <TableCell className="p-1 md:p-2 max-w-[80px] truncate">{/* fecha */}</TableCell>
+                                <TableCell className="p-1 md:p-2 max-w-[80px] truncate">{/* usuario */}</TableCell>
+                                <TableCell className="hidden md:table-cell p-1 md:p-2">{/* tipo */}</TableCell>
+                                <TableCell className="p-1 md:p-2 max-w-[100px] truncate">{/* título */}</TableCell>
+                                <TableCell className="hidden md:table-cell p-1 md:p-2 max-w-[100px] truncate">{/* descripción */}</TableCell>
+                                <TableCell className="hidden md:table-cell p-1 md:p-2">{/* estado */}</TableCell>
+                                <TableCell className="hidden md:table-cell p-1 md:p-2">{/* detalles */}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                        
+                        {notifications.length === 0 && (
+                          <div className="text-center py-8 text-gray-500">
+                            No hay notificaciones registradas
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
         </main>
       </div>
+
+      {/* Modal de Marcado Manual de Pagos */}
+      <Dialog open={paymentMarkingModal.isOpen} onOpenChange={closePaymentMarkingModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Marcar Pago como Completado</DialogTitle>
+            <DialogDescription>
+              Confirma el pago manual para el vendedor {paymentMarkingModal.vendedorNombre}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium">Vendedor</Label>
+                <p className="text-sm text-gray-600">{paymentMarkingModal.vendedorNombre}</p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Monto a Pagar</Label>
+                <p className="text-sm font-semibold text-green-600">
+                  ${paymentMarkingModal.monto.toFixed(2)}
+                </p>
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="paymentMethod" className="text-sm font-medium">
+                Método de Pago
+              </Label>
+              <Select value={paymentMethod} onValueChange={(value: 'bank_transfer' | 'mercadopago' | 'cash') => setPaymentMethod(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank_transfer">Transferencia Bancaria</SelectItem>
+                  <SelectItem value="mercadopago">MercadoPago</SelectItem>
+                  <SelectItem value="cash">Efectivo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label htmlFor="paymentNotes" className="text-sm font-medium">
+                Notas del Pago
+              </Label>
+              <Textarea
+                id="paymentNotes"
+                placeholder="Agregar notas sobre el pago (opcional)"
+                value={paymentNotes}
+                onChange={(e) => setPaymentNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+            
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <div className="flex items-center">
+                <AlertTriangle className="h-4 w-4 text-yellow-600 mr-2" />
+                <p className="text-sm text-yellow-800">
+                  Esta acción marcará el pago como completado y enviará una notificación al vendedor.
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={closePaymentMarkingModal}
+              disabled={markingPayment === `${paymentMarkingModal.compraId}-${paymentMarkingModal.vendedorId}`}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleMarkPaymentAsPaid}
+              disabled={markingPayment === `${paymentMarkingModal.compraId}-${paymentMarkingModal.vendedorId}`}
+            >
+              {markingPayment === `${paymentMarkingModal.compraId}-${paymentMarkingModal.vendedorId}` ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Procesando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Confirmar Pago
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Ventas y Comisiones Tab */}
+      {/* Modal de Detalle de Compra */}
+      <Dialog open={showPurchaseModal} onOpenChange={setShowPurchaseModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Detalle de Compra</DialogTitle>
+            <DialogDescription>
+              ID Pago: {selectedPurchase?.paymentId}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p>Fecha: {selectedPurchase?.createdAt ? (selectedPurchase?.createdAt.toDate ? new Date(selectedPurchase.createdAt.toDate()).toLocaleString() : new Date(selectedPurchase.createdAt).toLocaleString()) : ''}</p>
+            <p>Comprador: {selectedPurchase?.buyerId ? usersMap[selectedPurchase.buyerId as string]?.name || selectedPurchase.buyerId : ''}</p>
+            <p>Total: ${selectedPurchase?.totalAmount?.toFixed(2)}</p>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Producto</TableHead>
+                  <TableHead>Cantidad</TableHead>
+                  <TableHead>Precio</TableHead>
+                  <TableHead>Subtotal</TableHead>
+                  <TableHead>Vendedor</TableHead>
+                  <TableHead>Acción</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedPurchase?.products?.map((p: any, idx: number) => (
+                  <TableRow key={idx}>
+                    <TableCell>{p.nombre || p.productName || p.productoNombre || 'Producto'}</TableCell>
+                    <TableCell>{p.quantity || p.cantidad || 1}</TableCell>
+                    <TableCell>${(p.precio || p.price || 0).toFixed(2)}</TableCell>
+                    <TableCell>${((p.precio || p.price || 0) * (p.quantity || p.cantidad || 1)).toFixed(2)}</TableCell>
+                    <TableCell>{usersMap[p.vendedorId]?.name || p.vendedorId}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewSeller(p.vendedorId as string)}
+                      >
+                        Ver Vendedor
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Agregar el modal de información del vendedor */}
+      <Dialog open={showSellerModal} onOpenChange={setShowSellerModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Datos del Vendedor</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Avatar>
+              <AvatarImage src={selectedSellerId ? usersMap[selectedSellerId as string]?.photoURL : undefined} />
+              <AvatarFallback>V</AvatarFallback>
+            </Avatar>
+            <p><strong>Nombre:</strong> {selectedSellerId ? usersMap[selectedSellerId as string]?.name : ''}</p>
+            <p><strong>Email:</strong> {selectedSellerId ? usersMap[selectedSellerId as string]?.email : ''}</p>
+            <p><strong>UID:</strong> {selectedSellerId}</p>
+            <p><strong>Activo:</strong> {selectedSellerId ? (usersMap[selectedSellerId as string]?.isActive ? 'Sí' : 'No') : ''}</p>
+            <p><strong>Suscrito:</strong> {selectedSellerId ? (usersMap[selectedSellerId as string]?.isSubscribed ? 'Sí' : 'No') : ''}</p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

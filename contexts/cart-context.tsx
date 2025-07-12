@@ -53,6 +53,12 @@ interface CartContextType {
   clearCart: () => void
   getItemQuantity: (id: string) => number
   getTotalPrice: () => number // New function to get total discounted price
+  // 🆕 NUEVAS FUNCIONES PARA SISTEMA CENTRALIZADO
+  getItemsByVendor: () => { [sellerId: string]: CartItem[] }
+  getVendorCount: () => number
+  getTotalCommission: () => number
+  getVendorSubtotal: (sellerId: string) => number
+  canCreateCentralizedPurchase: () => boolean
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
@@ -156,6 +162,45 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return state.items.reduce((total, item) => total + item.discountedPrice * item.quantity, 0)
   }
 
+  // 🆕 NUEVAS FUNCIONES PARA SISTEMA CENTRALIZADO
+  const getItemsByVendor = (): { [sellerId: string]: CartItem[] } => {
+    return state.items.reduce((acc, item) => {
+      if (!acc[item.sellerId]) {
+        acc[item.sellerId] = []
+      }
+      acc[item.sellerId].push(item)
+      return acc
+    }, {} as { [sellerId: string]: CartItem[] })
+  }
+
+  const getVendorCount = (): number => {
+    const vendors = new Set(state.items.map(item => item.sellerId))
+    return vendors.size
+  }
+
+  const getTotalCommission = (): number => {
+    const total = getTotalPrice()
+    return Math.round(total * 0.12 * 100) / 100 // 12% comisión
+  }
+
+  const getVendorSubtotal = (sellerId: string): number => {
+    return state.items
+      .filter(item => item.sellerId === sellerId)
+      .reduce((total, item) => total + item.discountedPrice * item.quantity, 0)
+  }
+
+  const canCreateCentralizedPurchase = (): boolean => {
+    if (state.items.length === 0) return false
+    
+    return state.items.every(item => 
+      item.id && item.id.trim() !== '' &&
+      item.quantity > 0 && 
+      item.discountedPrice > 0 &&
+      item.sellerId && item.sellerId.trim() !== '' &&
+      item.name && item.name.trim() !== ''
+    )
+  }
+
   return (
     <CartContext.Provider
       value={{
@@ -166,6 +211,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         clearCart,
         getItemQuantity,
         getTotalPrice,
+        getItemsByVendor,
+        getVendorCount,
+        getTotalCommission,
+        getVendorSubtotal,
+        canCreateCentralizedPurchase,
       }}
     >
       {children}

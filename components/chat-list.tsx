@@ -103,7 +103,7 @@ export function ChatList({ userId, role }: ChatListProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-3 w-full">
       {chats.map((chat) => {
         const otherParticipantName = role === "buyer" ? chat.sellerName : chat.buyerName
         const lastMessageTime = chat.lastMessageTimestamp?.toDate
@@ -111,33 +111,33 @@ export function ChatList({ userId, role }: ChatListProps) {
           : "N/A"
 
         return (
-          <Link key={chat.id} href={`/chat/${chat.id}`} className="block">
-            <Card className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4 flex items-center space-x-4">
-                <Avatar className="h-12 w-12">
+          <Link key={chat.id} href={`/chat/${chat.id}`} className="block w-full">
+            <Card className="hover:shadow-md transition-shadow w-full">
+              <CardContent className="p-3 sm:p-4 flex items-center gap-3 sm:gap-4 w-full">
+                <Avatar className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0">
                   <AvatarImage src={`/placeholder.svg?text=${otherParticipantName.charAt(0)}`} />
                   <AvatarFallback>{otherParticipantName.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-semibold text-base truncate">{otherParticipantName}</h3>
-                    <span className="text-xs text-gray-500">{lastMessageTime}</span>
+                  <div className="flex justify-between items-center gap-2">
+                    <h3 className="font-semibold text-sm sm:text-base truncate max-w-[120px] sm:max-w-[180px]">{otherParticipantName}</h3>
+                    <span className="text-xs text-gray-500 whitespace-nowrap">{lastMessageTime}</span>
                   </div>
-                  <p className="text-sm text-gray-600 truncate">{chat.lastMessage || "No hay mensajes aún."}</p>
-                  <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                  <p className="text-xs sm:text-sm text-gray-600 truncate max-w-[180px] sm:max-w-full">{chat.lastMessage || "No hay mensajes aún."}</p>
+                  <div className="flex items-center gap-1 sm:gap-2 mt-1 text-xs text-gray-500">
                     {chat.productImageUrl && (
                       <Image
                         src={chat.productImageUrl || "/placeholder.svg"}
                         alt={chat.productName}
-                        width={20}
-                        height={20}
+                        width={18}
+                        height={18}
                         className="rounded-sm object-cover"
                       />
                     )}
-                    <span className="truncate">{chat.productName}</span>
+                    <span className="truncate max-w-[90px] sm:max-w-[160px]">{chat.productName}</span>
                   </div>
                 </div>
-                <MessageSquare className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                <MessageSquare className="h-5 w-5 text-blue-500 flex-shrink-0 hidden xs:block" />
               </CardContent>
             </Card>
           </Link>

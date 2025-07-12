@@ -304,7 +304,7 @@ export async function getSellerShipments(sellerId: string): Promise<PurchaseWith
 /**
  * Obtiene envíos de un comprador con validaciones de seguridad
  */
-export async function getBuyerShipments(buyerId: string): Promise<PurchaseWithShipping[]> {
+export async function getBuyerShipments(buyerId: string): Promise<any[]> {
   try {
     if (!buyerId || buyerId.trim().length === 0) {
       throw new Error("ID de comprador requerido")
@@ -318,46 +318,43 @@ export async function getBuyerShipments(buyerId: string): Promise<PurchaseWithSh
     )
 
     const purchasesSnapshot = await getDocs(purchasesQuery)
-    const purchases = purchasesSnapshot.docs.map(doc => ({
+    const purchases: any[] = purchasesSnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
-    })) as PurchaseWithShipping[]
+    }))
 
-    // Enriquecer con información del producto y vendedor
-    const enrichedPurchases = await Promise.all(
-      purchases.map(async (purchase) => {
+    const productosComprados: any[] = []
+    for (const compra of purchases) {
+      if (!Array.isArray(compra.products)) continue
+      for (const prod of compra.products) {
+        let productData = null
+        let sellerData = null
         try {
-          // Obtener información del producto
-          const productDoc = await getDoc(doc(db, "products", purchase.productId))
-          const productData = productDoc.exists() ? productDoc.data() : null
-
-          // Obtener información del vendedor
-          const sellerDoc = await getDoc(doc(db, "users", purchase.sellerId))
-          const sellerData = sellerDoc.exists() ? sellerDoc.data() : null
-
-          return {
-            ...purchase,
-            productName: productData?.name || "Producto no encontrado",
-            productImage: productData?.media?.[0]?.url || null,
-            productIsService: productData?.isService || false,
-            sellerName: sellerData?.displayName || "Vendedor no encontrado",
-            sellerEmail: sellerData?.email || null
-          }
-        } catch (error) {
-          console.error(`Error enriching purchase ${purchase.id}:`, error)
-          return {
-            ...purchase,
-            productName: "Error al cargar producto",
-            productImage: null,
-            productIsService: false,
-            sellerName: "Error al cargar vendedor",
-            sellerEmail: null
-          }
-        }
-      })
-    )
-
-    return enrichedPurchases
+          const productDoc = await getDoc(doc(db, "products", prod.productId))
+          productData = productDoc.exists() ? productDoc.data() : null
+          const sellerDoc = await getDoc(doc(db, "users", prod.vendedorId))
+          sellerData = sellerDoc.exists() ? sellerDoc.data() : null
+        } catch {}
+        productosComprados.push({
+          compraId: compra.id,
+          paymentId: compra.paymentId || '',
+          fechaCompra: compra.createdAt?.toDate?.() ? compra.createdAt.toDate().toISOString() : (typeof compra.createdAt === 'string' ? compra.createdAt : ''),
+          estadoPago: compra.status || '',
+          buyerId: compra.buyerId || '',
+          productId: prod.productId || '',
+          productName: prod.nombre || productData?.name || '',
+          productPrice: prod.precio || productData?.price || 0,
+          quantity: prod.quantity || 0,
+          vendedorId: prod.vendedorId || '',
+          vendedorNombre: sellerData?.name || '',
+          vendedorEmail: sellerData?.email || '',
+          isService: prod.isService || productData?.isService || false,
+          shipping: compra.shipping || null,
+          productImageUrl: prod.imageUrl || productData?.imageUrl || '',
+        })
+      }
+    }
+    return productosComprados
   } catch (error) {
     console.error("Error fetching buyer shipments:", error)
     throw error

@@ -469,180 +469,180 @@ export function Header() {
         {/* Desktop Layout - Horizontal */}
         <div className="hidden md:block">
           <div className="container mx-auto flex h-16 items-center justify-between px-4 lg:px-6">
-            <Link href="/" className="flex items-center gap-2 text-xl font-bold">
-              <Image
-                src="/images/logo.png"
-                alt="Servido Logo"
+          <Link href="/" className="flex items-center gap-2 text-xl font-bold">
+            <Image
+              src="/images/logo.png"
+              alt="Servido Logo"
                 width={280}
                 height={100}
                 className="w-[280px] h-[100px] lg:w-[340px] lg:h-[120px]"
-                style={{ objectFit: "contain", filter: "grayscale(1) brightness(1000%)" }}
-              />
-            </Link>
+              style={{ objectFit: "contain", filter: "grayscale(1) brightness(1000%)" }}
+            />
+          </Link>
             
             <div className="flex-1 max-w-2xl mx-4 search-container">
-              <form onSubmit={handleSearchSubmit} className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <Input
-                  type="search"
-                  placeholder="Buscar productos, marcas y más..."
-                  value={searchTerm}
-                  onChange={handleSearchChange}
-                  onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
+            <form onSubmit={handleSearchSubmit} className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Input
+                type="search"
+                placeholder="Buscar productos, marcas y más..."
+                value={searchTerm}
+                onChange={handleSearchChange}
+                onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
                   className="w-full pl-10 pr-10 py-2.5 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-400"
-                />
-                {searchTerm && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearSearch}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-gray-100"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-                
+              />
+              {searchTerm && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearSearch}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-gray-100"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+              
                 {/* Desktop Search Results */}
-                {showSearchResults && (
+              {showSearchResults && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto search-results">
-                    {isSearching ? (
-                      <div className="p-4 text-center">
-                        <Loader2 className="h-6 w-6 animate-spin mx-auto text-purple-600" />
-                        <p className="text-sm text-gray-500 mt-2">Buscando...</p>
-                      </div>
-                    ) : searchResults.length > 0 ? (
-                      <div className="py-2">
-                        {searchResults.map((product, index) => (
-                          <Link
-                            key={product.id}
-                            href={`/product/${product.id}`}
-                            onClick={() => setShowSearchResults(false)}
-                            className="flex items-center gap-2 p-3 hover:bg-gray-100 transition-colors border-b last:border-b-0 border-gray-100"
-                          >
-                            {product.imageUrl && (
-                              <div className="w-10 h-10 relative rounded-sm overflow-hidden flex-shrink-0">
-                                <Image
-                                  src={product.imageUrl}
-                                  alt={product.name}
-                                  fill
-                                  className="object-contain"
-                                />
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm break-words line-clamp-2 text-black">{product.name}</p>
-                              <p className="text-xs text-purple-600 font-semibold">${product.price.toFixed(2)}</p>
+                  {isSearching ? (
+                    <div className="p-4 text-center">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto text-purple-600" />
+                      <p className="text-sm text-gray-500 mt-2">Buscando...</p>
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    <div className="py-2">
+                      {searchResults.map((product, index) => (
+                        <Link
+                          key={product.id}
+                          href={`/product/${product.id}`}
+                          onClick={() => setShowSearchResults(false)}
+                          className="flex items-center gap-2 p-3 hover:bg-gray-100 transition-colors border-b last:border-b-0 border-gray-100"
+                        >
+                          {product.imageUrl && (
+                            <div className="w-10 h-10 relative rounded-sm overflow-hidden flex-shrink-0">
+                              <Image
+                                src={product.imageUrl}
+                                alt={product.name}
+                                fill
+                                className="object-contain"
+                              />
                             </div>
-                          </Link>
-                        ))}
-                        <div className="border-t pt-2 px-3">
-                          <Button
-                            type="submit"
-                            variant="ghost"
-                            size="sm"
-                            className="w-full text-purple-600 hover:bg-purple-50"
-                          >
-                            Ver todos los resultados
-                          </Button>
-                        </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm break-words line-clamp-2 text-black">{product.name}</p>
+                            <p className="text-xs text-purple-600 font-semibold">${product.price.toFixed(2)}</p>
+                          </div>
+                        </Link>
+                      ))}
+                      <div className="border-t pt-2 px-3">
+                        <Button
+                          type="submit"
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-purple-600 hover:bg-purple-50"
+                        >
+                          Ver todos los resultados
+                        </Button>
                       </div>
-                    ) : searchTerm.length >= 2 ? (
-                      <div className="p-4 text-center">
-                        <p className="text-sm text-gray-500">No se encontraron productos</p>
-                        <p className="text-xs text-gray-400 mt-1">Intenta con otros términos</p>
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-              </form>
-            </div>
+                    </div>
+                  ) : searchTerm.length >= 2 ? (
+                    <div className="p-4 text-center">
+                      <p className="text-sm text-gray-500">No se encontraron productos</p>
+                      <p className="text-xs text-gray-400 mt-1">Intenta con otros términos</p>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </form>
+          </div>
             
             {/* Desktop Right side: User links + Cart */}
-            <div className="flex items-center gap-3">
-              {/* Desktop-only user/auth links */}
+          <div className="flex items-center gap-3">
+            {/* Desktop-only user/auth links */}
               <div className="flex items-center gap-3">
-                {authLoading ? null : currentUser ? (
-                  <>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="hover:opacity-80 hover:bg-purple-700 flex items-center gap-1 p-1 h-auto text-navbar-foreground"
-                        >
-                          <Avatar className="h-6 w-6">
-                            <AvatarImage
+              {authLoading ? null : currentUser ? (
+                <>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        className="hover:opacity-80 hover:bg-purple-700 flex items-center gap-1 p-1 h-auto text-navbar-foreground"
+                      >
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage
                               src={currentUser.firebaseUser.photoURL || undefined}
                               alt={currentUser.firebaseUser.displayName || "User"}
-                            />
-                            <AvatarFallback>
-                              <User className="h-4 w-4" />
-                            </AvatarFallback>
-                          </Avatar>
+                          />
+                          <AvatarFallback>
+                            <User className="h-4 w-4" />
+                          </AvatarFallback>
+                        </Avatar>
                           <span className="hidden lg:inline">{currentUser.firebaseUser.displayName || currentUser.firebaseUser.email?.split("@")[0]}</span>
-                          <ChevronDown className="h-3 w-3" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem asChild>
-                          <Link href={getDashboardLink()} className="flex items-center">
-                            {currentUser.role === "admin" && <ShieldCheck className="mr-2 h-4 w-4" />}
-                            {currentUser.role === "seller" && <Store className="mr-2 h-4 w-4" />}
-                            {(!currentUser.role || currentUser.role === "user") && <User className="mr-2 h-4 w-4" />}
-                            Mi Panel
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <Link href="/dashboard/buyer">Mis Compras</Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <Link href="/dashboard/buyer?tab=favorites">Favoritos</Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={handleLogout} className="text-red-600">
-                          <LogOut className="mr-2 h-4 w-4" />
-                          Cerrar Sesión
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                        <ChevronDown className="h-3 w-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem asChild>
+                        <Link href={getDashboardLink()} className="flex items-center">
+                          {currentUser.role === "admin" && <ShieldCheck className="mr-2 h-4 w-4" />}
+                          {currentUser.role === "seller" && <Store className="mr-2 h-4 w-4" />}
+                          {(!currentUser.role || currentUser.role === "user") && <User className="mr-2 h-4 w-4" />}
+                          Mi Panel
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/dashboard/buyer">Mis Compras</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/dashboard/buyer?tab=favorites">Favoritos</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Cerrar Sesión
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
-                    {currentUser.role === "admin" && (
-                      <Link
-                        href="/admin"
-                        className="hover:opacity-80 text-yellow-300 font-semibold flex items-center gap-1"
-                      >
+                  {currentUser.role === "admin" && (
+                    <Link
+                      href="/admin"
+                      className="hover:opacity-80 text-yellow-300 font-semibold flex items-center gap-1"
+                    >
                         <ShieldCheck className="h-4 w-4" /> 
                         <span className="hidden lg:inline">Admin</span>
-                      </Link>
-                    )}
-                    {currentUser.role === "seller" && (
-                      <Link
-                        href="/dashboard/seller"
-                        className="hover:opacity-80 text-orange-300 font-semibold flex items-center gap-1"
-                      >
+                    </Link>
+                  )}
+                  {currentUser.role === "seller" && (
+                    <Link
+                      href="/dashboard/seller"
+                      className="hover:opacity-80 text-orange-300 font-semibold flex items-center gap-1"
+                    >
                         <Store className="h-4 w-4" /> 
                         <span className="hidden lg:inline">Vender</span>
-                      </Link>
-                    )}
-                  </>
-                ) : (
-                  <>
+                    </Link>
+                  )}
+                </>
+              ) : (
+                <>
                     <Link href="/signup" className="hover:opacity-80 text-sm lg:text-base">
-                      Crea tu cuenta
-                    </Link>
+                    Crea tu cuenta
+                  </Link>
                     <Link href="/login" className="hover:opacity-80 text-sm lg:text-base">
-                      Ingresa
-                    </Link>
+                    Ingresa
+                  </Link>
                     <Link href="#" className="hover:opacity-80 text-sm lg:text-base">
-                      Mis compras
-                    </Link>
-                  </>
-                )}
-              </div>
+                    Mis compras
+                  </Link>
+                </>
+              )}
+            </div>
 
               {/* Cart Drawer */}
-              <CartDrawer />
-            </div>
+            <CartDrawer />
+                </div>
           </div>
         </div>
       </header>
@@ -671,67 +671,67 @@ export function Header() {
 
           {/* Desktop Secondary Nav */}
           <div className="hidden md:flex items-center justify-between text-xs lg:text-sm">
-            <div className="flex items-center gap-1 cursor-pointer hover:opacity-80">
-              <MapPin className="h-4 w-4" />
-              <span>Enviar a {location}</span>
-              <ChevronDown className="h-3 w-3" />
-            </div>
+          <div className="flex items-center gap-1 cursor-pointer hover:opacity-80">
+            <MapPin className="h-4 w-4" />
+            <span>Enviar a {location}</span>
+            <ChevronDown className="h-3 w-3" />
+          </div>
             <div className="flex items-center gap-4">
-              <Link href="/products" className="hover:opacity-80">
-                Explorar Productos
-              </Link>
-              {/* Desktop Categories Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="p-0 h-auto text-navbar-foreground hover:bg-transparent hover:opacity-80 flex items-center gap-1"
-                  >
-                    Categorías <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48">
-                  {loadingCategories ? (
-                    <DropdownMenuItem disabled>Cargando categorías...</DropdownMenuItem>
-                  ) : categories.length === 0 ? (
-                    <DropdownMenuItem disabled>No hay categorías disponibles.</DropdownMenuItem>
-                  ) : (
-                    categories.map((category) => (
-                      <DropdownMenuItem key={category.id} asChild>
-                        <Link href={`/category/${category.id}`}>{category.name}</Link>
-                      </DropdownMenuItem>
-                    ))
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Link href="/notifications" className="hover:opacity-80">
-                Notificaciones
-              </Link>
+            <Link href="/products" className="hover:opacity-80">
+              Explorar Productos
+            </Link>
+            {/* Desktop Categories Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="p-0 h-auto text-navbar-foreground hover:bg-transparent hover:opacity-80 flex items-center gap-1"
+                >
+                  Categorías <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                {loadingCategories ? (
+                  <DropdownMenuItem disabled>Cargando categorías...</DropdownMenuItem>
+                ) : categories.length === 0 ? (
+                  <DropdownMenuItem disabled>No hay categorías disponibles.</DropdownMenuItem>
+                ) : (
+                  categories.map((category) => (
+                    <DropdownMenuItem key={category.id} asChild>
+                      <Link href={`/category/${category.id}`}>{category.name}</Link>
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Link href="/notifications" className="hover:opacity-80">
+              Notificaciones
+            </Link>
               <Link href="#" className="hover:opacity-80 hidden lg:inline">
-                Historial
-              </Link>
+              Historial
+            </Link>
               <Link href="#" className="hover:opacity-80 hidden lg:inline">
-                Carrito de compras
-              </Link>
+              Carrito de compras
+            </Link>
               <Link href="/terminos-y-condiciones" className="hover:opacity-80 hidden lg:inline">
-                Términos y condiciones
-              </Link>
+              Términos y condiciones
+            </Link>
               <Link href="/politicas-de-privacidad" className="hover:opacity-80 hidden lg:inline">
-                Políticas de privacidad
-              </Link>
-              <Link href={getVenderLink()} className="hover:opacity-80">
-                Vender
-              </Link>
+              Políticas de privacidad
+            </Link>
+            <Link href={getVenderLink()} className="hover:opacity-80">
+              Vender
+            </Link>
               <Link href="#" className="hover:opacity-80 hidden lg:inline">
-                Ayuda / PQR
-              </Link>
-            </div>
+              Ayuda / PQR
+            </Link>
+          </div>
             <div className="flex items-center gap-3">
-              {authLoading ? null : currentUser ? (
-                <>{/* These links are now part of the primary header's desktop-only section */}</>
-              ) : (
-                <>{/* These links are now part of the primary header's desktop-only section */}</>
-              )}
+            {authLoading ? null : currentUser ? (
+              <>{/* These links are now part of the primary header's desktop-only section */}</>
+            ) : (
+              <>{/* These links are now part of the primary header's desktop-only section */}</>
+            )}
             </div>
           </div>
         </div>

@@ -10,7 +10,13 @@ export function TabBar() {
   const { currentUser, authLoading, handleLogout, getDashboardLink } = useAuth()
   const pathname = usePathname()
 
-  const tabItems = [
+  const tabItems: Array<{
+    name: string;
+    icon: any;
+    href: string;
+    active: boolean;
+    action?: () => void;
+  }> = [
     {
       name: "Inicio",
       icon: Home,
@@ -45,7 +51,7 @@ export function TabBar() {
       href: "#",
       active: false,
       action: handleLogout,
-    } as any)
+    })
   }
 
   if (authLoading) {
