@@ -31,6 +31,7 @@ import {
   CheckCircle,
   Clock,
   X,
+  Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -90,6 +91,7 @@ import {
   type CommissionDistribution
 } from "@/lib/centralized-payments-api"
 import * as XLSX from "xlsx"
+import { useToast } from "@/components/ui/use-toast"
 
 interface UserData {
   id: string
@@ -192,6 +194,7 @@ interface Purchase {
   type: string
   vendedorIds: string[]
   products: any[] // <-- Añadido para reflejar el modelo real de Firestore
+  paidToSellers?: boolean // <-- NUEVO CAMPO OPCIONAL
 }
 interface UserMap { [key: string]: any }
 interface ProductMap { [key: string]: any }
@@ -219,6 +222,7 @@ interface VentaProductoAdmin {
 export default function AdminDashboard() {
   const { currentUser, authLoading } = useAuth()
   const router = useRouter()
+  const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState("overview")
   const [users, setUsers] = useState<UserData[]>([])
@@ -360,6 +364,7 @@ export default function AdminDashboard() {
 
   const [viewByPurchase, setViewByPurchase] = useState(false)
   const [purchases, setPurchases] = useState<Purchase[]>([])
+  const [filteredPurchases, setFilteredPurchases] = useState<Purchase[]>([])
   const [usersMap, setUsersMap] = useState<UserMap>({})
   const [productsMap, setProductsMap] = useState<ProductMap>({})
   const [loadingAdmin, setLoadingAdmin] = useState(true)
@@ -379,12 +384,14 @@ export default function AdminDashboard() {
 
   const searchTimeout = useRef<NodeJS.Timeout | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
 
   // Justo después de los useState
   const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [selectedSellerId, setSelectedSellerId] = useState<string | null>(null);
   const [showSellerModal, setShowSellerModal] = useState(false);
+  const [bankData, setBankData] = useState<any | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -439,6 +446,73 @@ export default function AdminDashboard() {
       fetchCommissionReport()
     }
   }, [activeTab, currentUser])
+
+  // Debounce para la búsqueda
+  useEffect(() => {
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current)
+    }
+    
+    searchTimeout.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 300)
+    
+    return () => {
+      if (searchTimeout.current) {
+        clearTimeout(searchTimeout.current)
+      }
+    }
+  }, [searchTerm])
+
+  // Filtrado en tiempo real de compras
+  useEffect(() => {
+    const filtered = purchases.filter(compra => {
+      // Filtro por estado de pago
+      if (salesFilters.estadoPago && salesFilters.estadoPago !== 'all') {
+        if (salesFilters.estadoPago === 'pendiente' && compra.status !== 'pending') return false
+        if (salesFilters.estadoPago === 'pagado' && compra.status !== 'approved') return false
+        if (salesFilters.estadoPago === 'cancelado' && compra.status !== 'cancelled') return false
+      }
+      
+      // Filtro por estado de envío
+      if (salesFilters.estadoEnvio && salesFilters.estadoEnvio !== 'all') {
+        if (compra.status !== salesFilters.estadoEnvio) return false
+      }
+      
+      // Filtro por vendedor
+      if (salesFilters.vendedorId && salesFilters.vendedorId !== 'all') {
+        const hasVendedor = Array.isArray(compra.products) && compra.products.some((p: any) => p.vendedorId === salesFilters.vendedorId)
+        if (!hasVendedor) return false
+      }
+      
+      // Filtro por búsqueda
+      if (debouncedSearchTerm) {
+        const searchLower = debouncedSearchTerm.toLowerCase()
+        
+        // Buscar por ID de compra
+        if (compra.id.toLowerCase().includes(searchLower)) return true
+        
+        // Buscar por comprador
+        const buyerName = usersMap[compra.buyerId as string]?.name || ''
+        if (buyerName.toLowerCase().includes(searchLower)) return true
+        
+        // Buscar por productos
+        if (Array.isArray(compra.products)) {
+          const hasMatchingProduct = compra.products.some((p: any) => {
+            const productName = p.nombre || p.productName || p.productoNombre || ''
+            return productName.toLowerCase().includes(searchLower)
+          })
+          if (hasMatchingProduct) return true
+        }
+        
+        return false
+      }
+      
+      return true
+    })
+    
+    setFilteredPurchases(filtered)
+  }, [purchases, salesFilters, debouncedSearchTerm, usersMap])
 
   const fetchAdminData = async () => {
     setLoading(true)
@@ -1543,6 +1617,28 @@ export default function AdminDashboard() {
     setShowSellerModal(true);
   }
 
+  // Función para buscar datos bancarios por vendedorId
+  const fetchBankDataForSeller = async (vendedorId: string) => {
+    const q = query(
+      collection(db, "sellerBankConfigs"),
+      where("vendedorId", "==", vendedorId)
+    )
+    const snap = await getDocs(q)
+    if (!snap.empty) {
+      return snap.docs[0].data()
+    }
+    return null
+  }
+
+  // Cargar los datos bancarios cuando se abre el modal de vendedor
+  useEffect(() => {
+    if (showSellerModal && selectedSellerId) {
+      fetchBankDataForSeller(selectedSellerId).then(setBankData)
+    } else {
+      setBankData(null)
+    }
+  }, [showSellerModal, selectedSellerId])
+
   if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -1598,8 +1694,6 @@ export default function AdminDashboard() {
                 { tab: "brands", label: "Marcas", icon: Tag },
                 { tab: "allProducts", label: "Todos los Productos", icon: ShoppingCart },
                 { tab: "sales", label: "Ventas", icon: DollarSign },
-                { tab: "manual-payments", label: "Pagos Manuales", icon: TrendingUp },
-                { tab: "notifications", label: "Notificaciones", icon: AlertTriangle },
                 { tab: "banners", label: "Banners", icon: ImageIcon },
                 { tab: "alerts", label: "Alertas", icon: Megaphone },
                 { tab: "coupons", label: "Cupones", icon: Percent },
@@ -1645,8 +1739,6 @@ export default function AdminDashboard() {
                   { tab: "brands", label: "Marcas", icon: Tag },
                   { tab: "allProducts", label: "Todos los Productos", icon: ShoppingCart },
                   { tab: "sales", label: "Ventas", icon: DollarSign },
-                  { tab: "manual-payments", label: "Pagos Manuales", icon: TrendingUp },
-                  { tab: "notifications", label: "Notificaciones", icon: AlertTriangle },
                   { tab: "banners", label: "Banners", icon: ImageIcon },
                   { tab: "alerts", label: "Alertas", icon: Megaphone },
                   { tab: "coupons", label: "Cupones", icon: Percent },
@@ -1691,8 +1783,6 @@ export default function AdminDashboard() {
               <TabsTrigger value="brands">Marcas</TabsTrigger>
               <TabsTrigger value="allProducts">Todos los Productos</TabsTrigger>
               <TabsTrigger value="sales">Ventas y Comisiones</TabsTrigger>
-              <TabsTrigger value="manual-payments">Pagos Manuales</TabsTrigger>
-              <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
               <TabsTrigger value="banners">Banners</TabsTrigger>
               <TabsTrigger value="alerts">Alertas</TabsTrigger>
               <TabsTrigger value="coupons">Cupones</TabsTrigger>
@@ -3007,241 +3097,101 @@ export default function AdminDashboard() {
                     <CardTitle>Filtros y Ordenamiento</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {/* Primera fila de filtros */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                              <div>
-                          <Label htmlFor="filterEstadoPago">Estado de Pago</Label>
-                          <Select 
-                            value={salesFilters.estadoPago} 
-                            onValueChange={(value) => setSalesFilters({...salesFilters, estadoPago: value as any})}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">Todos</SelectItem>
-                              <SelectItem value="pendiente">Pendiente</SelectItem>
-                              <SelectItem value="pagado">Pagado</SelectItem>
-                              <SelectItem value="cancelado">Cancelado</SelectItem>
-                            </SelectContent>
-                          </Select>
-                                </div>
-                        <div>
-                          <Label htmlFor="filterEstadoEnvio">Estado de Envío</Label>
-                          <Select 
-                            value={salesFilters.estadoEnvio || "all"} 
-                            onValueChange={(value) => setSalesFilters({...salesFilters, estadoEnvio: value === "all" ? undefined : value as any})}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">Todos</SelectItem>
-                              <SelectItem value="pendiente">Pendiente</SelectItem>
-                              <SelectItem value="en_preparacion">En Preparación</SelectItem>
-                              <SelectItem value="enviado">Enviado</SelectItem>
-                              <SelectItem value="entregado">Entregado</SelectItem>
-                              <SelectItem value="cancelado">Cancelado</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label htmlFor="filterVendedor">Vendedor</Label>
-                          <Select 
-                            value={salesFilters.vendedorId || "all"} 
-                            onValueChange={(value) => setSalesFilters({...salesFilters, vendedorId: value === "all" ? undefined : value})}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">Todos</SelectItem>
-                              {salesSummary.ventasPorVendedor.map((vendedor) => (
-                                <SelectItem key={vendedor.vendedorId} value={vendedor.vendedorId}>
-                                  {vendedor.vendedorNombre}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label htmlFor="filterFechaDesde">Fecha Desde</Label>
-                          <Input
-                            id="filterFechaDesde"
-                            type="date"
-                            value={salesFilters.fechaDesde || ""}
-                            onChange={(e) => setSalesFilters({...salesFilters, fechaDesde: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="filterFechaHasta">Fecha Hasta</Label>
-                          <Input
-                            id="filterFechaHasta"
-                            type="date"
-                            value={salesFilters.fechaHasta || ""}
-                            onChange={(e) => setSalesFilters({...salesFilters, fechaHasta: e.target.value})}
-                          />
-                        </div>
+                                      <div className="space-y-4">
+                    {/* Filtros simplificados */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <Label htmlFor="filterEstadoPago">Estado de Pago</Label>
+                        <Select 
+                          value={salesFilters.estadoPago} 
+                          onValueChange={(value) => setSalesFilters({...salesFilters, estadoPago: value as any})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos</SelectItem>
+                            <SelectItem value="pendiente">Pendiente</SelectItem>
+                            <SelectItem value="pagado">Pagado</SelectItem>
+                            <SelectItem value="cancelado">Cancelado</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                      
-                      {/* Segunda fila de filtros */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                        <div>
-                          <Label htmlFor="filterMontoMinimo">Monto Mínimo</Label>
-                          <Input
-                            id="filterMontoMinimo"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={salesFilters.montoMinimo || ""}
-                            onChange={(e) => setSalesFilters({...salesFilters, montoMinimo: e.target.value ? parseFloat(e.target.value) : undefined})}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="filterMontoMaximo">Monto Máximo</Label>
-                          <Input
-                            id="filterMontoMaximo"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            placeholder="999999.99"
-                            value={salesFilters.montoMaximo || ""}
-                            onChange={(e) => setSalesFilters({...salesFilters, montoMaximo: e.target.value ? parseFloat(e.target.value) : undefined})}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="sortField">Ordenar por</Label>
-                          <Select 
-                            value={salesSorting.field} 
-                            onValueChange={(value) => setSalesSorting({...salesSorting, field: value as any})}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="fecha">Fecha</SelectItem>
-                              <SelectItem value="monto">Monto</SelectItem>
-                              <SelectItem value="vendedor">Vendedor</SelectItem>
-                              <SelectItem value="comprador">Comprador</SelectItem>
-                              <SelectItem value="estado">Estado</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label htmlFor="sortOrder">Orden</Label>
-                          <Select 
-                            value={salesSorting.order} 
-                            onValueChange={(value) => setSalesSorting({...salesSorting, order: value as any})}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="desc">Descendente</SelectItem>
-                              <SelectItem value="asc">Ascendente</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="flex items-end">
-                          <Button 
-                            variant="outline" 
-                            onClick={() => {
-                              setSalesFilters({estadoPago: 'all', estadoEnvio: 'all'})
-                              setSalesSorting({field: 'fecha', order: 'desc'})
-                            }}
-                          >
-                            <X className="mr-2 h-4 w-4" />
-                            Limpiar
-                          </Button>
-                        </div>
+                      <div>
+                        <Label htmlFor="filterEstadoEnvio">Estado de Envío</Label>
+                        <Select 
+                          value={salesFilters.estadoEnvio || "all"} 
+                          onValueChange={(value) => setSalesFilters({...salesFilters, estadoEnvio: value === "all" ? undefined : value as any})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos</SelectItem>
+                            <SelectItem value="pendiente">Pendiente</SelectItem>
+                            <SelectItem value="en_preparacion">En Preparación</SelectItem>
+                            <SelectItem value="enviado">Enviado</SelectItem>
+                            <SelectItem value="entregado">Entregado</SelectItem>
+                            <SelectItem value="cancelado">Cancelado</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                      
-                      {/* Estadísticas de filtros */}
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>Mostrando {salesData.length} de {salesData.length} ventas</span>
-                        {(salesFilters.estadoPago !== 'all' || salesFilters.estadoEnvio !== 'all' || salesFilters.vendedorId || salesFilters.fechaDesde || salesFilters.fechaHasta || salesFilters.montoMinimo || salesFilters.montoMaximo) && (
-                          <Badge variant="outline">
-                            Filtros aplicados
-                          </Badge>
-                        )}
+                      <div>
+                        <Label htmlFor="filterVendedor">Vendedor</Label>
+                        <Select 
+                          value={salesFilters.vendedorId || "all"} 
+                          onValueChange={(value) => setSalesFilters({...salesFilters, vendedorId: value === "all" ? undefined : value})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos</SelectItem>
+                            {salesSummary.ventasPorVendedor.map((vendedor) => (
+                              <SelectItem key={vendedor.vendedorId} value={vendedor.vendedorId}>
+                                {vendedor.vendedorNombre}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
+                      <div className="flex items-end">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => {
+                            setSalesFilters({estadoPago: 'all', estadoEnvio: 'all'})
+                            setSalesSorting({field: 'fecha', order: 'desc'})
+                          }}
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          Limpiar
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {/* Barra de búsqueda */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        placeholder="Buscar por comprador, producto o ID de compra..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    
+                    {/* Estadísticas de filtros */}
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span>Mostrando {filteredPurchases.length} de {purchases.length} compras</span>
+                      {(salesFilters.estadoPago !== 'all' || salesFilters.estadoEnvio !== 'all' || salesFilters.vendedorId || searchTerm) && (
+                        <Badge variant="outline">
+                          Filtros aplicados
+                        </Badge>
+                      )}
+                    </div>
                     </div>
                   </CardContent>
                 </Card>
-
-                {/* Tabla de Ventas */}
-                {/* <Card>
-                  <CardHeader>
-                    <CardTitle>Gestión de Pagos a Vendedores</CardTitle>
-                    <CardDescription>
-                      Administra los pagos pendientes y realizados a los vendedores
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {loadingSales ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
-                        <span className="ml-2">Cargando ventas...</span>
-                      </div>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="p-1 md:p-2">Fecha</TableHead>
-                              <TableHead className="p-1 md:p-2">Producto</TableHead>
-                              <TableHead className="p-1 md:p-2">Vendedor</TableHead>
-                              <TableHead className="hidden md:table-cell p-1 md:p-2">Comprador</TableHead>
-                              <TableHead className="p-1 md:p-2">Precio</TableHead>
-                              <TableHead className="p-1 md:p-2">Neto</TableHead>
-                              <TableHead className="hidden md:table-cell p-1 md:p-2">Estado</TableHead>
-                              <TableHead className="hidden md:table-cell p-1 md:p-2">Acciones</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {paginatedSales.map((sale) => {
-                              const neto = sale.productPrice * (1 - 0.12)
-                              return (
-                                <TableRow key={`${sale.compraId}-${sale.productId}`} className="text-xs md:text-sm">
-                                  <TableCell className="p-1 md:p-2 max-w-[80px] truncate">
-                                    {new Date(sale.fechaCompra).toLocaleDateString('es-ES')}
-                                  </TableCell>
-                                  <TableCell className="p-1 md:p-2 max-w-[100px] truncate">{sale.productName}</TableCell>
-                                  <TableCell className="p-1 md:p-2 max-w-[80px] truncate">{sale.vendedorNombre}</TableCell>
-                                  <TableCell className="hidden md:table-cell p-1 md:p-2 max-w-[80px] truncate">{sale.compradorNombre}</TableCell>
-                                  <TableCell className="p-1 md:p-2">${sale.productPrice.toFixed(2)}</TableCell>
-                                  <TableCell className="p-1 md:p-2 text-green-700 font-semibold">${neto.toFixed(2)}</TableCell>
-                                  <TableCell className="hidden md:table-cell p-1 md:p-2">
-                                    {sale.pagado ? (
-                                      <Badge variant="default">Pagado</Badge>
-                                    ) : (
-                                      <Badge variant="secondary">Pendiente</Badge>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="hidden md:table-cell p-1 md:p-2">
-                                    {!sale.pagado && (
-                                      <Button size="sm" variant="default" onClick={() => openPaymentMarkingModal(sale)}>
-                                        Marcar como Pagado
-                                      </Button>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              )
-                            })}
-                          </TableBody>
-                        </Table>
-                        
-                        {salesData.length === 0 && (
-                          <div className="text-center py-8 text-gray-500">
-                            No se encontraron ventas con los filtros aplicados
-                              </div>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card> */}
 
                 {/* Ventas y Comisiones Tab */}
                 <Card>
@@ -3267,39 +3217,50 @@ export default function AdminDashboard() {
                               <TableHead className="p-1 md:p-2">Comprador</TableHead>
                               <TableHead className="p-1 md:p-2">Total</TableHead>
                               <TableHead className="p-1 md:p-2">Estado</TableHead>
+                              <TableHead className="p-1 md:p-2">Pago a vendedores</TableHead>
                               <TableHead className="p-1 md:p-2">Acciones</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {purchases.map((compra) => (
-                              <TableRow key={compra.id}>
-                                <TableCell>{new Date(compra.createdAt?.toDate?.() || compra.createdAt).toLocaleDateString('es-ES')}</TableCell>
-                                <TableCell>
-                                  <ul className="list-disc pl-4">
-                                    {Array.isArray(compra.products) && compra.products.map((p, idx) => (
-                                      <li key={idx}>{p.nombre || p.productName || p.productoNombre || 'Producto'} (x{p.quantity || p.cantidad || 1})</li>
-                                    ))}
-                                  </ul>
-                            </TableCell>
-                                <TableCell>{usersMap[compra.buyerId]?.name || compra.buyerId}</TableCell>
-                                <TableCell>${compra.totalAmount?.toFixed(2)}</TableCell>
-                            <TableCell>
-                                  <Badge variant={compra.status === 'approved' ? 'default' : 'secondary'}>
-                                    {compra.status}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Button variant="outline" size="sm" onClick={() => handleViewDetails(compra)}>
-                                    Ver Detalles
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                            {filteredPurchases.map((compra) => {
+                              const allPaid = compra.paidToSellers === true || (Array.isArray(compra.products) && compra.products.every((p: any) => p.paidToSeller === true));
+                              return (
+                                <TableRow key={compra.id}>
+                                  <TableCell>{new Date(compra.createdAt?.toDate?.() || compra.createdAt).toLocaleDateString('es-ES')}</TableCell>
+                                  <TableCell>
+                                    <ul className="list-disc pl-4">
+                                      {Array.isArray(compra.products) && compra.products.map((p, idx) => (
+                                        <li key={idx}>{p.nombre || p.productName || p.productoNombre || 'Producto'} (x{p.quantity || p.cantidad || 1})</li>
+                                      ))}
+                                    </ul>
+                                  </TableCell>
+                                  <TableCell>{usersMap[compra.buyerId]?.name || compra.buyerId}</TableCell>
+                                  <TableCell>${compra.totalAmount?.toFixed(2)}</TableCell>
+                                  <TableCell>
+                                    <Badge variant={compra.status === 'approved' ? 'default' : 'secondary'}>
+                                      {compra.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    {allPaid ? (
+                                      <Badge variant="default">Pagado</Badge>
+                                    ) : (
+                                      <Badge variant="secondary">Pendiente de pago a vendedores</Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Button variant="outline" size="sm" onClick={() => handleViewDetails(compra)}>
+                                      Ver Detalles
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
                           </TableBody>
                         </Table>
-                        {purchases.length === 0 && (
+                        {filteredPurchases.length === 0 && (
                           <div className="text-center py-8 text-gray-500">
-                            No se encontraron compras
+                            {purchases.length === 0 ? 'No se encontraron compras' : 'No hay compras que coincidan con los filtros aplicados'}
                           </div>
                                 )}
                               </div>
@@ -3309,187 +3270,7 @@ export default function AdminDashboard() {
               </div>
             </TabsContent>
 
-            {/* Pagos Manuales Tab */}
-            <TabsContent value="manual-payments" className="mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Historial de Pagos Manuales</CardTitle>
-                  <CardDescription>
-                    Registro de todos los pagos marcados manualmente por administradores
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loadingManualPayments ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                      <span className="ml-2">Cargando historial de pagos...</span>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Fecha</TableHead>
-                            <TableHead>Vendedor</TableHead>
-                            <TableHead>Compra ID</TableHead>
-                            <TableHead>Monto</TableHead>
-                            <TableHead>Método</TableHead>
-                            <TableHead>Administrador</TableHead>
-                            <TableHead>Notas</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {manualPayments.map((payment) => (
-                            <TableRow key={payment.id}>
-                            <TableCell>
-                              <div className="text-sm">
-                                  {new Date(payment.fechaPago).toLocaleDateString('es-ES', {
-                                    year: 'numeric',
-                                    month: 'short',
-                                    day: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                                <div className="font-medium">{payment.vendedorNombre}</div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="font-mono text-sm">{payment.compraId}</div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="font-semibold text-green-600">
-                                  ${payment.monto.toFixed(2)}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                                <Badge variant={
-                                  payment.metodoPago === 'bank_transfer' ? 'default' :
-                                  payment.metodoPago === 'mercadopago' ? 'secondary' : 'outline'
-                                }>
-                                  {payment.metodoPago === 'bank_transfer' ? 'Transferencia' :
-                                   payment.metodoPago === 'mercadopago' ? 'MercadoPago' : 'Efectivo'}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="text-sm">{payment.administradorNombre}</div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="text-sm text-gray-600 max-w-xs truncate">
-                                  {payment.notas}
-                                </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                      
-                      {manualPayments.length === 0 && (
-                        <div className="text-center py-8 text-gray-500">
-                          No hay pagos manuales registrados
-                  </div>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
 
-            {/* Notificaciones Tab */}
-            <TabsContent value="notifications" className="mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Sistema de Notificaciones</CardTitle>
-                  <CardDescription>
-                    Monitorea todas las notificaciones enviadas a los usuarios
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loadingNotifications ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                      <span className="ml-2">Cargando notificaciones...</span>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Estadísticas de notificaciones */}
-                      <div className="grid gap-4 md:grid-cols-3">
-                        <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Total Notificaciones</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{notifications.length}</div>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">No Leídas</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-red-600">
-                              {notifications.filter(n => !n.isRead).length}
-                            </div>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Últimas 24h</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-green-600">
-                              {notifications.filter(n => {
-                                const notificationDate = n.createdAt?.toDate?.() || new Date(n.createdAt)
-                                const yesterday = new Date()
-                                yesterday.setDate(yesterday.getDate() - 1)
-                                return notificationDate > yesterday
-                              }).length}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-
-                      {/* Tabla de notificaciones */}
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="p-1 md:p-2">Fecha</TableHead>
-                              <TableHead className="p-1 md:p-2">Usuario</TableHead>
-                              <TableHead className="hidden md:table-cell p-1 md:p-2">Tipo</TableHead>
-                              <TableHead className="p-1 md:p-2">Título</TableHead>
-                              <TableHead className="hidden md:table-cell p-1 md:p-2">Descripción</TableHead>
-                              <TableHead className="hidden md:table-cell p-1 md:p-2">Estado</TableHead>
-                              <TableHead className="hidden md:table-cell p-1 md:p-2">Detalles</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {notifications.map((notification) => (
-                              <TableRow key={notification.id} className="text-xs md:text-sm">
-                                <TableCell className="p-1 md:p-2 max-w-[80px] truncate">{/* fecha */}</TableCell>
-                                <TableCell className="p-1 md:p-2 max-w-[80px] truncate">{/* usuario */}</TableCell>
-                                <TableCell className="hidden md:table-cell p-1 md:p-2">{/* tipo */}</TableCell>
-                                <TableCell className="p-1 md:p-2 max-w-[100px] truncate">{/* título */}</TableCell>
-                                <TableCell className="hidden md:table-cell p-1 md:p-2 max-w-[100px] truncate">{/* descripción */}</TableCell>
-                                <TableCell className="hidden md:table-cell p-1 md:p-2">{/* estado */}</TableCell>
-                                <TableCell className="hidden md:table-cell p-1 md:p-2">{/* detalles */}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                        
-                        {notifications.length === 0 && (
-                          <div className="text-center py-8 text-gray-500">
-                            No hay notificaciones registradas
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
           </Tabs>
         </main>
       </div>
@@ -3587,7 +3368,7 @@ export default function AdminDashboard() {
       {/* Ventas y Comisiones Tab */}
       {/* Modal de Detalle de Compra */}
       <Dialog open={showPurchaseModal} onOpenChange={setShowPurchaseModal}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-5xl w-full">
           <DialogHeader>
             <DialogTitle>Detalle de Compra</DialogTitle>
             <DialogDescription>
@@ -3598,38 +3379,86 @@ export default function AdminDashboard() {
             <p>Fecha: {selectedPurchase?.createdAt ? (selectedPurchase?.createdAt.toDate ? new Date(selectedPurchase.createdAt.toDate()).toLocaleString() : new Date(selectedPurchase.createdAt).toLocaleString()) : ''}</p>
             <p>Comprador: {selectedPurchase?.buyerId ? usersMap[selectedPurchase.buyerId as string]?.name || selectedPurchase.buyerId : ''}</p>
             <p>Total: ${selectedPurchase?.totalAmount?.toFixed(2)}</p>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Producto</TableHead>
-                  <TableHead>Cantidad</TableHead>
-                  <TableHead>Precio</TableHead>
-                  <TableHead>Subtotal</TableHead>
-                  <TableHead>Vendedor</TableHead>
-                  <TableHead>Acción</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {selectedPurchase?.products?.map((p: any, idx: number) => (
-                  <TableRow key={idx}>
-                    <TableCell>{p.nombre || p.productName || p.productoNombre || 'Producto'}</TableCell>
-                    <TableCell>{p.quantity || p.cantidad || 1}</TableCell>
-                    <TableCell>${(p.precio || p.price || 0).toFixed(2)}</TableCell>
-                    <TableCell>${((p.precio || p.price || 0) * (p.quantity || p.cantidad || 1)).toFixed(2)}</TableCell>
-                    <TableCell>{usersMap[p.vendedorId]?.name || p.vendedorId}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewSeller(p.vendedorId as string)}
-                      >
-                        Ver Vendedor
-                      </Button>
-                    </TableCell>
+            {/* Tabla de productos en el modal */}
+            <div>
+              <Table className="w-full min-w-[900px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="py-2 px-3 align-middle">Producto</TableHead>
+                    <TableHead className="py-2 px-3 align-middle">Cantidad</TableHead>
+                    <TableHead className="py-2 px-3 align-middle">Precio</TableHead>
+                    <TableHead className="py-2 px-3 align-middle">Subtotal</TableHead>
+                    <TableHead className="py-2 px-3 align-middle">Vendedor</TableHead>
+                    <TableHead className="py-2 px-3 align-middle">Monto a Pagar</TableHead>
+                    <TableHead className="py-2 px-3 align-middle">Estado</TableHead>
+                    <TableHead className="py-2 px-3 align-middle">Acción</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {selectedPurchase?.products?.map((p: any, idx: number) => {
+                    const amountToPay = (p.precio || p.price || 0) * (p.quantity || p.cantidad || 1) * 0.88; // 12% comisión
+                    const isPaid = p.paidToSeller === true;
+                    return (
+                      <TableRow key={idx} className="align-middle">
+                        <TableCell className="py-2 px-3 align-middle">{p.nombre || p.productName || p.productoNombre || 'Producto'}</TableCell>
+                        <TableCell className="py-2 px-3 align-middle">{p.quantity || p.cantidad || 1}</TableCell>
+                        <TableCell className="py-2 px-3 align-middle">${(p.precio || p.price || 0).toFixed(2)}</TableCell>
+                        <TableCell className="py-2 px-3 align-middle">${((p.precio || p.price || 0) * (p.quantity || p.cantidad || 1)).toFixed(2)}</TableCell>
+                        <TableCell className="py-2 px-3 align-middle">{usersMap[p.vendedorId]?.name || p.vendedorId}</TableCell>
+                        <TableCell className="py-2 px-3 align-middle text-green-700 font-semibold">${amountToPay.toFixed(2)}</TableCell>
+                        <TableCell className="py-2 px-3 align-middle">
+                          {isPaid ? (
+                            <Badge variant="default">Pagado</Badge>
+                          ) : (
+                            <Badge variant="secondary">Pendiente</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-2 px-3 align-middle">
+                          <div className="flex flex-col md:flex-row gap-2 items-start md:items-center">
+                            <Button
+                              variant="default"
+                              size="sm"
+                              disabled={isPaid}
+                              onClick={async () => {
+                                if (!selectedPurchase?.id) return;
+                                // Actualizar paidToSeller en Firestore
+                                const compraRef = doc(db, 'purchases', selectedPurchase.id);
+                                const updatedProducts = selectedPurchase.products.map((prod: any, i: number) =>
+                                  i === idx ? { ...prod, paidToSeller: true } : prod
+                                );
+                                // Verificar si todos quedan pagados
+                                const allPaid = updatedProducts.every((prod: any) => prod.paidToSeller === true);
+                                await updateDoc(compraRef, {
+                                  products: updatedProducts,
+                                  paidToSellers: allPaid
+                                });
+                                // Refrescar datos locales
+                                setSelectedPurchase({ ...selectedPurchase, products: updatedProducts });
+                                fetchAdminData();
+                                // Mostrar toast de confirmación
+                                toast({
+                                  title: 'Pago marcado como realizado',
+                                  description: `El producto ha sido marcado como pagado al vendedor.`
+                                });
+                              }}
+                            >
+                              Marcar como pagado
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewSeller(p.vendedorId as string)}
+                            >
+                              Ver Vendedor
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -3649,6 +3478,23 @@ export default function AdminDashboard() {
             <p><strong>UID:</strong> {selectedSellerId}</p>
             <p><strong>Activo:</strong> {selectedSellerId ? (usersMap[selectedSellerId as string]?.isActive ? 'Sí' : 'No') : ''}</p>
             <p><strong>Suscrito:</strong> {selectedSellerId ? (usersMap[selectedSellerId as string]?.isSubscribed ? 'Sí' : 'No') : ''}</p>
+            {bankData ? (
+              <div className="pt-4 border-t space-y-1">
+                <h3 className="font-semibold text-sm">Datos Bancarios</h3>
+                <p><strong>Banco:</strong> {bankData.banco}</p>
+                <p><strong>Alias:</strong> {bankData.alias}</p>
+                <p><strong>CBU:</strong> {bankData.cbu}</p>
+                <p><strong>Titular:</strong> {bankData.titular}</p>
+                <p><strong>CUIT:</strong> {bankData.cuit}</p>
+                <p><strong>Tipo de Cuenta:</strong> {bankData.tipoCuenta}</p>
+                <p><strong>Preferencia de Retiro:</strong> {bankData.preferenciaRetiro}</p>
+                <p><strong>Impuesto Inmediato:</strong> {bankData.impuestoInmediato}%</p>
+                <p><strong>Impuesto 7 días:</strong> {bankData.impuesto7Dias}%</p>
+                <p><strong>Impuesto 30 días:</strong> {bankData.impuesto30Dias}%</p>
+              </div>
+            ) : (
+              <p className="text-muted pt-4 border-t">Este vendedor no tiene datos bancarios cargados.</p>
+            )}
           </div>
         </DialogContent>
       </Dialog>

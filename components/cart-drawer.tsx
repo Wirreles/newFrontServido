@@ -240,7 +240,8 @@ export function CartDrawer() {
         <SheetHeader>
           <SheetTitle>Carrito de Compras</SheetTitle>
         </SheetHeader>
-        <div className="mt-8">
+        {/* Contenido scrollable */}
+        <div className="mt-8 max-h-[70vh] overflow-y-auto pr-2">
           {Object.entries(groupedItems).map(([sellerId, sellerItems]) => (
             <div key={sellerId} className="mb-8 border-b pb-4">
               <h3 className="font-semibold mb-4 text-sm text-gray-600">Vendedor</h3>
@@ -273,43 +274,64 @@ export function CartDrawer() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {/* Botón de compra individual */}
-                    <Button
-                      size="sm"
-                      onClick={() => handleBuyIndividualItem(item)}
-                      disabled={loadingItems.has(item.id)}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      {loadingItems.has(item.id) ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        "Comprar"
-                      )}
-                    </Button>
                     {/* Botón de eliminar */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeFromCart(item.id)}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeFromCart(item.id)}
                       className="text-red-500 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               ))}
-              
-              {/* Botón para comprar todos los productos del vendedor */}
+              {/* Subtotal por vendedor (solo visual, sin botón de compra por vendedor) */}
               <div className="bg-gray-50 p-3 rounded-lg mt-4">
                 <div className="flex justify-between items-center font-semibold text-base mb-2">
-                <span>Subtotal Vendedor:</span>
+                  <span>Subtotal Vendedor:</span>
                   <span>${getVendorSubtotal(sellerId).toFixed(2)}</span>
+                </div>
               </div>
+            </div>
+          ))}
+          {items.length === 0 && (
+            <div className="text-center py-8">
+              <ShoppingBag className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-500">Tu carrito está vacío</p>
+              <Link href="/products">
+                <Button className="mt-4">Ver productos</Button>
+              </Link>
+            </div>
+          )}
+        </div>
+        {/* Botones de acción fijos abajo */}
+        {items.length > 0 && (
+          <div className="mt-6 pt-4 border-t bg-white sticky bottom-0 z-10">
+            <div className="bg-purple-50 p-4 rounded-lg mb-4">
+              <h4 className="font-semibold text-sm text-purple-800 mb-2">
+                🛒 Compra Centralizada
+              </h4>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Vendedores:</span>
+                  <span className="font-medium">{getVendorCount()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Productos:</span>
+                  <span className="font-medium">{items.length}</span>
+                </div>
+                <div className="flex justify-between font-bold text-lg border-t pt-2">
+                  <span>Total:</span>
+                  <span>${getTotalPrice().toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
               <Button
-                  className="w-full bg-blue-600 hover:bg-blue-700"
-                  onClick={() => handleBuyVendorItems(sellerItems, sellerId)}
+                onClick={handleBuyAllItems}
                 disabled={loading}
-                  size="sm"
+                className="w-full bg-purple-600 hover:bg-purple-700"
               >
                 {loading ? (
                   <>
@@ -317,80 +339,26 @@ export function CartDrawer() {
                     Procesando...
                   </>
                 ) : (
-                    `Comprar de este vendedor ($${getVendorSubtotal(sellerId).toFixed(2)})`
+                  <>
+                    <ShoppingBag className="mr-2 h-4 w-4" />
+                    Comprar Todo (${getTotalPrice().toFixed(2)})
+                  </>
                 )}
               </Button>
-              </div>
-            </div>
-          ))}
-          
-          {items.length === 0 && (
-            <div className="text-center py-8">
-              <ShoppingBag className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-500">Tu carrito está vacío</p>
-                <Link href="/products">
-                <Button className="mt-4">Ver productos</Button>
-                </Link>
-            </div>
-          )}
-          
-          {items.length > 0 && (
-            <div className="mt-6 pt-4 border-t">
-              <div className="bg-purple-50 p-4 rounded-lg mb-4">
-                <h4 className="font-semibold text-sm text-purple-800 mb-2">
-                  🛒 Compra Centralizada
-                </h4>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>Vendedores:</span>
-                    <span className="font-medium">{getVendorCount()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Productos:</span>
-                    <span className="font-medium">{items.length}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-lg border-t pt-2">
-                    <span>Total:</span>
-                <span>${getTotalPrice().toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Button
-                  onClick={handleBuyAllItems}
-                  disabled={loading}
-                  className="w-full bg-purple-600 hover:bg-purple-700"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Procesando...
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingBag className="mr-2 h-4 w-4" />
-                      Comprar Todo (${getTotalPrice().toFixed(2)})
-                    </>
-                  )}
-                </Button>
-                
               <Button
                 variant="outline"
-                  onClick={clearCart}
+                onClick={clearCart}
                 className="w-full"
               >
-                  Limpiar carrito
+                Limpiar carrito
               </Button>
-              </div>
-              
-              <div className="mt-4 text-xs text-gray-500">
-                <p>💡 Puedes comprar productos individuales, por vendedor, o todo junto.</p>
-                <p>El sistema centralizado permite múltiples productos en una sola transacción.</p>
-              </div>
             </div>
-          )}
-        </div>
+            <div className="mt-4 text-xs text-gray-500">
+              <p>💡 Ahora solo puedes realizar compras centralizadas de todos los productos del carrito.</p>
+              <p>El sistema centralizado permite múltiples productos en una sola transacción.</p>
+            </div>
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   )
