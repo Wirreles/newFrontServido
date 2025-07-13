@@ -1770,25 +1770,7 @@ export default function SellerDashboardPage() {
                 <Tag className="h-4 w-4" />
                 Cupones
               </Button>
-              <Button
-                variant={activeTab === "stats" ? "secondary" : "ghost"}
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
-                onClick={() => setActiveTab("stats")}
-              >
-                <LineChart className="h-4 w-4" />
-                Estadísticas
-              </Button>
-              <Button
-                variant={activeTab === "earnings" ? "secondary" : "ghost"}
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
-                onClick={() => {
-                  setActiveTab("earnings")
-                  fetchSellerEarnings()
-                }}
-              >
-                <DollarSign className="h-4 w-4" />
-                Mis Ganancias
-              </Button>
+
               <Button
                 variant={activeTab === "profile" ? "secondary" : "ghost"}
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
@@ -1907,17 +1889,7 @@ export default function SellerDashboardPage() {
                   <MessageSquare className="mr-2 h-5 w-5" />
                   Mis Chats
                 </Button>
-                <Button
-                  variant={activeTab === "stats" ? "secondary" : "ghost"}
-                  onClick={() => {
-                    setActiveTab("stats")
-                    closeMobileMenu()
-                  }}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
-                >
-                  <BarChart3 className="mr-2 h-5 w-5" />
-                  Estadísticas
-                </Button>
+
                 <Button
                   variant={activeTab === "profile" ? "secondary" : "ghost"}
                   onClick={() => {
@@ -2728,17 +2700,7 @@ export default function SellerDashboardPage() {
             </Card>
           )}
 
-          {activeTab === "stats" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Estadísticas</CardTitle>
-                <CardDescription>Análisis de ventas y rendimiento.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-500">Funcionalidad de estadísticas próximamente.</p>
-              </CardContent>
-            </Card>
-          )}
+
 
           {activeTab === "profile" && (
             <Card>
@@ -2973,7 +2935,7 @@ export default function SellerDashboardPage() {
                 </Card>
               </div>
 
-              {/* Filtros */}
+              
               <Card>
                 <CardHeader>
                   <CardTitle>Filtros de Historial</CardTitle>
@@ -3024,85 +2986,8 @@ export default function SellerDashboardPage() {
                 </CardContent>
               </Card>
 
-              {/* Historial de Ventas */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Historial de Ventas</CardTitle>
-                  <CardDescription>
-                    Detalle de todas tus ventas y comisiones
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loadingEarnings ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
-                      <span className="ml-2">Cargando historial...</span>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Fecha</TableHead>
-                            <TableHead>Comprador</TableHead>
-                            <TableHead>Productos</TableHead>
-                            <TableHead>Subtotal</TableHead>
-                            <TableHead>Comisión (12%)</TableHead>
-                            <TableHead>Neto</TableHead>
-                            <TableHead>Estado</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {getFilteredSales().map((sale) => (
-                            <TableRow key={sale.compraId}>
-                              <TableCell>
-                                <div className="font-medium">
-                                  {new Date(sale.fechaCompra).toLocaleDateString()}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="font-medium">{sale.compradorNombre}</div>
-                              </TableCell>
-                                                             <TableCell>
-                                 <div className="space-y-1">
-                                   {sale.items.map((item, index) => (
-                                     <div key={index} className="text-sm">
-                                       {item.productoNombre} x{item.cantidad}
-                                     </div>
-                                   ))}
-                                 </div>
-                               </TableCell>
-                               <TableCell>
-                                 <div className="font-medium">${sale.subtotalVendedor.toFixed(2)}</div>
-                               </TableCell>
-                               <TableCell>
-                                 <div className="text-red-600">-${sale.comisionApp.toFixed(2)}</div>
-                               </TableCell>
-                               <TableCell>
-                                 <div className="font-bold text-green-600">${sale.montoAPagar.toFixed(2)}</div>
-                               </TableCell>
-                              <TableCell>
-                                <Badge 
-                                  variant={sale.estadoPago === 'pagado' ? 'default' : 'secondary'}
-                                  className={sale.estadoPago === 'pagado' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}
-                                >
-                                  {sale.estadoPago === 'pagado' ? 'Pagado' : 'Pendiente'}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                      
-                      {getFilteredSales().length === 0 && (
-                        <div className="text-center py-8 text-gray-500">
-                          No hay ventas que mostrar con los filtros seleccionados
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+            
+           
 
               {/* Información del Sistema de Comisiones */}
               <Card>

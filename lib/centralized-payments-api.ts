@@ -25,6 +25,56 @@ import type {
 } from '@/types/centralized-payments'
 import { COMMISSION_RATE, TAX_RATES } from '@/types/centralized-payments'
 
+// Función de prueba para debuggear
+export async function testFirestoreConnection(): Promise<string> {
+  try {
+    console.log('Testing Firestore connection...')
+    const testDoc = {
+      test: 'hello',
+      timestamp: serverTimestamp(),
+      number: 123,
+      boolean: true
+    }
+    
+    const docRef = await addDoc(collection(db, 'test'), testDoc)
+    console.log('Test document created with ID:', docRef.id)
+    return docRef.id
+  } catch (error) {
+    console.error('Test failed:', error)
+    throw error
+  }
+}
+
+// Función simplificada para guardar solo campos básicos
+export async function saveSellerBankConfigSimple(config: {
+  vendedorId: string
+  cbu: string
+  banco: string
+  titular: string
+  tipoCuenta: string
+}): Promise<string> {
+  try {
+    console.log('Saving simplified bank config:', config)
+    
+    const simpleConfig = {
+      vendedorId: config.vendedorId,
+      cbu: config.cbu,
+      banco: config.banco,
+      titular: config.titular,
+      tipoCuenta: config.tipoCuenta,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }
+    
+    const docRef = await addDoc(collection(db, 'sellerBankConfigs'), simpleConfig)
+    console.log('Simplified config saved with ID:', docRef.id)
+    return docRef.id
+  } catch (error) {
+    console.error('Error saving simplified config:', error)
+    throw error
+  }
+}
+
 // Tipo local para CommissionDistribution
 export interface CommissionDistribution {
   vendedorId: string
@@ -68,7 +118,7 @@ export async function getSellerBankConfig(sellerId: string): Promise<SellerBankC
   try {
     const q = query(
       collection(db, 'sellerBankConfigs'),
-      where('sellerId', '==', sellerId)
+      where('vendedorId', '==', sellerId)
     )
     
     const querySnapshot = await getDocs(q)
@@ -936,10 +986,12 @@ export function getCartPurchaseSummary(
 // FUNCIONES DE CONFIGURACIÓN BANCARIA
 // ============================================================================
 
-export function validateBankConfig(config: Partial<SellerBankConfig>): { isValid: boolean; errors: string[] } {
+export function validateBankConfig(config: Partial<SellerBankConfig>): string[] {
   const errors: string[] = []
   
-  if (!config.banco?.trim()) {
+  console.log('Validating config:', config)
+  
+  if (!config.banco || typeof config.banco !== 'string' || !config.banco.trim()) {
     errors.push('El nombre del banco es requerido')
   }
   
@@ -947,41 +999,93 @@ export function validateBankConfig(config: Partial<SellerBankConfig>): { isValid
     errors.push('El tipo de cuenta es requerido')
   }
   
-  if (!config.cbu?.trim()) {
+  if (!config.cbu || typeof config.cbu !== 'string' || !config.cbu.trim()) {
     errors.push('El CBU es requerido')
   }
   
-  if (!config.titular?.trim()) {
+  if (!config.titular || typeof config.titular !== 'string' || !config.titular.trim()) {
     errors.push('El titular de la cuenta es requerido')
   }
   
-  if (!config.cuit?.trim()) {
-    errors.push('El CUIT del titular es requerido')
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  }
+  console.log('Validation errors:', errors)
+  return errors
 }
 
-export async function saveSellerBankConfig(sellerId: string, config: SellerBankConfig): Promise<void> {
+export async function saveSellerBankConfig(config: Omit<SellerBankConfig, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
   try {
-    const docRef = doc(db, 'sellerBankConfigs', sellerId)
-    await setDoc(docRef, {
-      ...config,
-      sellerId,
-      updatedAt: serverTimestamp()
+    console.log('Saving bank config with data:', config)
+    
+    // Verificar cada campo individualmente
+    const fieldsToCheck = [
+      'vendedorId', 'cbu', 'alias', 'banco', 'titular', 'cuit', 
+      'tipoCuenta', 'preferenciaRetiro'
+    ]
+    
+    fieldsToCheck.forEach(field => {
+      const value = (config as any)[field]
+      console.log(`Field ${field}:`, value, typeof value)
+      if (value !== undefined && value !== null && typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+        console.warn(`Field ${field} has unexpected type:`, typeof value, value)
+      }
     })
+    
+    const docRef = doc(collection(db, 'sellerBankConfigs'))
+    
+    // Crear el objeto paso a paso para identificar el problema
+    const baseConfig = {
+      vendedorId: config.vendedorId,
+      cbu: config.cbu,
+      banco: config.banco,
+      titular: config.titular,
+      tipoCuenta: config.tipoCuenta,
+      preferenciaRetiro: config.preferenciaRetiro,
+      impuestoInmediato: config.impuestoInmediato,
+      impuesto7Dias: config.impuesto7Dias,
+      impuesto30Dias: config.impuesto30Dias,
+      isActive: config.isActive
+    }
+    
+    // Agregar campos opcionales solo si existen
+    if (config.alias !== undefined) {
+      (baseConfig as any).alias = config.alias
+    }
+    if (config.cuit !== undefined) {
+      (baseConfig as any).cuit = config.cuit
+    }
+    
+    const configToSave = {
+      ...baseConfig,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }
+    
+    console.log('Config to save:', configToSave)
+    console.log('Config to save (stringified):', JSON.stringify(configToSave, null, 2))
+    
+    // Intentar con addDoc primero
+    try {
+      const docRef2 = await addDoc(collection(db, 'sellerBankConfigs'), configToSave)
+      console.log('Config saved successfully with addDoc, ID:', docRef2.id)
+      return docRef2.id
+    } catch (addDocError) {
+      console.error('addDoc failed, trying setDoc:', addDocError)
+      await setDoc(docRef, configToSave)
+      console.log('Config saved successfully with setDoc, ID:', docRef.id)
+      return docRef.id
+    }
   } catch (error) {
     console.error('Error saving seller bank config:', error)
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    })
     throw error
   }
 }
 
-export async function updateSellerBankConfig(sellerId: string, config: Partial<SellerBankConfig>): Promise<void> {
+export async function updateSellerBankConfig(configId: string, config: Partial<SellerBankConfig>): Promise<void> {
   try {
-    const docRef = doc(db, 'sellerBankConfigs', sellerId)
+    const docRef = doc(db, 'sellerBankConfigs', configId)
     await updateDoc(docRef, {
       ...config,
       updatedAt: serverTimestamp()

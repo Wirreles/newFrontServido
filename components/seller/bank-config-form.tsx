@@ -18,7 +18,9 @@ import {
   validateBankConfig as validateConfig,
   saveSellerBankConfig as saveBankConfig,
   getSellerBankConfig as getBankConfig,
-  updateSellerBankConfig as updateBankConfig
+  updateSellerBankConfig as updateBankConfig,
+  testFirestoreConnection,
+  saveSellerBankConfigSimple
 } from "@/lib/centralized-payments-api"
 
 interface BankConfigFormProps {
@@ -59,7 +61,22 @@ export function BankConfigForm({ sellerId, onConfigSaved }: BankConfigFormProps)
         const existing = await getBankConfig(sellerId)
         if (existing) {
           setExistingConfig(existing)
-          setConfig(existing)
+          // Asegurar que los tipos sean correctos al cargar
+          setConfig({
+            ...existing,
+            vendedorId: String(existing.vendedorId || sellerId),
+            cbu: String(existing.cbu || ''),
+            alias: existing.alias ? String(existing.alias) : '',
+            banco: String(existing.banco || ''),
+            titular: String(existing.titular || ''),
+            cuit: existing.cuit ? String(existing.cuit) : '',
+            tipoCuenta: existing.tipoCuenta || 'ahorro',
+            preferenciaRetiro: existing.preferenciaRetiro || 'a_7_dias',
+            impuestoInmediato: Number(existing.impuestoInmediato || TAX_RATES.inmediato * 100),
+            impuesto7Dias: Number(existing.impuesto7Dias || TAX_RATES.a_7_dias * 100),
+            impuesto30Dias: Number(existing.impuesto30Dias || TAX_RATES.a_30_dias * 100),
+            isActive: Boolean(existing.isActive)
+          })
         }
       } catch (error) {
         console.error("Error loading bank config:", error)
@@ -73,6 +90,7 @@ export function BankConfigForm({ sellerId, onConfigSaved }: BankConfigFormProps)
   
   // Manejar cambios en el formulario
   const handleInputChange = (field: keyof SellerBankConfig, value: string) => {
+    console.log(`Changing field ${field} to:`, value)
     setConfig(prev => ({
       ...prev,
       [field]: value
@@ -86,39 +104,56 @@ export function BankConfigForm({ sellerId, onConfigSaved }: BankConfigFormProps)
   
   // Validar y guardar configuración
   const handleSave = async () => {
+    let sanitizedConfig: any = null
+
     try {
       setSaving(true)
       setErrors([])
-      
-      // Validar formulario
-      const validationErrors = validateConfig(config)
-      if (validationErrors.length > 0) {
-        setErrors(validationErrors)
+
+      // Validar solo los campos principales
+      const mainErrors = []
+      if (!config.cbu || String(config.cbu).trim() === "") mainErrors.push("El CBU es obligatorio")
+      if (!config.banco || String(config.banco).trim() === "") mainErrors.push("El banco es obligatorio")
+      if (!config.titular || String(config.titular).trim() === "") mainErrors.push("El titular es obligatorio")
+      if (mainErrors.length > 0) {
+        setErrors(mainErrors)
+        setSaving(false)
         return
       }
-      
+
+      // Guardar el objeto tal como viene, pero forzando todos los valores a string (excepto booleanos y números)
+      sanitizedConfig = {};
+      Object.entries(config).forEach(([key, value]) => {
+        if (typeof value === "boolean" || typeof value === "number" || value === null || value === undefined) {
+          sanitizedConfig[key] = value;
+        } else {
+          sanitizedConfig[key] = String(value);
+        }
+      });
+
       // Guardar o actualizar
       if (existingConfig) {
-        await updateBankConfig(existingConfig.id, config)
+        await updateBankConfig(existingConfig.id, sanitizedConfig)
         toast({
           title: "Configuración actualizada",
           description: "Tus datos bancarios han sido actualizados correctamente",
         })
       } else {
-        const newId = await saveBankConfig(config as Omit<SellerBankConfig, 'id' | 'createdAt' | 'updatedAt'>)
-        setExistingConfig({ ...config, id: newId } as SellerBankConfig)
+        const configToSave = sanitizedConfig as Omit<SellerBankConfig, 'id' | 'createdAt' | 'updatedAt'>
+        const newId = await saveBankConfig(configToSave)
+        setExistingConfig({ ...sanitizedConfig, id: newId } as SellerBankConfig)
         toast({
           title: "Configuración guardada",
           description: "Tus datos bancarios han sido guardados correctamente",
         })
       }
-      
+
       onConfigSaved?.()
     } catch (error) {
       console.error("Error saving bank config:", error)
       toast({
         title: "Error",
-        description: "No se pudo guardar la configuración bancaria",
+        description: `No se pudo guardar la configuración bancaria: ${error instanceof Error ? error.message : 'Error desconocido'}`,
         variant: "destructive"
       })
     } finally {
@@ -151,14 +186,10 @@ export function BankConfigForm({ sellerId, onConfigSaved }: BankConfigFormProps)
   
   if (loading) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center gap-2">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span>Cargando configuración...</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="fixed inset-0 flex items-center justify-center bg-white bg-opacity-80 z-50">
+        <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
+        <span className="ml-4 text-lg font-semibold text-gray-700">Cargando configuración...</span>
+      </div>
     )
   }
   
@@ -348,8 +379,9 @@ export function BankConfigForm({ sellerId, onConfigSaved }: BankConfigFormProps)
           </AlertDescription>
         </Alert>
         
-        {/* Botón de guardar */}
-        <div className="flex justify-end">
+        {/* Botones de prueba temporal */}
+        <div className="flex justify-between">
+          {/* Elimina los botones de prueba temporal y deja solo el botón de guardar */}
           <Button
             onClick={handleSave}
             disabled={saving}
