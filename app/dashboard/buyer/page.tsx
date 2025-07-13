@@ -33,7 +33,7 @@ import Image from "next/image"
 
 import { useState, useEffect, type ChangeEvent } from "react"
 import { db, storage } from "@/lib/firebase"
-import { doc, collection, query, where, getDocs, deleteDoc, orderBy, updateDoc, getDoc } from "firebase/firestore"
+import { doc, collection, query, where, getDocs, deleteDoc, orderBy, updateDoc, getDoc, addDoc, serverTimestamp, limit } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"
 import { updateProfile, getAuth } from "firebase/auth" // Import updateProfile
 import { useRouter } from "next/navigation"
@@ -413,6 +413,61 @@ export default function BuyerDashboardPage() {
     })
 
     return Object.values(grouped)
+  }
+
+  // Función para manejar el chat con el vendedor
+  const handleChatWithSeller = async (purchase: CompraProductoBuyer) => {
+    if (!currentUser) {
+      alert("Debes iniciar sesión para chatear con el vendedor.")
+      return
+    }
+
+    try {
+      // Buscar si ya existe un chat entre este comprador y vendedor para este producto
+      const existingChatQuery = query(
+        collection(db, "chats"),
+        where("productId", "==", purchase.productId),
+        where("buyerId", "==", currentUser.firebaseUser.uid),
+        where("sellerId", "==", purchase.vendedorId),
+        limit(1)
+      )
+      const existingChatSnapshot = await getDocs(existingChatQuery)
+
+      if (existingChatSnapshot.docs.length > 0) {
+        // Si existe el chat, navegar a él
+        const existingChatId = existingChatSnapshot.docs[0].id
+        router.push(`/chat/${existingChatId}`)
+      } else {
+        // Si no existe, crear un nuevo chat
+        const newChatData = {
+          productId: purchase.productId,
+          buyerId: currentUser.firebaseUser.uid,
+          sellerId: purchase.vendedorId,
+          buyerName: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email?.split("@")?.[0] || "Comprador",
+          sellerName: purchase.vendedorNombre || purchase.vendedorEmail?.split("@")[0] || "Vendedor",
+          productName: purchase.productName,
+          productImageUrl: purchase.productImageUrl || null,
+          lastMessage: "¡Hola! Tengo una consulta sobre mi compra.",
+          lastMessageTimestamp: serverTimestamp(),
+          createdAt: serverTimestamp(),
+        }
+        
+        const docRef = await addDoc(collection(db, "chats"), newChatData)
+
+        // Crear el primer mensaje
+        await addDoc(collection(db, "chats", docRef.id, "messages"), {
+          senderId: currentUser.firebaseUser.uid,
+          senderName: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email?.split("@")?.[0] || "Comprador",
+          text: "¡Hola! Tengo una consulta sobre mi compra.",
+          timestamp: serverTimestamp(),
+        })
+
+        router.push(`/chat/${docRef.id}`)
+      }
+    } catch (err) {
+      console.error("Error handling chat with seller:", err)
+      alert("Error al iniciar el chat. Inténtalo de nuevo.")
+    }
   }
 
   // --- Profile Image Functions ---
@@ -904,280 +959,107 @@ export default function BuyerDashboardPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Mis Compras</CardTitle>
-                <CardDescription>Historial de tus pedidos y su estado</CardDescription>
+                <CardDescription>Revisa el estado de tus pedidos y contacta al vendedor si lo necesitas.</CardDescription>
               </CardHeader>
               <CardContent>
-                {loadingData ? (
-                  <div className="flex justify-center items-center py-10">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                  </div>
-                ) : centralizedPurchases.length === 0 && productosComprados.length === 0 ? (
+                {paginatedPurchases.length === 0 ? (
                   <div className="text-center py-10">
-                    <p className="text-lg text-muted-foreground mb-6">Aún no has realizado compras.</p>
-                    <Button asChild>
-                      <Link href="/">Explorar productos</Link>
-                    </Button>
+                    <p className="text-lg text-muted-foreground mb-6">No tienes compras registradas.</p>
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {/* 🆕 NUEVO: Mostrar compras centralizadas agrupadas por vendedor */}
-                    {centralizedPurchases.length > 0 && (
-                      <div className="space-y-8">
-                        <div className="flex items-center gap-2 mb-4">
-                          <h3 className="text-lg font-semibold">Compras Centralizadas</h3>
-                          <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                            {centralizedPurchases.length} compra{centralizedPurchases.length > 1 ? 's' : ''}
-                          </span>
-                        </div>
-                        
-                        {getGroupedCentralizedPurchases().map((vendorGroup) => (
-                          <Card key={vendorGroup.vendedorId} className="overflow-hidden border-l-4 border-l-blue-500">
-                            <CardHeader className="bg-blue-50 py-4">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <h4 className="font-semibold text-blue-900">
-                                    Vendedor: {vendorGroup.vendedorNombre}
-                                  </h4>
-                                  <p className="text-sm text-blue-700">
-                                    {vendorGroup.compras.length} compra{vendorGroup.compras.length > 1 ? 's' : ''}
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-sm text-blue-700">Total del vendedor:</p>
-                                  <p className="font-bold text-blue-900">
-                                    ${vendorGroup.compras.reduce((sum, compra) => sum + compra.total, 0).toFixed(2)}
-                                  </p>
-                                </div>
-                              </div>
-                            </CardHeader>
-                            
-                            <CardContent className="p-0">
-                              {vendorGroup.compras.map((compra) => (
-                                <div key={compra.compraId} className="border-b last:border-b-0 p-4">
-                                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3">
-                                    <div>
-                                      <p className="text-sm font-medium">
-                                        Compra #{compra.compraId.slice(-8)} -{" "}
-                                        <span className="text-muted-foreground">
-                                          {new Date(compra.fecha).toLocaleDateString()}
-                                        </span>
-                                      </p>
-                                    </div>
-                                    <div className="mt-2 sm:mt-0 flex gap-2">
-                                      <span
-                                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                          compra.estadoPago === "pagado" 
-                                            ? "bg-green-100 text-green-800" 
-                                            : compra.estadoPago === "pendiente"
-                                            ? "bg-yellow-100 text-yellow-800"
-                                            : "bg-gray-100 text-gray-800"
-                                        }`}
-                                      >
-                                        {compra.estadoPago === "pagado" ? "Pagado" :
-                                         compra.estadoPago === "pendiente" ? "Pendiente" : compra.estadoPago}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Items de la compra */}
-                                  <div className="space-y-3">
-                                    {compra.items.map((item, itemIndex) => (
-                                      <div key={itemIndex} className="flex items-center space-x-4 bg-gray-50 p-3 rounded-lg">
-                                        <div className="h-12 w-12 bg-gray-200 rounded-md flex items-center justify-center">
-                                          <Package className="h-6 w-6 text-gray-500" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-sm font-medium truncate">
-                                            {item.productoNombre}
-                                          </p>
-                                          <p className="text-xs text-muted-foreground">
-                                            Cantidad: {item.cantidad} × ${item.precioUnitario.toFixed(2)}
-                                          </p>
-                                        </div>
-                                        <div className="text-sm font-medium">
-                                          ${item.subtotal.toFixed(2)}
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  
-                                  <div className="mt-3 pt-3 border-t bg-gray-50 p-3 rounded-lg">
-                                    <div className="flex justify-between text-sm">
-                                      <span>Subtotal:</span>
-                                      <span>${compra.total.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm text-muted-foreground">
-                                      <span>Comisión de la app (12%):</span>
-                                      <span>-${(compra.total * 0.12).toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between font-medium text-sm border-t pt-2 mt-2">
-                                      <span>Total pagado:</span>
-                                      <span>${compra.total.toFixed(2)}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {/* Mostrar compras legacy si existen */}
-                    {productosComprados.length > 0 && (
-                      <div className="space-y-6">
-                        <div className="flex items-center gap-2 mb-4">
-                          <h3 className="text-lg font-semibold">Compras Anteriores</h3>
-                          <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">
-                            Sistema anterior
-                          </span>
-                        </div>
-                        
-                        {productosComprados.map((purchase) => {
-                          // Buscar información de envío correspondiente
-                          const shippingInfo = purchasesWithShipping.find(p => p.id === purchase.compraId || (p as any).compraId === purchase.compraId)?.shipping
-                          
-                          return (
-                            <Card key={purchase.compraId} className="overflow-hidden">
+                    {paginatedPurchases.map((purchase, index) => (
+                      <Card key={`${purchase.compraId}-${purchase.productId}-${index}`} className="overflow-hidden">
                         <CardHeader className="bg-gray-50 py-3">
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                             <div>
                               <p className="text-sm font-medium">
-                                      Compra #{purchase.paymentId} -{" "}
-                                      <span className="text-muted-foreground">
-                                        {new Date(purchase.fechaCompra).toLocaleDateString()}
-                                      </span>
+                                Compra #{purchase.paymentId} - {new Date(purchase.fechaCompra).toLocaleDateString()}
                               </p>
                             </div>
-                                  <div className="mt-2 sm:mt-0 flex gap-2">
-                                    {/* Badge de estado de pago */}
-                              <span
-                                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                        purchase.estadoPago === "pagado" 
-                                          ? "bg-green-100 text-green-800" 
-                                          : purchase.estadoPago === "pendiente"
-                                          ? "bg-yellow-100 text-yellow-800"
-                                          : purchase.estadoPago === "rechazado"
-                                          ? "bg-red-100 text-red-800"
-                                          : "bg-gray-100 text-gray-800"
-                                      }`}
-                              >
-                                      {purchase.estadoPago === "pagado" ? "Pagado" :
-                                       purchase.estadoPago === "pendiente" ? "Pendiente" :
-                                       purchase.estadoPago === "rechazado" ? "Rechazado" :
-                                       purchase.estadoPago === "cancelado" ? "Cancelado" : purchase.estadoPago}
+                            <div className="mt-2 sm:mt-0 flex gap-2">
+                              {/* Badge de estado de pago */}
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                purchase.estadoPago === "pagado"
+                                  ? "bg-green-100 text-green-800"
+                                  : purchase.estadoPago === "pendiente"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : purchase.estadoPago === "rechazado"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-gray-100 text-gray-800"
+                              }`}>
+                                {purchase.estadoPago === "pagado"
+                                  ? "Pagado"
+                                  : purchase.estadoPago === "pendiente"
+                                  ? "Pendiente"
+                                  : purchase.estadoPago === "rechazado"
+                                  ? "Rechazado"
+                                  : purchase.estadoPago === "cancelado"
+                                  ? "Cancelado"
+                                  : purchase.estadoPago}
                               </span>
-                                    
-                                    {/* Badge de estado de envío (solo para productos físicos aprobados) */}
-                                    {purchase.estadoPago === "pagado" && !purchase.isService && (
-                                      <span
-                                        className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
-                                          shippingInfo ? getShippingBadgeClass(shippingInfo.status as ShippingStatus) : "bg-gray-100 text-gray-800"
-                                        }`}
-                                      >
-                                        {shippingInfo ? getShippingIcon(shippingInfo.status as ShippingStatus) : <Clock className="h-4 w-4" />}
-                                        {shippingInfo ? getShippingStatusText(shippingInfo.status as ShippingStatus) : "Sin envío"}
-                                      </span>
-                                    )}
+                              {/* Badge de estado de envío */}
+                              {!purchase.isService && (
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
+                                  getShippingBadgeClass(purchase.shippingStatus as ShippingStatus)
+                                }`}>
+                                  {getShippingIcon(purchase.shippingStatus as ShippingStatus)}
+                                  {getShippingStatusText(purchase.shippingStatus as ShippingStatus)}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </CardHeader>
                         <CardContent className="p-4">
                           <div className="space-y-4">
-                              {/* Información del producto */}
-                              <div className="flex items-center space-x-4">
-                                <div className="h-12 w-12 relative flex-shrink-0">
-                                  <Image
-                                    src={purchase.productImageUrl || "/placeholder.svg"}
-                                    alt={purchase.productName || "Producto"}
-                                    layout="fill"
-                                    objectFit="cover"
-                                    className="rounded-md"
-                                  />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">
-                                    {purchase.productName || "Producto desconocido"}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {purchase.isService ? "Servicio" : "Producto"} - 
-                                    Vendedor: {purchase.vendedorNombre || "Desconocido"}
-                                  </p>
-                                </div>
-                                <div className="text-sm font-medium">
-                                  ${purchase.productPrice.toFixed(2)}
-                                </div>
+                            <div className="flex items-center space-x-4">
+                              <div className="h-12 w-12 relative flex-shrink-0">
+                                <Image
+                                  src={purchase.productImageUrl || "/placeholder.svg"}
+                                  alt={purchase.productName || "Producto"}
+                                  layout="fill"
+                                  objectFit="cover"
+                                  className="rounded-md"
+                                />
                               </div>
-                              
-                              {/* Información de envío detallada (solo para productos físicos) */}
-                              {purchase.estadoPago === "pagado" && !purchase.isService && shippingInfo && (
-                                <div className="mt-4 pt-4 border-t bg-gray-50 p-3 rounded-lg">
-                                  <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
-                                    <Truck className="h-4 w-4" />
-                                    Información de Envío
-                                  </h4>
-                                  <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Estado:</span>
-                                      <span className="font-medium">{getShippingStatusText(shippingInfo.status as ShippingStatus)}</span>
-                          </div>
-                                    
-                                    {shippingInfo.trackingNumber && (
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Número de seguimiento:</span>
-                                        <span className="font-mono text-xs">{shippingInfo.trackingNumber}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">
+                                  {purchase.productName || "Producto desconocido"}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {purchase.isService ? "Servicio" : "Producto"} - Vendedor: {purchase.vendedorNombre || "Desconocido"}
+                                </p>
+                              </div>
+                              <div className="text-sm font-medium">
+                                ${purchase.productPrice.toFixed(2)}
+                              </div>
                             </div>
-                                    )}
-                                    
-                                    {shippingInfo.carrierName && (
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Transportista:</span>
-                                        <span>{shippingInfo.carrierName}</span>
+                            {/* Estado de envío detallado */}
+                            {!purchase.isService && (
+                              <div className="mt-2 flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">Estado de envío:</span>
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getShippingBadgeClass(purchase.shippingStatus as ShippingStatus)}`}>
+                                  {getShippingIcon(purchase.shippingStatus as ShippingStatus)}
+                                  {getShippingStatusText(purchase.shippingStatus as ShippingStatus)}
+                                </span>
+                              </div>
+                            )}
+                            {/* Botón para ir al chat con el vendedor */}
+                            <div className="mt-2 flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleChatWithSeller(purchase)}
+                                className="flex items-center gap-2"
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                                Chatear con el vendedor
+                              </Button>
                             </div>
-                                    )}
-                                    
-                                    {shippingInfo.estimatedDelivery && (
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Entrega estimada:</span>
-                                        <span>{new Date(shippingInfo.estimatedDelivery).toLocaleDateString()}</span>
-                                      </div>
-                                    )}
-                                    
-                                    {shippingInfo.actualDelivery && (
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Entregado el:</span>
-                                        <span className="text-green-600 font-medium">
-                                          {new Date(shippingInfo.actualDelivery).toLocaleDateString()}
-                                        </span>
-                                      </div>
-                                    )}
-                                    
-                                    {shippingInfo.notes && (
-                                      <div className="mt-2 pt-2 border-t">
-                                        <span className="text-muted-foreground">Notas:</span>
-                                        <p className="text-sm mt-1">{shippingInfo.notes}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                              
-                              {/* Mensaje para servicios */}
-                              {purchase.isService && (
-                                <div className="mt-4 pt-4 border-t bg-blue-50 p-3 rounded-lg">
-                                  <p className="text-sm text-blue-700 flex items-center gap-2">
-                                    <CheckCircle className="h-4 w-4" />
-                                    Este es un servicio. No requiere envío físico.
-                                  </p>
-                                </div>
-                              )}
                           </div>
                         </CardContent>
                       </Card>
-                      )
-                    })}
-                      </div>
-                    )}
+                    ))}
                   </div>
                 )}
               </CardContent>
