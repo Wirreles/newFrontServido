@@ -1698,29 +1698,72 @@ export default function SellerDashboardPage() {
 
   // Función para guardar el estado de envío en Firestore (con notificaciones)
   const handleSaveShippingState = async (venta: any) => {
+    console.log('🚀 FUNCIÓN EJECUTADA - handleSaveShippingState');
+    console.log('Venta recibida:', venta);
+    
     try {
+      console.log('Intentando guardar estado de envío para:', venta);
+      
       const compraRef = doc(db, "purchases", venta.compraId);
       const compraSnap = await getDoc(compraRef);
-      if (!compraSnap.exists()) return;
+      
+      if (!compraSnap.exists()) {
+        console.error('Compra no encontrada:', venta.compraId);
+        toast({
+          title: 'Error',
+          description: 'No se encontró la compra especificada.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
       const compraData = compraSnap.data();
+      console.log('Datos de compra:', compraData);
+      
       const products = Array.isArray(compraData.products) ? [...compraData.products] : [];
+      console.log('Productos en la compra:', products);
+      
       const idx = products.findIndex((p: any) => p.productId === venta.productId);
-      if (idx === -1) return;
+      console.log('Índice del producto encontrado:', idx);
+      
+      if (idx === -1) {
+        console.error('Producto no encontrado en la compra:', venta.productId);
+        toast({
+          title: 'Error',
+          description: 'No se encontró el producto en la compra.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      const newShippingStatus = shippingStates[venta.compraId + '-' + venta.productId] || 'pendiente';
+      console.log('Nuevo estado de envío:', newShippingStatus);
+      
       products[idx] = {
         ...products[idx],
-        shippingStatus: shippingStates[venta.compraId + '-' + venta.productId] || 'pendiente',
+        shippingStatus: newShippingStatus,
       };
+      
+      console.log('Productos actualizados:', products);
+      
       await updateDoc(compraRef, { products });
+      
       toast({
         title: 'Estado de envío actualizado',
         description: `El estado del envío para "${venta.productName}" se guardó correctamente.`,
         variant: 'default',
       });
+      
+      // Recargar los datos de ventas para mostrar el cambio
+      if (currentUser) {
+        fetchSellerData(currentUser.firebaseUser.uid);
+      }
+      
     } catch (err) {
       console.error('Error actualizando estado de envío:', err);
       toast({
         title: 'Error al actualizar el estado',
-        description: 'No se pudo guardar el estado de envío. Intenta nuevamente.',
+        description: `No se pudo guardar el estado de envío: ${err instanceof Error ? err.message : 'Error desconocido'}`,
         variant: 'destructive',
       });
     }
@@ -3296,7 +3339,15 @@ export default function SellerDashboardPage() {
                           </Select>
                         </TableCell>
                         <TableCell>
-                          <Button variant="outline" size="sm" onClick={() => handleSaveShippingState(venta)}>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => {
+                              console.log('🔘 BOTÓN CLICKEADO - Guardar Estado');
+                              console.log('Venta a guardar:', venta);
+                              handleSaveShippingState(venta);
+                            }}
+                          >
                             Guardar Estado
                           </Button>
                         </TableCell>
