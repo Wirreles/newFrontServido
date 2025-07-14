@@ -96,6 +96,7 @@ import type {
 import { getSellerShipments, updateShippingStatus, initializeShipping } from "@/lib/shipping"
 // Los iconos ya están importados arriba
 import * as XLSX from "xlsx"
+import { getDashboardProductImage } from "@/lib/image-utils"
 
 interface UserProfile {
   uid: string

@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { getChatProductImage } from "@/lib/image-utils"
 import { Loader2, Send, ArrowLeft, Info } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
@@ -37,6 +38,7 @@ interface Chat {
   sellerPhotoURL?: string // Added for user images
   productName: string
   productImageUrl?: string
+  productMedia?: any[]
   lastMessage?: string
   lastMessageTimestamp?: any
   createdAt: any
@@ -216,15 +218,13 @@ export default function ChatPage() {
             href={`/product/${chat.productId}`}
             className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
           >
-            {chat.productImageUrl && (
-              <Image
-                src={chat.productImageUrl || "/placeholder.svg"}
-                alt={chat.productName}
-                width={30}
-                height={30}
-                className="rounded-sm object-cover"
-              />
-            )}
+            <Image
+              src={getChatProductImage(chat.productMedia, chat.productImageUrl)}
+              alt={chat.productName}
+              width={30}
+              height={30}
+              className="rounded-sm object-cover"
+            />
             <span className="hidden sm:block truncate max-w-[100px]">{chat.productName}</span>
             <Info className="h-4 w-4" />
           </Link>

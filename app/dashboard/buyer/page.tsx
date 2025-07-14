@@ -51,6 +51,7 @@ import { getBuyerShipments } from "@/lib/shipping"
 import { getBuyerPurchases } from "@/lib/centralized-payments-api"
 import type { CentralizedPurchase, PurchaseItem } from "@/types/centralized-payments"
 import * as XLSX from "xlsx"
+import { getDashboardProductImage } from "@/lib/image-utils"
 
 
 // Mantenemos la interface Purchase original para compatibilidad
@@ -96,6 +97,7 @@ interface FavoriteProduct {
   name: string
   price: number
   imageUrl?: string
+  media?: any[]
   addedAt: any
 }
 
@@ -1089,7 +1091,7 @@ export default function BuyerDashboardPage() {
                       <Card key={product.id} className="overflow-hidden">
                         <div className="aspect-square relative">
                           <Image
-                            src={product.imageUrl || "/placeholder.svg"}
+                            src={getDashboardProductImage(product.media, product.imageUrl)}
                             alt={product.name}
                             layout="fill"
                             objectFit="cover"

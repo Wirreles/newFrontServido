@@ -10,12 +10,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ArrowLeft, AlertCircle, Loader2 } from "lucide-react"
+import { getProductThumbnail } from "@/lib/image-utils"
 
 interface Product {
   id: string
   name: string
   price: number
   imageUrl?: string
+  media?: any[]
   imageQuery?: string
   category?: string
   description?: string
@@ -133,10 +135,7 @@ export default function CategoryProductsPage() {
                 <Card className="overflow-hidden hover:shadow-xl transition-shadow h-full flex flex-col">
                   <div className="aspect-square relative w-full">
                     <Image
-                      src={
-                        product.imageUrl ||
-                        `/placeholder.svg?height=200&width=200&query=${product.imageQuery || product.name}`
-                      }
+                      src={getProductThumbnail(product.media, product.imageUrl, product.name)}
                       alt={product.name}
                       layout="fill"
                       objectFit="cover"

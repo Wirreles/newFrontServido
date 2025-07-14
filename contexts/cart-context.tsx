@@ -29,6 +29,7 @@ export interface CartItem {
   discountedPrice: number // Price after coupon application
   quantity: number
   imageUrl?: string
+  media?: any[]
   isService: boolean
   sellerId: string
   stock?: number

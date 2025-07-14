@@ -10,6 +10,7 @@ import { db } from "@/lib/firebase"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Loader2, MessageSquare, Frown } from "lucide-react"
+import { getChatProductImage } from "@/lib/image-utils"
 
 interface Chat {
   id: string
@@ -20,6 +21,7 @@ interface Chat {
   sellerName: string
   productName: string
   productImageUrl?: string
+  productMedia?: any[]
   lastMessage?: string
   lastMessageTimestamp?: any
   createdAt: any
@@ -125,15 +127,13 @@ export function ChatList({ userId, role }: ChatListProps) {
                   </div>
                   <p className="text-xs sm:text-sm text-gray-600 truncate max-w-[180px] sm:max-w-full">{chat.lastMessage || "No hay mensajes aún."}</p>
                   <div className="flex items-center gap-1 sm:gap-2 mt-1 text-xs text-gray-500">
-                    {chat.productImageUrl && (
-                      <Image
-                        src={chat.productImageUrl || "/placeholder.svg"}
-                        alt={chat.productName}
-                        width={18}
-                        height={18}
-                        className="rounded-sm object-cover"
-                      />
-                    )}
+                    <Image
+                      src={getChatProductImage(chat.productMedia, chat.productImageUrl)}
+                      alt={chat.productName}
+                      width={18}
+                      height={18}
+                      className="rounded-sm object-cover"
+                    />
                     <span className="truncate max-w-[90px] sm:max-w-[160px]">{chat.productName}</span>
                   </div>
                 </div>

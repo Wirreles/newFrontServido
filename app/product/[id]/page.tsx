@@ -423,6 +423,7 @@ export default function ProductDetailPage() {
         createdAt: serverTimestamp(),
       }
       const docRef = await addDoc(collection(db, "reviews"), reviewData)
+      // Actualizar el estado local inmediatamente para productos y servicios
       setReviews((prev) => [{ id: docRef.id, ...reviewData, createdAt: new Date() } as Review, ...prev])
       setReviewRating(0)
       setReviewComment("")
@@ -466,9 +467,10 @@ export default function ProductDetailPage() {
         createdAt: serverTimestamp(),
       }
       const docRef = await addDoc(collection(db, "questions"), questionData)
+      // Actualizar el estado local inmediatamente para productos y servicios
       setQuestions((prev) => [{ id: docRef.id, ...questionData, createdAt: new Date() } as Question, ...prev])
       setNewQuestion("")
-      setQuestionSuccess("Pregunta enviada exitosamente. El vendedor será notificado.")
+      setQuestionSuccess("Pregunta enviada exitosamente. ¡Gracias por tu consulta!")
     } catch (err) {
       console.error("Error submitting question:", err)
       setQuestionError("Error al enviar la pregunta. Inténtalo de nuevo.")
@@ -610,7 +612,8 @@ export default function ProductDetailPage() {
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
         <Alert variant="destructive" className="max-w-md">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error || "Producto no encontrado"}</AlertDescription>
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error || "Producto no disponible."}</AlertDescription>
         </Alert>
         <Button asChild className="mt-4">
           <Link href="/">Volver al inicio</Link>
@@ -619,10 +622,53 @@ export default function ProductDetailPage() {
     )
   }
 
-  // Render condicional según isService
+  // Render condicional para servicios
   if (product.isService) {
     return (
-      <ServiceDetail service={product} onContactSeller={handleContactSeller} />
+      <ServiceDetail
+        service={{
+          ...product,
+          categoryName: category?.name,
+          isFavorite,
+          averageRating: reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0,
+          reviewsCount: reviews.length,
+        }}
+        breadcrumbs={[
+          { name: "Inicio", href: "/" },
+          ...(category ? [{ name: category.name, href: `/category/${category.id}` }] : []),
+          { name: product.name },
+        ]}
+        isFavorite={isFavorite}
+        onToggleFavorite={handleToggleFavorite}
+        onShare={() => navigator.clipboard && navigator.clipboard.writeText(window.location.href)}
+        onContactSeller={handleContactSeller}
+        reviews={reviews}
+        onSubmitReview={(rating, comment) => {
+          setReviewRating(rating)
+          setReviewComment(comment)
+          handleSubmitReview({ preventDefault: () => {} } as any)
+        }}
+        questions={questions}
+        onSubmitQuestion={(question) => {
+          setNewQuestion(question)
+          handleSubmitQuestion({ preventDefault: () => {} } as any)
+        }}
+        currentUser={currentUser}
+        loading={loading}
+        reviewError={reviewError}
+        reviewSuccess={reviewSuccess}
+        submittingReview={submittingReview}
+        questionError={questionError}
+        questionSuccess={questionSuccess}
+        submittingQuestion={submittingQuestion}
+        answeringQuestionId={answeringQuestionId}
+        answerText={answerText}
+        setAnsweringQuestionId={setAnsweringQuestionId}
+        setAnswerText={setAnswerText}
+        handleSubmitAnswer={handleSubmitAnswer}
+        submittingAnswer={submittingAnswer}
+        hasUserReviewed={hasUserReviewed}
+      />
     )
   }
 

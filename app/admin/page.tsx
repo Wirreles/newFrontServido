@@ -92,6 +92,7 @@ import {
 } from "@/lib/centralized-payments-api"
 import * as XLSX from "xlsx"
 import { useToast } from "@/components/ui/use-toast"
+import { getDashboardProductImage } from "@/lib/image-utils"
 
 interface UserData {
   id: string
@@ -128,6 +129,7 @@ interface Product {
   category: string
   brand?: string
   imageUrl?: string
+  media?: any[]
   isService: boolean
   stock?: number
   sellerId: string
@@ -2472,17 +2474,13 @@ export default function AdminDashboard() {
                               <TableCell className="p-1 md:p-2 max-w-[100px] xs:max-w-[110px] align-middle">
                                 <div className="flex items-center gap-1 xs:gap-2 md:gap-3 min-w-0">
                                   <div className="h-6 w-6 xs:h-7 xs:w-7 md:h-10 md:w-10 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                    {product.imageUrl ? (
-                                      <Image
-                                        src={product.imageUrl || "/placeholder.svg"}
-                                        alt={product.name}
-                                        width={24}
-                                        height={24}
-                                        className="object-cover xs:w-[28px] xs:h-[28px] md:w-[40px] md:h-[40px]"
-                                      />
-                                    ) : (
-                                      <ShoppingBag className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
-                                    )}
+                                    <Image
+                                      src={getDashboardProductImage(product.media, product.imageUrl)}
+                                      alt={product.name}
+                                      width={24}
+                                      height={24}
+                                      className="object-cover xs:w-[28px] xs:h-[28px] md:w-[40px] md:h-[40px]"
+                                    />
                                   </div>
                                   <div className="flex flex-col min-w-0">
                                     <span className="font-medium truncate max-w-[60px] xs:max-w-[70px] text-xs xs:text-sm md:text-sm">{product.name}</span>
@@ -2542,58 +2540,58 @@ export default function AdminDashboard() {
 
             {/* Ventas y Comisiones Tab */}
             <TabsContent value="sales" className="mt-4">
-              <div className="w-full max-w-full px-2 sm:px-4 mx-auto space-y-4 overflow-x-hidden">
+              <div className="pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] px-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] space-y-4 w-full">
                 {/* Resumen de Ventas */}
-                <div className="grid grid-cols-1 gap-2 sm:gap-4 w-full min-w-0">
-                  <Card className="w-full min-w-0 mx-auto sm:max-w-[28rem]">
-                    <CardHeader className="pb-1 xs:pb-2 min-w-0 w-full flex items-center gap-2 overflow-hidden">
-                      <CardTitle className="text-base xs:text-lg md:text-sm font-medium truncate max-w-full min-w-0">Total Ventas</CardTitle>
-                      <TrendingUp className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full">
+                  <Card className="w-full">
+                    <CardHeader className="pb-1 xs:pb-2">
+                      <CardTitle className="text-base xs:text-lg md:text-sm font-medium">Total Ventas</CardTitle>
+                      <TrendingUp className="w-4 h-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent className="p-2 sm:p-4 md:p-6 min-w-0 w-full overflow-hidden">
-                      <div className="text-xl xs:text-2xl font-bold truncate max-w-full min-w-0">${salesSummary.totalVentas.toFixed(2)}</div>
-                      <p className="text-xs text-muted-foreground truncate max-w-full min-w-0">Valor bruto de todas las ventas</p>
+                    <CardContent className="p-2 sm:p-4 md:p-6">
+                      <div className="text-xl xs:text-2xl font-bold">${salesSummary.totalVentas.toFixed(2)}</div>
+                      <p className="text-xs text-muted-foreground">Valor bruto de todas las ventas</p>
                     </CardContent>
                   </Card>
-                  <Card className="w-full max-w-full min-w-0 sm:max-w-md mx-auto">
-                    <CardHeader className="pb-1 xs:pb-2 min-w-0 w-full">
-                      <CardTitle className="text-base xs:text-lg md:text-sm font-medium truncate max-w-full min-w-0">Comisiones</CardTitle>
+                  <Card className="w-full">
+                    <CardHeader className="pb-1 xs:pb-2">
+                      <CardTitle className="text-base xs:text-lg md:text-sm font-medium">Comisiones</CardTitle>
                       <DollarSign className="w-4 h-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent className="p-2 sm:p-4 md:p-6 min-w-0 w-full">
-                      <div className="text-xl xs:text-2xl font-bold truncate max-w-full min-w-0">${salesSummary.totalComisiones.toFixed(2)}</div>
-                      <p className="text-xs text-muted-foreground truncate max-w-full min-w-0">12% de comisión total</p>
+                    <CardContent className="p-2 sm:p-4 md:p-6">
+                      <div className="text-xl xs:text-2xl font-bold">${salesSummary.totalComisiones.toFixed(2)}</div>
+                      <p className="text-xs text-muted-foreground">12% de comisión total</p>
                     </CardContent>
                   </Card>
-                  <Card className="w-full max-w-full min-w-0 sm:max-w-md mx-auto">
-                    <CardHeader className="pb-1 xs:pb-2 min-w-0 w-full">
-                      <CardTitle className="text-base xs:text-lg md:text-sm font-medium truncate max-w-full min-w-0">Pendiente de Pago</CardTitle>
+                  <Card className="w-full">
+                    <CardHeader className="pb-1 xs:pb-2">
+                      <CardTitle className="text-base xs:text-lg md:text-sm font-medium">Pendiente de Pago</CardTitle>
                       <Clock className="w-4 h-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent className="p-2 sm:p-4 md:p-6 min-w-0 w-full">
-                      <div className="text-xl xs:text-2xl font-bold truncate max-w-full min-w-0">${salesSummary.totalPendientePago.toFixed(2)}</div>
-                      <p className="text-xs text-muted-foreground truncate max-w-full min-w-0">A pagar a vendedores</p>
+                    <CardContent className="p-2 sm:p-4 md:p-6">
+                      <div className="text-xl xs:text-2xl font-bold">${salesSummary.totalPendientePago.toFixed(2)}</div>
+                      <p className="text-xs text-muted-foreground">A pagar a vendedores</p>
                     </CardContent>
                   </Card>
-                  <Card className="w-full max-w-full min-w-0 sm:max-w-md mx-auto">
-                    <CardHeader className="pb-1 xs:pb-2 min-w-0 w-full">
-                      <CardTitle className="text-base xs:text-lg md:text-sm font-medium truncate max-w-full min-w-0">Pagado</CardTitle>
+                  <Card className="w-full">
+                    <CardHeader className="pb-1 xs:pb-2">
+                      <CardTitle className="text-base xs:text-lg md:text-sm font-medium">Pagado</CardTitle>
                       <CheckCircle className="w-4 h-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent className="p-2 sm:p-4 md:p-6 min-w-0 w-full">
-                      <div className="text-xl xs:text-2xl font-bold truncate max-w-full min-w-0">${salesSummary.totalPagado.toFixed(2)}</div>
-                      <p className="text-xs text-muted-foreground truncate max-w-full min-w-0">Ya pagado a vendedores</p>
+                    <CardContent className="p-2 sm:p-4 md:p-6">
+                      <div className="text-xl xs:text-2xl font-bold">${salesSummary.totalPagado.toFixed(2)}</div>
+                      <p className="text-xs text-muted-foreground">Ya pagado a vendedores</p>
                     </CardContent>
                   </Card>
                 </div>
                 {/* Filtros y Ordenamiento */}
-                <Card className="w-full min-w-0 mx-auto sm:max-w-[28rem]">
-                  <CardHeader className="pb-2 px-2 sm:px-4 min-w-0 w-full overflow-hidden">
-                    <CardTitle className="text-base font-semibold truncate min-w-0">Filtros y Ordenamiento</CardTitle>
+                <Card className="w-full">
+                  <CardHeader className="pb-2 xs:pb-3">
+                    <CardTitle className="text-lg xs:text-xl md:text-2xl">Filtros y Ordenamiento</CardTitle>
                   </CardHeader>
-                  <CardContent className="p-2 sm:p-4 min-w-0 w-full overflow-hidden">
-                    <div className="space-y-3 w-full">
-                      <div className="grid grid-cols-1 gap-2 sm:gap-4 w-full">
+                  <CardContent className="p-2 sm:p-4 md:p-6">
+                    <div className="space-y-2 xs:space-y-4 w-full">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full">
                         <div className="w-full">
                           <Label htmlFor="filterEstadoPago" className="text-xs xs:text-sm">Estado de Pago</Label>
                           <Select value={salesFilters.estadoPago} onValueChange={(value) => setSalesFilters({...salesFilters, estadoPago: value as any})}>
@@ -2646,11 +2644,11 @@ export default function AdminDashboard() {
                           </Button>
                         </div>
                       </div>
-                      <div className="relative w-full overflow-hidden">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
-                        <Input placeholder="Buscar..." className="pl-10 text-xs xs:text-sm w-full h-8 xs:h-9" />
+                      <div className="relative w-full">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input placeholder="Buscar por comprador, producto o ID de compra..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 text-xs xs:text-sm w-full h-8 xs:h-9" />
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground w-full">
+                      <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs xs:text-sm text-muted-foreground w-full">
                         <span>Mostrando {filteredPurchases.length} de {purchases.length} compras</span>
                         {(salesFilters.estadoPago !== 'all' || salesFilters.estadoEnvio !== 'all' || salesFilters.vendedorId || searchTerm) && (
                           <Badge variant="outline">Filtros aplicados</Badge>
@@ -2660,12 +2658,12 @@ export default function AdminDashboard() {
                   </CardContent>
                 </Card>
                 {/* Tabla de compras */}
-                <Card className="w-full min-w-0 mx-auto sm:max-w-[28rem]">
-                  <CardHeader className="pb-2 px-2 sm:px-4 min-w-0 w-full overflow-hidden">
-                    <CardTitle className="text-base font-semibold truncate min-w-0">Gestión de Compras (por compra)</CardTitle>
-                    <CardDescription className="text-xs truncate min-w-0">Administra las compras agrupadas por documento de la colección purchases</CardDescription>
+                <Card className="w-full">
+                  <CardHeader className="pb-2 xs:pb-3">
+                    <CardTitle className="text-lg xs:text-xl md:text-2xl">Gestión de Compras (por compra)</CardTitle>
+                    <CardDescription className="text-xs xs:text-sm">Administra las compras agrupadas por documento de la colección purchases</CardDescription>
                   </CardHeader>
-                  <CardContent className="p-2 sm:p-4 min-w-0 w-full overflow-hidden">
+                  <CardContent className="p-2 sm:p-4 md:p-6">
                     {loadingSales ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
@@ -2673,7 +2671,7 @@ export default function AdminDashboard() {
                       </div>
                     ) : (
                       <div className="overflow-x-auto w-full">
-                        <Table className="min-w-[600px] w-full text-xs">
+                        <Table className="min-w-[700px] w-full text-xs sm:text-sm">
                           <TableHeader>
                             <TableRow>
                               <TableHead className="p-1 md:p-2 w-[90px] text-xs">Fecha</TableHead>
@@ -2691,14 +2689,14 @@ export default function AdminDashboard() {
                               return (
                                 <TableRow key={compra.id} className="text-xs sm:text-sm">
                                   <TableCell className="p-1 md:p-2 align-middle">{new Date(compra.createdAt?.toDate?.() || compra.createdAt).toLocaleDateString('es-ES')}</TableCell>
-                                  <TableCell className="p-1 md:p-2 align-middle max-w-[160px] truncate min-w-0">
-                                    <ul className="list-disc pl-4 min-w-0">
+                                  <TableCell className="p-1 md:p-2 align-middle max-w-[160px] truncate">
+                                    <ul className="list-disc pl-4">
                                       {Array.isArray(compra.products) && compra.products.map((p, idx) => (
-                                        <li key={idx} className="truncate text-xs sm:text-sm break-all max-w-full min-w-0">{p.nombre || p.productName || p.productoNombre || 'Producto'} (x{p.quantity || p.cantidad || 1})</li>
+                                        <li key={idx} className="truncate text-xs sm:text-sm">{p.nombre || p.productName || p.productoNombre || 'Producto'} (x{p.quantity || p.cantidad || 1})</li>
                                       ))}
                                     </ul>
                                   </TableCell>
-                                  <TableCell className="p-1 md:p-2 align-middle max-w-[100px] truncate min-w-0 break-all">{usersMap[compra.buyerId]?.name || compra.buyerId}</TableCell>
+                                  <TableCell className="p-1 md:p-2 align-middle max-w-[100px] truncate">{usersMap[compra.buyerId]?.name || compra.buyerId}</TableCell>
                                   <TableCell className="p-1 md:p-2 align-middle whitespace-nowrap">${compra.totalAmount?.toFixed(2)}</TableCell>
                                   <TableCell className="p-1 md:p-2 align-middle">
                                     <Badge variant={compra.status === 'approved' ? 'default' : 'secondary'}>{compra.status}</Badge>

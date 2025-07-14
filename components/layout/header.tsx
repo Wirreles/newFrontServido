@@ -33,6 +33,7 @@ import { CartDrawer } from "@/components/cart-drawer"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { db } from "@/lib/firebase" // Import db
 import { collection, getDocs, query, orderBy, where, limit } from "firebase/firestore" // Import Firestore functions
+import { getSearchResultImage } from "@/lib/image-utils"
 
 interface CategoryItem {
   id: string
@@ -46,6 +47,7 @@ interface SearchProduct {
   name: string
   price: number
   imageUrl?: string
+  media?: any[]
   category?: string
   sellerName?: string
 }
@@ -258,16 +260,14 @@ export function Header() {
                             onClick={() => setShowSearchResults(false)}
                             className="flex items-center gap-3 p-3 hover:bg-gray-100 transition-colors border-b last:border-b-0 border-gray-100"
                           >
-                            {product.imageUrl && (
-                              <div className="w-12 h-12 relative rounded-md overflow-hidden flex-shrink-0">
-                                <Image
-                                  src={product.imageUrl}
-                                  alt={product.name}
-                                  fill
-                                  className="object-contain"
-                                />
-                              </div>
-                            )}
+                            <div className="w-12 h-12 relative rounded-md overflow-hidden flex-shrink-0">
+                              <Image
+                                src={getSearchResultImage(product.media, product.imageUrl, product.name)}
+                                alt={product.name}
+                                fill
+                                className="object-contain"
+                              />
+                            </div>
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-sm break-words line-clamp-2 text-black">{product.name}</p>
                               <p className="text-sm text-purple-600 font-semibold">${product.price.toFixed(2)}</p>
@@ -520,16 +520,14 @@ export function Header() {
                           onClick={() => setShowSearchResults(false)}
                           className="flex items-center gap-2 p-3 hover:bg-gray-100 transition-colors border-b last:border-b-0 border-gray-100"
                         >
-                          {product.imageUrl && (
-                            <div className="w-10 h-10 relative rounded-sm overflow-hidden flex-shrink-0">
-                              <Image
-                                src={product.imageUrl}
-                                alt={product.name}
-                                fill
-                                className="object-contain"
-                              />
-                            </div>
-                          )}
+                          <div className="w-10 h-10 relative rounded-sm overflow-hidden flex-shrink-0">
+                            <Image
+                              src={getSearchResultImage(product.media, product.imageUrl, product.name)}
+                              alt={product.name}
+                              fill
+                              className="object-contain"
+                            />
+                          </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm break-words line-clamp-2 text-black">{product.name}</p>
                             <p className="text-xs text-purple-600 font-semibold">${product.price.toFixed(2)}</p>

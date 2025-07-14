@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2, Search, XCircle, Frown, Filter } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { getProductThumbnail } from "@/lib/image-utils"
 
 interface Product {
   id: string
@@ -23,6 +24,7 @@ interface Product {
   category: string
   brand?: string
   imageUrl?: string
+  media?: any[]
   isService: boolean
   stock?: number
   sellerId: string
@@ -380,10 +382,7 @@ export default function ProductsPage() {
                       <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-200 h-full">
                         <div className="aspect-square relative bg-gray-100">
                           <Image
-                            src={
-                              product.imageUrl ||
-                              `/placeholder.svg?height=200&width=200&query=${encodeURIComponent(product.name)}`
-                            }
+                            src={getProductThumbnail(product.media, product.imageUrl, product.name)}
                             alt={product.name}
                             fill
                             className="object-cover"

@@ -10,12 +10,14 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { db } from "@/lib/firebase"
 import { collection, getDocs, query, where, orderBy, limit } from "firebase/firestore"
+import { getSearchResultImage } from "@/lib/image-utils"
 
 interface Product {
   id: string
   name: string
   price: number
   imageUrl?: string
+  media?: any[]
   category?: string
   description?: string
   sellerName?: string
@@ -166,7 +168,7 @@ export default function SearchPage() {
                 <Link href={`/product/${product.id}`}>
                   <div className={viewMode === 'grid' ? "aspect-square relative" : "h-32 relative"}>
                     <Image
-                      src={product.imageUrl || `/placeholder.svg?height=300&width=300&query=${product.name}`}
+                      src={getSearchResultImage(product.media, product.imageUrl, product.name)}
                       alt={product.name}
                       layout="fill"
                       objectFit="cover"
