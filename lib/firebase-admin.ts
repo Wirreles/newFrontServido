@@ -3,7 +3,7 @@ import { getAuth } from 'firebase-admin/auth'
 import { getFirestore } from 'firebase-admin/firestore'
 
 const firebaseAdminConfig = {
-  projectId: process.env.FIREBASE_PROJECT_ID || "servidodb-e85ce",
+  projectId: process.env.FIREBASE_PROJECT_ID || "servidodb2",
   clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
   privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
 }
