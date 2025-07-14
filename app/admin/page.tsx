@@ -2362,45 +2362,46 @@ export default function AdminDashboard() {
 
             {/* Todos los Productos Tab */}
             <TabsContent value="allProducts" className="mt-4">
-              <Card>
+              <Card className="w-full max-w-full">
                 <CardHeader>
                   <CardTitle>Todos los Productos de la Plataforma</CardTitle>
                   <CardDescription>
                     Visualiza y gestiona todos los productos y servicios de todos los vendedores.
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-1 xs:px-2 sm:px-4 md:px-6 py-2 w-full max-w-full">
                   {/* Filtros para todos los productos */}
-                  <div className="mb-6 p-4 border rounded-lg bg-white grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div>
+                  <div className="mb-4 sm:mb-6 w-full max-w-full px-0 py-2 border rounded-lg bg-white flex flex-col gap-2 xs:gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
+                    <div className="w-full max-w-full">
                       <Label htmlFor="allProductsSearchTerm">Buscar</Label>
                       <Input
                         id="allProductsSearchTerm"
                         placeholder="Nombre o descripción..."
                         value={allProductsSearchTerm}
                         onChange={(e) => setAllProductsSearchTerm(e.target.value)}
+                        className="text-xs xs:text-sm w-full max-w-full"
                       />
                     </div>
-                    <div>
+                    <div className="w-full max-w-full">
                       <Label htmlFor="allProductsFilterCategory">Categoría</Label>
                       <Select value={allProductsFilterCategory} onValueChange={setAllProductsFilterCategory}>
-                        <SelectTrigger>
+                        <SelectTrigger className="text-xs xs:text-sm w-full max-w-full">
                           <SelectValue placeholder="Todas las categorías" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">Todas las categorías</SelectItem>
                           {categories.map((cat) => (
-                            <SelectItem key={cat.id} value={cat.id}>
+                            <SelectItem key={cat.id} value={cat.id} className="text-xs xs:text-sm">
                               {cat.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
+                    <div className="w-full max-w-full">
                       <Label htmlFor="allProductsFilterSeller">Vendedor</Label>
                       <Select value={allProductsFilterSeller} onValueChange={setAllProductsFilterSeller}>
-                        <SelectTrigger>
+                        <SelectTrigger className="text-xs xs:text-sm w-full max-w-full">
                           <SelectValue placeholder="Todos los vendedores" />
                         </SelectTrigger>
                         <SelectContent>
@@ -2408,17 +2409,17 @@ export default function AdminDashboard() {
                           {users
                             .filter((user) => user.role === "seller")
                             .map((seller) => (
-                              <SelectItem key={seller.id} value={seller.id}>
+                              <SelectItem key={seller.id} value={seller.id} className="text-xs xs:text-sm">
                                 {seller.name}
                               </SelectItem>
                             ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
+                    <div className="w-full max-w-full">
                       <Label htmlFor="allProductsFilterType">Tipo</Label>
                       <Select value={allProductsFilterIsService} onValueChange={setAllProductsFilterIsService}>
-                        <SelectTrigger>
+                        <SelectTrigger className="text-xs xs:text-sm w-full max-w-full">
                           <SelectValue placeholder="Todos los tipos" />
                         </SelectTrigger>
                         <SelectContent>
@@ -2428,10 +2429,10 @@ export default function AdminDashboard() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
+                    <div className="w-full max-w-full sm:col-span-2 lg:col-span-1">
                       <Label htmlFor="allProductsSortOrder">Ordenar por</Label>
                       <Select value={allProductsSortOrder} onValueChange={setAllProductsSortOrder}>
-                        <SelectTrigger>
+                        <SelectTrigger className="text-xs xs:text-sm w-full max-w-full">
                           <SelectValue placeholder="Orden predeterminado" />
                         </SelectTrigger>
                         <SelectContent>
@@ -2445,100 +2446,286 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Tabla de todos los productos */}
-                  <div className="rounded-md border">
-                    <div className="overflow-x-auto">
-                      {" "}
-                      {/* Added for responsiveness */}
-                      <Table>
-                        <TableHeader>
+                  <div className="rounded-md border overflow-x-auto w-full max-w-full">
+                    <Table className="min-w-[320px] xs:min-w-[360px] sm:min-w-[400px] md:min-w-[500px] w-full max-w-full">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="p-1 md:p-2 w-[100px] xs:w-[110px] text-xs">Producto</TableHead>
+                          <TableHead className="p-1 md:p-2 w-[60px] xs:w-[70px] text-xs">Precio</TableHead>
+                          <TableHead className="p-1 md:p-2 w-[70px] xs:w-[90px] text-xs">Vendedor</TableHead>
+                          {/* Solo en sm+ */}
+                          <TableHead className="hidden sm:table-cell p-1 md:p-2 w-[50px] xs:w-[60px] text-xs">Tipo</TableHead>
+                          <TableHead className="hidden md:table-cell p-1 md:p-2 w-[50px] xs:w-[60px] text-xs">Reseñas</TableHead>
+                          <TableHead className="hidden md:table-cell p-1 md:p-2 w-[60px] xs:w-[80px] text-xs">Acciones</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredAllProducts.length === 0 ? (
                           <TableRow>
-                            <TableHead className="p-1 md:p-2">Producto</TableHead>
-                            <TableHead className="p-1 md:p-2">Precio</TableHead>
-                            <TableHead className="hidden md:table-cell p-1 md:p-2">Tipo</TableHead>
-                            <TableHead className="p-1 md:p-2">Vendedor</TableHead>
-                            <TableHead className="hidden md:table-cell p-1 md:p-2">Reseñas</TableHead>
-                            <TableHead className="hidden md:table-cell p-1 md:p-2">Acciones</TableHead>
+                            <TableCell colSpan={6} className="text-center py-8 text-xs">
+                              No se encontraron productos que coincidan con los filtros.
+                            </TableCell>
                           </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredAllProducts.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={6} className="text-center py-10">
-                                No se encontraron productos que coincidan con los filtros.
+                        ) : (
+                          filteredAllProducts.map((product) => (
+                            <TableRow key={product.id} className="text-xs xs:text-sm md:text-sm">
+                              <TableCell className="p-1 md:p-2 max-w-[100px] xs:max-w-[110px] align-middle">
+                                <div className="flex items-center gap-1 xs:gap-2 md:gap-3 min-w-0">
+                                  <div className="h-6 w-6 xs:h-7 xs:w-7 md:h-10 md:w-10 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                    {product.imageUrl ? (
+                                      <Image
+                                        src={product.imageUrl || "/placeholder.svg"}
+                                        alt={product.name}
+                                        width={24}
+                                        height={24}
+                                        className="object-cover xs:w-[28px] xs:h-[28px] md:w-[40px] md:h-[40px]"
+                                      />
+                                    ) : (
+                                      <ShoppingBag className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="font-medium truncate max-w-[60px] xs:max-w-[70px] text-xs xs:text-sm md:text-sm">{product.name}</span>
+                                    <span className="text-[10px] text-gray-500 truncate max-w-[70px] xs:max-w-[80px]">{product.description}</span>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="p-1 md:p-2 whitespace-nowrap align-middle">${product.price.toFixed(2)}</TableCell>
+                              <TableCell className="p-1 md:p-2 max-w-[70px] xs:max-w-[90px] align-middle">
+                                <div className="flex items-center gap-1 xs:gap-2 md:gap-2 min-w-0">
+                                  <Avatar className="h-4 w-4 xs:h-5 xs:w-5 md:h-8 md:w-8 flex-shrink-0">
+                                    <AvatarImage src={product.seller?.photoURL || "/placeholder.svg"} />
+                                    <AvatarFallback>
+                                      <User className="h-3 w-3 md:h-4 md:w-4" />
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span className="text-[10px] xs:text-xs md:text-xs max-w-[40px] xs:max-w-[60px] truncate">{product.seller?.name || "Vendedor"}</span>
+                                </div>
+                              </TableCell>
+                              {/* Solo en sm+ */}
+                              <TableCell className="hidden sm:table-cell p-1 md:p-2 align-middle">
+                                <Badge variant={product.isService ? "outline" : "secondary"} className="text-[10px] md:text-xs">
+                                  {product.isService ? "Servicio" : "Producto"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell p-1 md:p-2 align-middle">
+                                <div className="flex items-center gap-1">
+                                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                  <span>{product.averageRating?.toFixed(1) || "N/A"}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell p-1 md:p-2 align-middle">
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleDeleteAllProduct(product.id, product.name)}
+                                  disabled={deletingProductId === product.id}
+                                >
+                                  {deletingProductId === product.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+                                    </>
+                                  )}
+                                </Button>
                               </TableCell>
                             </TableRow>
-                          ) : (
-                            filteredAllProducts.map((product) => (
-                              <TableRow key={product.id} className="text-xs md:text-sm">
-                                <TableCell className="p-1 md:p-2">
-                                  <div className="flex items-center space-x-2 md:space-x-3">
-                                    <div className="h-8 w-8 md:h-10 md:w-10 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
-                                      {product.imageUrl ? (
-                                        <Image
-                                          src={product.imageUrl || "/placeholder.svg"}
-                                          alt={product.name}
-                                          width={32}
-                                          height={32}
-                                          className="object-cover md:w-[40px] md:h-[40px]"
-                                        />
-                                      ) : (
-                                        <ShoppingBag className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
-                                      )}
-                                    </div>
-                                    <div>
-                                      <div className="font-medium max-w-[80px] truncate">{product.name}</div>
-                                      <div className="text-xs text-gray-500 truncate max-w-[100px]">{product.description}</div>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="p-1 md:p-2">${product.price.toFixed(2)}</TableCell>
-                                <TableCell className="hidden md:table-cell p-1 md:p-2">
-                                  <Badge variant={product.isService ? "outline" : "secondary"}>
-                                    {product.isService ? "Servicio" : "Producto"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="p-1 md:p-2">
-                                  <div className="flex items-center space-x-1 md:space-x-2">
-                                    <Avatar className="h-6 w-6 md:h-8 md:w-8">
-                                      <AvatarImage src={product.seller?.photoURL || "/placeholder.svg"} />
-                                      <AvatarFallback>
-                                        <User className="h-3 w-3 md:h-4 md:w-4" />
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <div className="text-xs md:text-sm max-w-[80px] truncate">{product.seller?.name || "Vendedor desconocido"}</div>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="hidden md:table-cell p-1 md:p-2">
-                                  <div className="flex items-center gap-1">
-                                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                    <span>{product.averageRating?.toFixed(1) || "N/A"}</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="hidden md:table-cell p-1 md:p-2">
-                                  <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => handleDeleteAllProduct(product.id, product.name)}
-                                    disabled={deletingProductId === product.id}
-                                  >
-                                    {deletingProductId === product.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <>
-                                        <Trash2 className="h-4 w-4 mr-1" /> Eliminar
-                                      </>
-                                    )}
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Ventas y Comisiones Tab */}
+            <TabsContent value="sales" className="mt-4">
+              <div className="w-full max-w-full px-2 sm:px-4 mx-auto space-y-4 overflow-x-hidden">
+                {/* Resumen de Ventas */}
+                <div className="grid grid-cols-1 gap-2 sm:gap-4 w-full min-w-0">
+                  <Card className="w-full min-w-0 mx-auto sm:max-w-[28rem]">
+                    <CardHeader className="pb-1 xs:pb-2 min-w-0 w-full flex items-center gap-2 overflow-hidden">
+                      <CardTitle className="text-base xs:text-lg md:text-sm font-medium truncate max-w-full min-w-0">Total Ventas</CardTitle>
+                      <TrendingUp className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    </CardHeader>
+                    <CardContent className="p-2 sm:p-4 md:p-6 min-w-0 w-full overflow-hidden">
+                      <div className="text-xl xs:text-2xl font-bold truncate max-w-full min-w-0">${salesSummary.totalVentas.toFixed(2)}</div>
+                      <p className="text-xs text-muted-foreground truncate max-w-full min-w-0">Valor bruto de todas las ventas</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="w-full max-w-full min-w-0 sm:max-w-md mx-auto">
+                    <CardHeader className="pb-1 xs:pb-2 min-w-0 w-full">
+                      <CardTitle className="text-base xs:text-lg md:text-sm font-medium truncate max-w-full min-w-0">Comisiones</CardTitle>
+                      <DollarSign className="w-4 h-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent className="p-2 sm:p-4 md:p-6 min-w-0 w-full">
+                      <div className="text-xl xs:text-2xl font-bold truncate max-w-full min-w-0">${salesSummary.totalComisiones.toFixed(2)}</div>
+                      <p className="text-xs text-muted-foreground truncate max-w-full min-w-0">12% de comisión total</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="w-full max-w-full min-w-0 sm:max-w-md mx-auto">
+                    <CardHeader className="pb-1 xs:pb-2 min-w-0 w-full">
+                      <CardTitle className="text-base xs:text-lg md:text-sm font-medium truncate max-w-full min-w-0">Pendiente de Pago</CardTitle>
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent className="p-2 sm:p-4 md:p-6 min-w-0 w-full">
+                      <div className="text-xl xs:text-2xl font-bold truncate max-w-full min-w-0">${salesSummary.totalPendientePago.toFixed(2)}</div>
+                      <p className="text-xs text-muted-foreground truncate max-w-full min-w-0">A pagar a vendedores</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="w-full max-w-full min-w-0 sm:max-w-md mx-auto">
+                    <CardHeader className="pb-1 xs:pb-2 min-w-0 w-full">
+                      <CardTitle className="text-base xs:text-lg md:text-sm font-medium truncate max-w-full min-w-0">Pagado</CardTitle>
+                      <CheckCircle className="w-4 h-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent className="p-2 sm:p-4 md:p-6 min-w-0 w-full">
+                      <div className="text-xl xs:text-2xl font-bold truncate max-w-full min-w-0">${salesSummary.totalPagado.toFixed(2)}</div>
+                      <p className="text-xs text-muted-foreground truncate max-w-full min-w-0">Ya pagado a vendedores</p>
+                    </CardContent>
+                  </Card>
+                </div>
+                {/* Filtros y Ordenamiento */}
+                <Card className="w-full min-w-0 mx-auto sm:max-w-[28rem]">
+                  <CardHeader className="pb-2 px-2 sm:px-4 min-w-0 w-full overflow-hidden">
+                    <CardTitle className="text-base font-semibold truncate min-w-0">Filtros y Ordenamiento</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-2 sm:p-4 min-w-0 w-full overflow-hidden">
+                    <div className="space-y-3 w-full">
+                      <div className="grid grid-cols-1 gap-2 sm:gap-4 w-full">
+                        <div className="w-full">
+                          <Label htmlFor="filterEstadoPago" className="text-xs xs:text-sm">Estado de Pago</Label>
+                          <Select value={salesFilters.estadoPago} onValueChange={(value) => setSalesFilters({...salesFilters, estadoPago: value as any})}>
+                            <SelectTrigger className="text-xs xs:text-sm w-full h-8 xs:h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Todos</SelectItem>
+                              <SelectItem value="pendiente">Pendiente</SelectItem>
+                              <SelectItem value="pagado">Pagado</SelectItem>
+                              <SelectItem value="cancelado">Cancelado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="w-full">
+                          <Label htmlFor="filterEstadoEnvio" className="text-xs xs:text-sm">Estado de Envío</Label>
+                          <Select value={salesFilters.estadoEnvio || 'all'} onValueChange={(value) => setSalesFilters({...salesFilters, estadoEnvio: value === 'all' ? undefined : value as any})}>
+                            <SelectTrigger className="text-xs xs:text-sm w-full h-8 xs:h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Todos</SelectItem>
+                              <SelectItem value="pendiente">Pendiente</SelectItem>
+                              <SelectItem value="en_preparacion">En Preparación</SelectItem>
+                              <SelectItem value="enviado">Enviado</SelectItem>
+                              <SelectItem value="entregado">Entregado</SelectItem>
+                              <SelectItem value="cancelado">Cancelado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="w-full">
+                          <Label htmlFor="filterVendedor" className="text-xs xs:text-sm">Vendedor</Label>
+                          <Select value={salesFilters.vendedorId || 'all'} onValueChange={(value) => setSalesFilters({...salesFilters, vendedorId: value === 'all' ? undefined : value})}>
+                            <SelectTrigger className="text-xs xs:text-sm w-full h-8 xs:h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Todos</SelectItem>
+                              {salesSummary.ventasPorVendedor.map((vendedor) => (
+                                <SelectItem key={vendedor.vendedorId} value={vendedor.vendedorId} className="text-xs xs:text-sm">
+                                  {vendedor.vendedorNombre}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-end w-full">
+                          <Button variant="outline" onClick={() => { setSalesFilters({estadoPago: 'all', estadoEnvio: 'all'}); setSalesSorting({field: 'fecha', order: 'desc'}); }} className="w-full h-8 xs:h-9 text-xs xs:text-sm">
+                            <X className="mr-2 h-4 w-4" /> Limpiar
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="relative w-full overflow-hidden">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
+                        <Input placeholder="Buscar..." className="pl-10 text-xs xs:text-sm w-full h-8 xs:h-9" />
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground w-full">
+                        <span>Mostrando {filteredPurchases.length} de {purchases.length} compras</span>
+                        {(salesFilters.estadoPago !== 'all' || salesFilters.estadoEnvio !== 'all' || salesFilters.vendedorId || searchTerm) && (
+                          <Badge variant="outline">Filtros aplicados</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                {/* Tabla de compras */}
+                <Card className="w-full min-w-0 mx-auto sm:max-w-[28rem]">
+                  <CardHeader className="pb-2 px-2 sm:px-4 min-w-0 w-full overflow-hidden">
+                    <CardTitle className="text-base font-semibold truncate min-w-0">Gestión de Compras (por compra)</CardTitle>
+                    <CardDescription className="text-xs truncate min-w-0">Administra las compras agrupadas por documento de la colección purchases</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-2 sm:p-4 min-w-0 w-full overflow-hidden">
+                    {loadingSales ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                        <span className="ml-2">Cargando compras...</span>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto w-full">
+                        <Table className="min-w-[600px] w-full text-xs">
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="p-1 md:p-2 w-[90px] text-xs">Fecha</TableHead>
+                              <TableHead className="p-1 md:p-2 w-[160px] text-xs">Productos</TableHead>
+                              <TableHead className="p-1 md:p-2 w-[100px] text-xs">Comprador</TableHead>
+                              <TableHead className="p-1 md:p-2 w-[80px] text-xs">Total</TableHead>
+                              <TableHead className="p-1 md:p-2 w-[80px] text-xs">Estado</TableHead>
+                              <TableHead className="p-1 md:p-2 w-[110px] text-xs">Pago a vendedores</TableHead>
+                              <TableHead className="p-1 md:p-2 w-[100px] text-xs">Acciones</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredPurchases.map((compra) => {
+                              const allPaid = compra.paidToSellers === true || (Array.isArray(compra.products) && compra.products.every((p: any) => p.paidToSeller === true));
+                              return (
+                                <TableRow key={compra.id} className="text-xs sm:text-sm">
+                                  <TableCell className="p-1 md:p-2 align-middle">{new Date(compra.createdAt?.toDate?.() || compra.createdAt).toLocaleDateString('es-ES')}</TableCell>
+                                  <TableCell className="p-1 md:p-2 align-middle max-w-[160px] truncate min-w-0">
+                                    <ul className="list-disc pl-4 min-w-0">
+                                      {Array.isArray(compra.products) && compra.products.map((p, idx) => (
+                                        <li key={idx} className="truncate text-xs sm:text-sm break-all max-w-full min-w-0">{p.nombre || p.productName || p.productoNombre || 'Producto'} (x{p.quantity || p.cantidad || 1})</li>
+                                      ))}
+                                    </ul>
+                                  </TableCell>
+                                  <TableCell className="p-1 md:p-2 align-middle max-w-[100px] truncate min-w-0 break-all">{usersMap[compra.buyerId]?.name || compra.buyerId}</TableCell>
+                                  <TableCell className="p-1 md:p-2 align-middle whitespace-nowrap">${compra.totalAmount?.toFixed(2)}</TableCell>
+                                  <TableCell className="p-1 md:p-2 align-middle">
+                                    <Badge variant={compra.status === 'approved' ? 'default' : 'secondary'}>{compra.status}</Badge>
+                                  </TableCell>
+                                  <TableCell className="p-1 md:p-2 align-middle">
+                                    {allPaid ? (
+                                      <Badge variant="default">Pagado</Badge>
+                                    ) : (
+                                      <Badge variant="secondary">Pendiente de pago a vendedores</Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="p-1 md:p-2 align-middle">
+                                    <Button variant="outline" size="sm" onClick={() => handleViewDetails(compra)} className="text-xs sm:text-sm">Ver Detalles</Button>
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
+                          </TableBody>
+                        </Table>
+                        {filteredPurchases.length === 0 && (
+                          <div className="text-center py-8 text-gray-500">{purchases.length === 0 ? 'No se encontraron compras' : 'No hay compras que coincidan con los filtros aplicados'}</div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             {/* Banners Tab */}
@@ -3043,234 +3230,6 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
-
-            {/* Ventas y Comisiones Tab */}
-            <TabsContent value="sales" className="mt-4">
-              <div className="space-y-6">
-                {/* Resumen de Ventas */}
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                      <CardTitle className="text-sm font-medium">Total Ventas</CardTitle>
-                      <TrendingUp className="w-4 h-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">${salesSummary.totalVentas.toFixed(2)}</div>
-                      <p className="text-xs text-muted-foreground">Valor bruto de todas las ventas</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                      <CardTitle className="text-sm font-medium">Comisiones</CardTitle>
-                      <DollarSign className="w-4 h-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">${salesSummary.totalComisiones.toFixed(2)}</div>
-                      <p className="text-xs text-muted-foreground">12% de comisión total</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                      <CardTitle className="text-sm font-medium">Pendiente de Pago</CardTitle>
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">${salesSummary.totalPendientePago.toFixed(2)}</div>
-                      <p className="text-xs text-muted-foreground">A pagar a vendedores</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                      <CardTitle className="text-sm font-medium">Pagado</CardTitle>
-                      <CheckCircle className="w-4 h-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">${salesSummary.totalPagado.toFixed(2)}</div>
-                      <p className="text-xs text-muted-foreground">Ya pagado a vendedores</p>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Filtros y Ordenamiento */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Filtros y Ordenamiento</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                                      <div className="space-y-4">
-                    {/* Filtros simplificados */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div>
-                        <Label htmlFor="filterEstadoPago">Estado de Pago</Label>
-                        <Select 
-                          value={salesFilters.estadoPago} 
-                          onValueChange={(value) => setSalesFilters({...salesFilters, estadoPago: value as any})}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">Todos</SelectItem>
-                            <SelectItem value="pendiente">Pendiente</SelectItem>
-                            <SelectItem value="pagado">Pagado</SelectItem>
-                            <SelectItem value="cancelado">Cancelado</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="filterEstadoEnvio">Estado de Envío</Label>
-                        <Select 
-                          value={salesFilters.estadoEnvio || "all"} 
-                          onValueChange={(value) => setSalesFilters({...salesFilters, estadoEnvio: value === "all" ? undefined : value as any})}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">Todos</SelectItem>
-                            <SelectItem value="pendiente">Pendiente</SelectItem>
-                            <SelectItem value="en_preparacion">En Preparación</SelectItem>
-                            <SelectItem value="enviado">Enviado</SelectItem>
-                            <SelectItem value="entregado">Entregado</SelectItem>
-                            <SelectItem value="cancelado">Cancelado</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="filterVendedor">Vendedor</Label>
-                        <Select 
-                          value={salesFilters.vendedorId || "all"} 
-                          onValueChange={(value) => setSalesFilters({...salesFilters, vendedorId: value === "all" ? undefined : value})}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">Todos</SelectItem>
-                            {salesSummary.ventasPorVendedor.map((vendedor) => (
-                              <SelectItem key={vendedor.vendedorId} value={vendedor.vendedorId}>
-                                {vendedor.vendedorNombre}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex items-end">
-                        <Button 
-                          variant="outline" 
-                          onClick={() => {
-                            setSalesFilters({estadoPago: 'all', estadoEnvio: 'all'})
-                            setSalesSorting({field: 'fecha', order: 'desc'})
-                          }}
-                        >
-                          <X className="mr-2 h-4 w-4" />
-                          Limpiar
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    {/* Barra de búsqueda */}
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <Input
-                        placeholder="Buscar por comprador, producto o ID de compra..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                    
-                    {/* Estadísticas de filtros */}
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>Mostrando {filteredPurchases.length} de {purchases.length} compras</span>
-                      {(salesFilters.estadoPago !== 'all' || salesFilters.estadoEnvio !== 'all' || salesFilters.vendedorId || searchTerm) && (
-                        <Badge variant="outline">
-                          Filtros aplicados
-                        </Badge>
-                      )}
-                    </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Ventas y Comisiones Tab */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Gestión de Compras (por compra)</CardTitle>
-                    <CardDescription>
-                      Administra las compras agrupadas por documento de la colección purchases
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {loadingSales ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
-                        <span className="ml-2">Cargando compras...</span>
-                      </div>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="p-1 md:p-2">Fecha</TableHead>
-                              <TableHead className="p-1 md:p-2">Productos</TableHead>
-                              <TableHead className="p-1 md:p-2">Comprador</TableHead>
-                              <TableHead className="p-1 md:p-2">Total</TableHead>
-                              <TableHead className="p-1 md:p-2">Estado</TableHead>
-                              <TableHead className="p-1 md:p-2">Pago a vendedores</TableHead>
-                              <TableHead className="p-1 md:p-2">Acciones</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredPurchases.map((compra) => {
-                              const allPaid = compra.paidToSellers === true || (Array.isArray(compra.products) && compra.products.every((p: any) => p.paidToSeller === true));
-                              return (
-                                <TableRow key={compra.id}>
-                                  <TableCell>{new Date(compra.createdAt?.toDate?.() || compra.createdAt).toLocaleDateString('es-ES')}</TableCell>
-                                  <TableCell>
-                                    <ul className="list-disc pl-4">
-                                      {Array.isArray(compra.products) && compra.products.map((p, idx) => (
-                                        <li key={idx}>{p.nombre || p.productName || p.productoNombre || 'Producto'} (x{p.quantity || p.cantidad || 1})</li>
-                                      ))}
-                                    </ul>
-                                  </TableCell>
-                                  <TableCell>{usersMap[compra.buyerId]?.name || compra.buyerId}</TableCell>
-                                  <TableCell>${compra.totalAmount?.toFixed(2)}</TableCell>
-                                  <TableCell>
-                                    <Badge variant={compra.status === 'approved' ? 'default' : 'secondary'}>
-                                      {compra.status}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    {allPaid ? (
-                                      <Badge variant="default">Pagado</Badge>
-                                    ) : (
-                                      <Badge variant="secondary">Pendiente de pago a vendedores</Badge>
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Button variant="outline" size="sm" onClick={() => handleViewDetails(compra)}>
-                                      Ver Detalles
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                              )
-                            })}
-                          </TableBody>
-                        </Table>
-                        {filteredPurchases.length === 0 && (
-                          <div className="text-center py-8 text-gray-500">
-                            {purchases.length === 0 ? 'No se encontraron compras' : 'No hay compras que coincidan con los filtros aplicados'}
-                          </div>
-                                )}
-                              </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-
-
           </Tabs>
         </main>
       </div>

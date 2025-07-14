@@ -48,6 +48,7 @@ import {
 } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
 import { useAuth } from "@/contexts/auth-context"
+import ServiceDetail from "@/components/services/ServiceDetail"
 
 interface ProductMedia {
   type: "image" | "video"
@@ -615,6 +616,13 @@ export default function ProductDetailPage() {
           <Link href="/">Volver al inicio</Link>
         </Button>
       </div>
+    )
+  }
+
+  // Render condicional según isService
+  if (product.isService) {
+    return (
+      <ServiceDetail service={product} onContactSeller={handleContactSeller} />
     )
   }
 

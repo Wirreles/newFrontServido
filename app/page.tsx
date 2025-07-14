@@ -22,6 +22,7 @@ interface Product {
   imageUrl?: string
   category?: string
   description?: string
+  media?: { url: string; type: string }[] // Added media property
 }
 
 interface CategoryItem {
@@ -319,6 +320,7 @@ export default function HomePage() {
                         <div className="aspect-square relative w-full">
                           <Image
                             src={
+                              (product.media && product.media.length > 0 && product.media[0].url) ||
                               product.imageUrl ||
                               `/placeholder.svg?height=200&width=200&query=${product.imageQuery || product.name}`
                             }
@@ -360,6 +362,7 @@ export default function HomePage() {
                         <div className="aspect-square relative w-full">
                           <Image
                             src={
+                              (product.media && product.media.length > 0 && product.media[0].url) ||
                               product.imageUrl ||
                               `/placeholder.svg?height=200&width=200&query=${product.imageQuery || product.name}`
                             }
@@ -397,6 +400,7 @@ export default function HomePage() {
                         <div className="aspect-square relative w-full">
                           <Image
                             src={
+                              (product.media && product.media.length > 0 && product.media[0].url) ||
                               product.imageUrl ||
                               `/placeholder.svg?height=200&width=200&query=${product.imageQuery || product.name}`
                             }

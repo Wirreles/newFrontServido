@@ -601,7 +601,7 @@ export default function BuyerDashboardPage() {
   }
 
   return (
-    <div className="grid min-h-screen w-full lg:grid-cols-[280px_1fr] bg-gray-100">
+    <div className="grid min-h-screen w-full lg:grid-cols-[280px_1fr] bg-gray-100 overflow-x-hidden">
       {/* Sidebar */}
       <div className="hidden border-r bg-white lg:block">
         <div className="flex h-full max-h-screen flex-col gap-2">
@@ -901,8 +901,8 @@ export default function BuyerDashboardPage() {
                     ))}
                     
                     {/* Mostrar compras legacy recientes */}
-                    {productosComprados.slice(0, 3).map((purchase) => (
-                      <div key={purchase.compraId} className="flex flex-col space-y-2">
+                    {productosComprados.slice(0, 3).map((purchase, index) => (
+                      <div key={`${purchase.compraId || 'sin-compra'}-${purchase.productId || 'sin-prod'}-${index}`} className="flex flex-col space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-4">
                             <div className="rounded-full bg-gray-100 p-2">
@@ -953,114 +953,116 @@ export default function BuyerDashboardPage() {
           )}
 
           {activeTab === "orders" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Mis Compras</CardTitle>
-                <CardDescription>Revisa el estado de tus pedidos y contacta al vendedor si lo necesitas.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {paginatedPurchases.length === 0 ? (
-                  <div className="text-center py-10">
-                    <p className="text-lg text-muted-foreground mb-6">No tienes compras registradas.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {paginatedPurchases.map((purchase, index) => (
-                      <Card key={`${purchase.compraId}-${purchase.productId}-${index}`} className="overflow-hidden">
-                        <CardHeader className="bg-gray-50 py-3">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                              <p className="text-sm font-medium">
-                                Compra #{purchase.paymentId} - {new Date(purchase.fechaCompra).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <div className="mt-2 sm:mt-0 flex gap-2">
-                              {/* Badge de estado de pago */}
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                purchase.estadoPago === "pagado"
-                                  ? "bg-green-100 text-green-800"
-                                  : purchase.estadoPago === "pendiente"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : purchase.estadoPago === "rechazado"
-                                  ? "bg-red-100 text-red-800"
-                                  : "bg-gray-100 text-gray-800"
-                              }`}>
-                                {purchase.estadoPago === "pagado"
-                                  ? "Pagado"
-                                  : purchase.estadoPago === "pendiente"
-                                  ? "Pendiente"
-                                  : purchase.estadoPago === "rechazado"
-                                  ? "Rechazado"
-                                  : purchase.estadoPago === "cancelado"
-                                  ? "Cancelado"
-                                  : purchase.estadoPago}
-                              </span>
-                              {/* Badge de estado de envío */}
-                              {!purchase.isService && (
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
-                                  getShippingBadgeClass(purchase.shippingStatus || 'pendiente')
-                                }`}>
-                                  {getShippingIcon(purchase.shippingStatus || 'pendiente')}
-                                  {getShippingStatusText(purchase.shippingStatus || 'pendiente')}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="p-4">
-                          <div className="space-y-4">
-                            <div className="flex items-center space-x-4">
-                              <div className="h-12 w-12 relative flex-shrink-0">
-                                <Image
-                                  src={purchase.productImageUrl || "/placeholder.svg"}
-                                  alt={purchase.productName || "Producto"}
-                                  layout="fill"
-                                  objectFit="cover"
-                                  className="rounded-md"
-                                />
+            <div className="pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] px-2 sm:px-4 w-full">
+              <Card className="w-full overflow-hidden">
+                <CardHeader className="p-2 sm:p-4">
+                  <CardTitle className="text-base sm:text-lg">Mis Compras</CardTitle>
+                  <CardDescription className="text-[11px] sm:text-sm leading-tight">Revisa el estado de tus pedidos y contacta al vendedor si lo necesitas.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-2 sm:p-4">
+                  {paginatedPurchases.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-base sm:text-lg text-muted-foreground mb-4">No tienes compras registradas.</p>
+                    </div>
+                  ) : (
+                    <div className="w-full">
+                      <div className="space-y-3 sm:space-y-4 w-full">
+                        {paginatedPurchases.map((purchase, index) => (
+                          <Card key={`${purchase.compraId}-${purchase.productId}-${index}`} className="overflow-hidden w-full">
+                            <CardHeader className="bg-gray-50 p-2 sm:p-4">
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 w-full">
+                                <div className="min-w-0 w-full">
+                                  <p className="text-[11px] sm:text-xs font-medium truncate break-all max-w-full">
+                                    Compra #{typeof purchase.paymentId === "string" ? `${purchase.paymentId.slice(0, 6)}...${purchase.paymentId.slice(-4)}` : "Sin ID"} - {new Date(purchase.fechaCompra).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <div className="flex flex-wrap gap-1 sm:gap-2">
+                                  {/* Badge de estado de pago */}
+                                  <span className={`px-2 py-1 rounded-full text-[10px] sm:text-xs font-medium truncate break-words ${
+                                    purchase.estadoPago === "pagado"
+                                      ? "bg-green-100 text-green-800"
+                                      : purchase.estadoPago === "pendiente"
+                                      ? "bg-yellow-100 text-yellow-800"
+                                      : purchase.estadoPago === "rechazado"
+                                      ? "bg-red-100 text-red-800"
+                                      : "bg-gray-100 text-gray-800"
+                                  }`}>
+                                    {purchase.estadoPago === "pagado"
+                                      ? "Pagado"
+                                      : purchase.estadoPago === "pendiente"
+                                      ? "Pendiente"
+                                      : purchase.estadoPago === "rechazado"
+                                      ? "Rechazado"
+                                      : purchase.estadoPago === "cancelado"
+                                      ? "Cancelado"
+                                      : purchase.estadoPago}
+                                  </span>
+                                  {/* Badge de estado de envío */}
+                                  {!purchase.isService && (
+                                    <span className={`px-2 py-1 rounded-full text-[10px] sm:text-xs font-medium flex items-center gap-1 truncate break-words ${getShippingBadgeClass(purchase.shippingStatus || 'pendiente')}`}>
+                                      {getShippingIcon(purchase.shippingStatus || 'pendiente')}
+                                      {getShippingStatusText(purchase.shippingStatus || 'pendiente')}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">
-                                  {purchase.productName || "Producto desconocido"}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {purchase.isService ? "Servicio" : "Producto"} - Vendedor: {purchase.vendedorNombre || "Desconocido"}
-                                </p>
+                            </CardHeader>
+                            <CardContent className="p-2 sm:p-4">
+                              <div className="space-y-2 sm:space-y-3 w-full">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full">
+                                  <div className="h-10 w-10 sm:h-12 sm:w-12 relative flex-shrink-0">
+                                    <Image
+                                      src={purchase.productImageUrl || "/placeholder.svg"}
+                                      alt={purchase.productName || "Producto"}
+                                      layout="fill"
+                                      objectFit="cover"
+                                      className="rounded-md"
+                                    />
+                                  </div>
+                                  <div className="flex-1 min-w-0 break-all w-full">
+                                    <p className="text-[11px] sm:text-xs font-medium truncate break-all max-w-full">
+                                      {purchase.productName || "Producto desconocido"}
+                                    </p>
+                                    <p className="text-[10px] sm:text-xs text-muted-foreground truncate break-all max-w-full">
+                                      {purchase.isService ? "Servicio" : "Producto"} - Vendedor: {purchase.vendedorNombre || "Desconocido"}
+                                    </p>
+                                  </div>
+                                  <div className="text-[11px] sm:text-xs font-medium whitespace-nowrap">
+                                    ${purchase.productPrice.toFixed(2)}
+                                  </div>
+                                </div>
+                                {/* Estado de envío detallado */}
+                                {!purchase.isService && (
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-[10px] sm:text-xs text-muted-foreground">Estado de envío:</span>
+                                    <span className={`px-2 py-1 rounded-full text-[10px] sm:text-xs font-medium flex items-center gap-1 truncate break-words ${getShippingBadgeClass(purchase.shippingStatus || 'pendiente')}`}>
+                                      {getShippingIcon(purchase.shippingStatus || 'pendiente')}
+                                      {getShippingStatusText(purchase.shippingStatus || 'pendiente')}
+                                    </span>
+                                  </div>
+                                )}
+                                {/* Botón para ir al chat con el vendedor */}
+                                <div className="flex items-center gap-2 mt-1 w-full">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleChatWithSeller(purchase)}
+                                    className="flex items-center gap-2 w-full text-[11px] sm:text-xs whitespace-nowrap"
+                                  >
+                                    <MessageSquare className="h-4 w-4 shrink-0" />
+                                    Chatear con el vendedor
+                                  </Button>
+                                </div>
                               </div>
-                              <div className="text-sm font-medium">
-                                ${purchase.productPrice.toFixed(2)}
-                              </div>
-                            </div>
-                            {/* Estado de envío detallado */}
-                            {!purchase.isService && (
-                              <div className="mt-2 flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground">Estado de envío:</span>
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getShippingBadgeClass(purchase.shippingStatus || 'pendiente')}`}>
-                                  {getShippingIcon(purchase.shippingStatus || 'pendiente')}
-                                  {getShippingStatusText(purchase.shippingStatus || 'pendiente')}
-                                </span>
-                              </div>
-                            )}
-                            {/* Botón para ir al chat con el vendedor */}
-                            <div className="mt-2 flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleChatWithSeller(purchase)}
-                                className="flex items-center gap-2"
-                              >
-                                <MessageSquare className="h-4 w-4" />
-                                Chatear con el vendedor
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           )}
 
           {activeTab === "favorites" && (
@@ -1139,10 +1141,10 @@ export default function BuyerDashboardPage() {
               </CardHeader>
               <CardContent>
                 <Tabs defaultValue="personal" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3">
+                  <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="personal">Datos Personales</TabsTrigger>
                     <TabsTrigger value="addresses">Direcciones</TabsTrigger>
-                    <TabsTrigger value="payment">Métodos de Pago</TabsTrigger>
+                    {/* <TabsTrigger value="payment">Métodos de Pago</TabsTrigger>  */}
                   </TabsList>
                   <TabsContent value="personal" className="mt-6">
                     <div className="space-y-4">
@@ -1286,7 +1288,7 @@ export default function BuyerDashboardPage() {
                       </div>
                     </div>
                   </TabsContent>
-                  <TabsContent value="payment" className="mt-6">
+                  {/* <TabsContent value="payment" className="mt-6">
                     <div className="space-y-4">
                       <div className="grid gap-2">
                         <h3 className="text-lg font-medium">Métodos de Pago</h3>
@@ -1316,98 +1318,103 @@ export default function BuyerDashboardPage() {
                         <Button>Añadir Método de Pago</Button>
                       </div>
                     </div>
-                  </TabsContent>
+                  </TabsContent> */}
                 </Tabs>
               </CardContent>
             </Card>
           )}
 
           {activeTab === "purchases" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Historial de Pagos</CardTitle>
-                <CardDescription>Detalle de todas tus transacciones y pagos realizados</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loadingData ? (
-                  <div className="flex justify-center items-center py-10">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                  </div>
-                ) : productosComprados.length === 0 ? (
-                  <div className="text-center py-10">
-                    <p className="text-lg text-muted-foreground mb-6">Aún no tienes transacciones registradas.</p>
-                    <Button asChild>
-                      <Link href="/">Explorar productos</Link>
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {productosComprados.map((purchase) => (
-                      <Card key={purchase.compraId} className="overflow-hidden">
-                        <CardContent className="p-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="flex items-center space-x-4">
-                              <div className="h-12 w-12 relative flex-shrink-0">
-                                <Image
-                                  src={purchase.productImageUrl || "/placeholder.svg"}
-                                  alt={purchase.productName || "Producto"}
-                                  width={48}
-                                  height={48}
-                                  className="rounded-md object-cover"
-                                />
+            <div className="w-full flex justify-center">
+              <Card className="w-full max-w-screen-sm mx-auto">
+                <CardHeader className="px-3 sm:px-4">
+                  <CardTitle>Historial de Pagos</CardTitle>
+                  <CardDescription>Detalle de todas tus transacciones y pagos realizados</CardDescription>
+                </CardHeader>
+                <CardContent className="px-3 sm:px-4">
+                  {loadingData ? (
+                    <div className="flex justify-center items-center py-10">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                    </div>
+                  ) : productosComprados.length === 0 ? (
+                    <div className="text-center py-10">
+                      <p className="text-lg text-muted-foreground mb-6">Aún no tienes transacciones registradas.</p>
+                      <Button asChild>
+                        <Link href="/">Explorar productos</Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 w-full">
+                      {productosComprados.map((purchase, index) => (
+                        <Card key={`${purchase.compraId || 'sin-compra'}-${purchase.productId || 'sin-prod'}-${index}`} className="overflow-hidden w-full">
+                          <CardContent className="p-3 sm:p-4 w-full">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
+                              <div className="flex items-center space-x-4 w-full">
+                                <div className="h-12 w-12 relative flex-shrink-0">
+                                  <Image
+                                    src={purchase.productImageUrl || "/placeholder.svg"}
+                                    alt={purchase.productName || "Producto"}
+                                    width={48}
+                                    height={48}
+                                    className="rounded-md object-cover"
+                                  />
+                                </div>
+                                <div className="flex-1 min-w-0 w-full">
+                                  <p className="text-sm font-medium truncate break-all max-w-full">
+                                    {purchase.productName || "Producto desconocido"}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground truncate break-all max-w-full">
+                                    {purchase.isService ? "Servicio" : "Producto"} • Vendedor: {purchase.vendedorNombre || "Desconocido"}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground break-all max-w-full">
+                                    ID de Pago: {typeof purchase.paymentId === "string" ? `${purchase.paymentId.slice(0, 6)}...${purchase.paymentId.slice(-4)}` : "Sin ID"}
+                                  </p>
+                                </div>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">
-                                  {purchase.productName || "Producto desconocido"}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {purchase.isService ? "Servicio" : "Producto"} • 
-                                  Vendedor: {purchase.vendedorNombre || "Desconocido"}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  ID de Pago: {purchase.paymentId}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex flex-col sm:items-end gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg font-semibold">${purchase.productPrice.toFixed(2)}</span>
-                                <span
-                                  className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                    purchase.estadoPago === "pagado" 
-                                      ? "bg-green-100 text-green-800" 
+                              <div className="flex flex-col sm:items-end gap-2 w-full sm:w-auto">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg font-semibold">${purchase.productPrice.toFixed(2)}</span>
+                                  <span
+                                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      purchase.estadoPago === "pagado"
+                                        ? "bg-green-100 text-green-800"
+                                        : purchase.estadoPago === "pendiente"
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : purchase.estadoPago === "rechazado"
+                                        ? "bg-red-100 text-red-800"
+                                        : "bg-gray-100 text-gray-800"
+                                    }`}
+                                  >
+                                    {purchase.estadoPago === "pagado"
+                                      ? "Aprobado"
                                       : purchase.estadoPago === "pendiente"
-                                      ? "bg-yellow-100 text-yellow-800"
+                                      ? "Pendiente"
                                       : purchase.estadoPago === "rechazado"
-                                      ? "bg-red-100 text-red-800"
-                                      : "bg-gray-100 text-gray-800"
-                                  }`}
-                                >
-                                  {purchase.estadoPago === "pagado" ? "Aprobado" :
-                                   purchase.estadoPago === "pendiente" ? "Pendiente" :
-                                   purchase.estadoPago === "rechazado" ? "Rechazado" :
-                                   purchase.estadoPago === "cancelado" ? "Cancelado" : purchase.estadoPago}
-                                </span>
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(purchase.fechaCompra).toLocaleDateString("es-ES", {
+                                      ? "Rechazado"
+                                      : purchase.estadoPago === "cancelado"
+                                      ? "Cancelado"
+                                      : purchase.estadoPago}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(purchase.fechaCompra).toLocaleDateString("es-ES", {
                                     year: 'numeric',
                                     month: 'long',
                                     day: 'numeric',
                                     hour: '2-digit',
                                     minute: '2-digit'
-                                  })
-                                }
-                              </p>
+                                  })}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           )}
         </main>
       </div>

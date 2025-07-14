@@ -2788,10 +2788,10 @@ export default function SellerDashboardPage() {
               </CardHeader>
               <CardContent>
                 <Tabs defaultValue="profile" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3">
+                  <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="profile">Mi Perfil</TabsTrigger>
                     <TabsTrigger value="subscription">Suscripción</TabsTrigger>
-                    <TabsTrigger value="mercadopago">MercadoPago</TabsTrigger>
+                    {/* <TabsTrigger value="mercadopago">MercadoPago</TabsTrigger>  */}
                   </TabsList>
                   
                   <TabsContent value="profile" className="space-y-6 mt-6">
@@ -2932,7 +2932,7 @@ export default function SellerDashboardPage() {
                     </div>
                   </TabsContent>
                   
-                  <TabsContent value="mercadopago" className="space-y-6 mt-6">
+                  {/* <TabsContent value="mercadopago" className="space-y-6 mt-6">
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold">Configuración de Pagos</h3>
                       <div className="bg-blue-100 text-blue-800 p-3 rounded flex items-center gap-2">
@@ -2946,7 +2946,7 @@ export default function SellerDashboardPage() {
                         </p>
                       </div>
                     </div>
-                  </TabsContent>
+                  </TabsContent> */}
                 </Tabs>
                   </CardContent>
                 </Card>
