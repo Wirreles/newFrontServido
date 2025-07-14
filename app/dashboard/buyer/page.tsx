@@ -193,13 +193,10 @@ export default function BuyerDashboardPage() {
       const productsSnap = await getDocs(collection(db, 'products'))
       const products: Record<string, any> = {}
       productsSnap.forEach(doc => { products[doc.id] = doc.data() })
-      // Obtener información de shipping
-      const shipments = await getBuyerShipments(userId)
       // Desglosar productos de cada compra
       const productos: CompraProductoBuyer[] = purchases.flatMap((compra: any) => {
         if (!Array.isArray(compra.products)) return []
         return compra.products.map((prod: any) => {
-          const shipping = shipments.find(s => s.compraId === compra.id && s.productId === prod.productId)
           return {
             compraId: compra.id || '',
             paymentId: compra.paymentId || '',
@@ -214,9 +211,9 @@ export default function BuyerDashboardPage() {
             vendedorNombre: users[prod.vendedorId]?.name || '',
             vendedorEmail: users[prod.vendedorId]?.email || '',
             isService: prod.isService || products[prod.productId]?.isService || false,
-            shippingStatus: shipping?.shipping?.status || '',
-            shippingTracking: shipping?.shipping?.trackingNumber || '',
-            shippingCarrier: shipping?.shipping?.carrierName || '',
+            shippingStatus: prod.shippingStatus || 'pendiente',
+            shippingTracking: prod.shippingTracking || '',
+            shippingCarrier: prod.shippingCarrier || '',
             productImageUrl: prod.imageUrl || products[prod.productId]?.imageUrl || '',
           }
         })
@@ -314,17 +311,17 @@ export default function BuyerDashboardPage() {
   }
 
   // Función para obtener el icono de estado de envío
-  const getShippingIcon = (status: ShippingStatus) => {
+  const getShippingIcon = (status: string) => {
     switch (status) {
-      case "pending":
+      case "pendiente":
         return <Clock className="h-4 w-4" />
-      case "preparing":
+      case "preparacion":
         return <Package className="h-4 w-4" />
-      case "shipped":
+      case "enviado":
         return <Truck className="h-4 w-4" />
-      case "delivered":
+      case "entregado":
         return <CheckCircle className="h-4 w-4" />
-      case "cancelled":
+      case "cancelado":
         return <XCircle className="h-4 w-4" />
       default:
         return <Clock className="h-4 w-4" />
@@ -332,17 +329,17 @@ export default function BuyerDashboardPage() {
   }
 
   // Función para obtener el color del badge de envío
-  const getShippingBadgeClass = (status: ShippingStatus) => {
+  const getShippingBadgeClass = (status: string) => {
     switch (status) {
-      case "pending":
+      case "pendiente":
         return "bg-yellow-100 text-yellow-800"
-      case "preparing":
+      case "preparacion":
         return "bg-blue-100 text-blue-800"
-      case "shipped":
+      case "enviado":
         return "bg-purple-100 text-purple-800"
-      case "delivered":
+      case "entregado":
         return "bg-green-100 text-green-800"
-      case "cancelled":
+      case "cancelado":
         return "bg-red-100 text-red-800"
       default:
         return "bg-gray-100 text-gray-800"
@@ -350,17 +347,17 @@ export default function BuyerDashboardPage() {
   }
 
   // Función para obtener el texto del estado de envío
-  const getShippingStatusText = (status: ShippingStatus) => {
+  const getShippingStatusText = (status: string) => {
     switch (status) {
-      case "pending":
+      case "pendiente":
         return "Pendiente"
-      case "preparing":
+      case "preparacion":
         return "En preparación"
-      case "shipped":
+      case "enviado":
         return "Enviado"
-      case "delivered":
+      case "entregado":
         return "Entregado"
-      case "cancelled":
+      case "cancelado":
         return "Cancelado"
       default:
         return "Desconocido"
@@ -1001,10 +998,10 @@ export default function BuyerDashboardPage() {
                               {/* Badge de estado de envío */}
                               {!purchase.isService && (
                                 <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
-                                  getShippingBadgeClass(purchase.shippingStatus as ShippingStatus)
+                                  getShippingBadgeClass(purchase.shippingStatus || 'pendiente')
                                 }`}>
-                                  {getShippingIcon(purchase.shippingStatus as ShippingStatus)}
-                                  {getShippingStatusText(purchase.shippingStatus as ShippingStatus)}
+                                  {getShippingIcon(purchase.shippingStatus || 'pendiente')}
+                                  {getShippingStatusText(purchase.shippingStatus || 'pendiente')}
                                 </span>
                               )}
                             </div>
@@ -1038,9 +1035,9 @@ export default function BuyerDashboardPage() {
                             {!purchase.isService && (
                               <div className="mt-2 flex items-center gap-2">
                                 <span className="text-xs text-muted-foreground">Estado de envío:</span>
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getShippingBadgeClass(purchase.shippingStatus as ShippingStatus)}`}>
-                                  {getShippingIcon(purchase.shippingStatus as ShippingStatus)}
-                                  {getShippingStatusText(purchase.shippingStatus as ShippingStatus)}
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getShippingBadgeClass(purchase.shippingStatus || 'pendiente')}`}>
+                                  {getShippingIcon(purchase.shippingStatus || 'pendiente')}
+                                  {getShippingStatusText(purchase.shippingStatus || 'pendiente')}
                                 </span>
                               </div>
                             )}
