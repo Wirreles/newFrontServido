@@ -227,25 +227,25 @@ export default function HomePage() {
           ) : categories.length === 0 ? (
             <p className="text-gray-500">No hay categorías disponibles.</p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
               {categories.map((category) => (
                 <Link
                   key={category.id}
                   href={`/category/${category.id}`}
-                  className="flex flex-col items-center p-4 bg-white rounded-lg shadow hover:shadow-lg transition-shadow duration-200 ease-in-out"
+                  className="flex flex-col items-center transition-all duration-200 ease-in-out hover:scale-105"
                 >
-                  <div className="relative w-20 h-20 mb-2">
+                  <div className="relative w-24 h-24 mb-3 rounded-full overflow-hidden bg-white shadow-md hover:shadow-lg flex items-center justify-center">
                     <Image
                       src={
                         category.imageUrl ||
-                        `/placeholder.svg?height=80&width=80&query=${category.iconQuery || category.name + " icon"}`
+                        `/placeholder.svg?height=96&width=96&query=${category.iconQuery || category.name + " icon"}`
                       }
                       alt={category.name}
                       fill
-                      className="object-contain"
+                      className="object-contain p-3"
                     />
                   </div>
-                  <span className="text-sm font-medium text-center">{category.name}</span>
+                  <span className="text-sm font-medium text-center text-gray-700">{category.name}</span>
                 </Link>
               ))}
             </div>
