@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth"
 import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
+import { sendWelcomeEmail, initEmailJS } from "@/lib/email-service"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -32,6 +33,9 @@ export default function SignupPage() {
     } else {
       setAccountType("buyer")
     }
+    
+    // Inicializar EmailJS
+    initEmailJS()
   }, [searchParams])
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -73,6 +77,13 @@ export default function SignupPage() {
       }
 
       await setDoc(doc(db, "users", user.uid), userData)
+
+      // Enviar email de bienvenida
+      await sendWelcomeEmail({
+        user_name: name,
+        user_email: email,
+        account_type: accountType
+      })
 
       if (accountType === "seller") {
         router.push("/dashboard/seller") // Redirect sellers to subscription page
