@@ -64,6 +64,15 @@ export class ApiService {
     }[]
     buyerId: string
     buyerEmail: string
+    shippingAddress?: {
+      fullName: string
+      phone: string
+      address: string
+      city: string
+      state: string
+      zipCode: string
+      additionalInfo?: string
+    }
   }): Promise<ApiResponse<{
     id: string
     init_point: string
@@ -122,11 +131,21 @@ export class ApiService {
     quantity: number
     buyerId: string
     buyerEmail: string
+    shippingAddress?: {
+      fullName: string
+      phone: string
+      address: string
+      city: string
+      state: string
+      zipCode: string
+      additionalInfo?: string
+    }
   }) {
     return this.createProductPreference({
       products: [{ productId: data.productId, quantity: data.quantity }],
       buyerId: data.buyerId,
-      buyerEmail: data.buyerEmail
+      buyerEmail: data.buyerEmail,
+      shippingAddress: data.shippingAddress
     })
   }
 
@@ -138,6 +157,15 @@ export class ApiService {
     }[]
     buyerId: string
     buyerEmail: string
+    shippingAddress?: {
+      fullName: string
+      phone: string
+      address: string
+      city: string
+      state: string
+      zipCode: string
+      additionalInfo?: string
+    }
   }) {
     return this.createProductPreference(data)
   }

@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ArrowLeft, AlertCircle, Loader2 } from "lucide-react"
 import { getProductThumbnail } from "@/lib/image-utils"
+import { formatPrice } from "@/lib/utils"
 
 interface Product {
   id: string
@@ -21,6 +22,9 @@ interface Product {
   imageQuery?: string
   category?: string
   description?: string
+  condition?: 'nuevo' | 'usado'
+  freeShipping?: boolean
+  shippingCost?: number
 }
 
 interface Category {
@@ -143,8 +147,19 @@ export default function CategoryProductsPage() {
                   </div>
                   <CardContent className="p-3 flex flex-col flex-grow">
                     <h3 className="text-sm font-medium mb-1 truncate h-10 leading-tight">{product.name}</h3>
-                    <p className="text-lg font-semibold text-blue-600 mb-2">${product.price.toFixed(2)}</p>
-                    <span className="text-xs text-green-600">Envío gratis</span>
+                    <p className="text-lg font-semibold text-blue-600 mb-2">{formatPrice(product.price)}</p>
+                    {/* Condición */}
+                    {product.condition && (
+                      <span className="text-xs font-medium text-gray-700 mb-1">
+                        {product.condition === 'nuevo' ? 'Nuevo' : 'Usado'}
+                      </span>
+                    )}
+                    {/* Envío */}
+                    {product.freeShipping ? (
+                      <span className="text-xs text-green-600">Envío gratis</span>
+                    ) : (
+                      <span className="text-xs text-gray-600">Envío: {product.shippingCost !== undefined ? formatPrice(product.shippingCost) : '-'}</span>
+                    )}
                   </CardContent>
                 </Card>
               </Link>

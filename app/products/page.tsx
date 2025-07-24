@@ -15,6 +15,7 @@ import { Loader2, Search, XCircle, Frown, Filter } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { getProductThumbnail } from "@/lib/image-utils"
+import { formatPrice } from "@/lib/utils"
 
 interface Product {
   id: string
@@ -30,6 +31,9 @@ interface Product {
   sellerId: string
   createdAt: any
   updatedAt?: any
+  condition?: 'nuevo' | 'usado'
+  freeShipping?: boolean
+  shippingCost?: number
 }
 
 interface Category {
@@ -391,8 +395,19 @@ export default function ProductsPage() {
                         </div>
                         <CardContent className="p-3">
                           <h3 className="text-sm font-medium mb-2 line-clamp-2 min-h-[2.5rem]">{product.name}</h3>
-                          <p className="text-lg font-bold text-blue-600 mb-1">${product.price.toFixed(2)}</p>
-                          <span className="text-xs text-green-600">Envío gratis</span>
+                          <p className="text-lg font-bold text-blue-600 mb-1">{formatPrice(product.price)}</p>
+                          {/* Condición */}
+                          {product.condition && (
+                            <span className="text-xs font-medium text-gray-700 mb-1">
+                              {product.condition === 'nuevo' ? 'Nuevo' : 'Usado'}
+                            </span>
+                          )}
+                          {/* Envío */}
+                          {product.freeShipping ? (
+                            <span className="text-xs text-green-600">Envío gratis</span>
+                          ) : (
+                            <span className="text-xs text-gray-600">Envío: {product.shippingCost !== undefined ? formatPrice(product.shippingCost) : '-'}</span>
+                          )}
                         </CardContent>
                       </Card>
                     </Link>

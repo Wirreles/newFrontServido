@@ -52,6 +52,7 @@ import { getBuyerPurchases } from "@/lib/centralized-payments-api"
 import type { CentralizedPurchase, PurchaseItem } from "@/types/centralized-payments"
 import * as XLSX from "xlsx"
 import { getDashboardProductImage } from "@/lib/image-utils"
+import { formatPrice, formatPriceNumber } from "@/lib/utils"
 
 
 // Mantenemos la interface Purchase original para compatibilidad
@@ -581,8 +582,8 @@ export default function BuyerDashboardPage() {
       Vendedor: p.vendedorNombre,
       Producto: p.productName,
       Cantidad: p.quantity,
-      PrecioUnitario: p.productPrice,
-      Subtotal: p.productPrice * p.quantity,
+              PrecioUnitario: formatPriceNumber(p.productPrice),
+        Subtotal: formatPriceNumber(p.productPrice * p.quantity),
       EstadoPago: p.estadoPago,
       EstadoEnvio: p.shippingStatus,
       Tracking: p.shippingTracking,
@@ -819,10 +820,10 @@ export default function BuyerDashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    ${(
+                    {formatPriceNumber(
                       productosComprados.filter(p => p.estadoPago === "pagado").reduce((sum, p) => sum + p.productPrice * p.quantity, 0) +
                       centralizedPurchases.reduce((sum, p) => sum + p.total, 0)
-                    ).toFixed(2)}
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -895,7 +896,7 @@ export default function BuyerDashboardPage() {
                         </div>
                         <div className="ml-10">
                           <p className="text-sm">
-                            Total: ${purchase.total.toFixed(2)} - 
+                            Total: {formatPriceNumber(purchase.total)} - 
                             {purchase.items.length > 1 ? ' Múltiples vendedores' : ` Vendedor: ${purchase.items[0].vendedorNombre}`}
                           </p>
                         </div>
@@ -938,7 +939,7 @@ export default function BuyerDashboardPage() {
                           <p className="text-sm">
                             {purchase.isService ? "Servicio" : "Producto"} - 
                             Vendedor: {purchase.vendedorNombre || "Desconocido"} - 
-                            Total: ${purchase.productPrice * purchase.quantity}
+                            Total: {formatPriceNumber(purchase.productPrice * purchase.quantity)}
                           </p>
                         </div>
                       </div>
@@ -1030,7 +1031,7 @@ export default function BuyerDashboardPage() {
                                     </p>
                                   </div>
                                   <div className="text-[11px] sm:text-xs font-medium whitespace-nowrap">
-                                    ${purchase.productPrice.toFixed(2)}
+                                    {formatPriceNumber(purchase.productPrice)}
                                   </div>
                                 </div>
                                 {/* Estado de envío detallado */}
@@ -1107,7 +1108,7 @@ export default function BuyerDashboardPage() {
                         </div>
                         <CardContent className="p-4">
                           <h3 className="font-medium truncate">{product.name}</h3>
-                          <p className="text-lg font-bold mt-1">${product.price.toFixed(2)}</p>
+                          <p className="text-lg font-bold mt-1">{formatPriceNumber(product.price)}</p>
                           <div className="mt-3 flex justify-between">
                             <Button variant="outline" size="sm" className="w-[48%]" asChild>
                               <Link href={`/product/${product.productId}`}>Ver Detalles</Link>
@@ -1375,7 +1376,7 @@ export default function BuyerDashboardPage() {
                               </div>
                               <div className="flex flex-col sm:items-end gap-2 w-full sm:w-auto">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-lg font-semibold">${purchase.productPrice.toFixed(2)}</span>
+                                  <span className="text-lg font-semibold">{formatPriceNumber(purchase.productPrice)}</span>
                                   <span
                                     className={`px-2 py-1 rounded-full text-xs font-medium ${
                                       purchase.estadoPago === "pagado"

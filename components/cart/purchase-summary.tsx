@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ShoppingCart, Users, Calculator, DollarSign } from "lucide-react"
 import { getCartPurchaseSummary } from "@/lib/centralized-payments-api"
+import { formatPrice, formatPriceNumber } from "@/lib/utils"
 
 interface PurchaseSummaryProps {
   cartItems: Array<{
@@ -65,21 +66,21 @@ export function PurchaseSummary({ cartItems, className = "" }: PurchaseSummaryPr
                   <Badge variant="outline">Vendedor {index + 1}</Badge>
                   <span className="text-sm">{vendor.itemCount} items</span>
                 </div>
-                <span className="font-medium">${vendor.subtotal.toFixed(2)}</span>
+                <span className="font-medium">{formatPriceNumber(vendor.subtotal)}</span>
               </div>
               
               <div className="space-y-1 text-xs text-gray-600">
                 <div className="flex justify-between">
                   <span>Subtotal:</span>
-                  <span>${vendor.subtotal.toFixed(2)}</span>
+                  <span>{formatPriceNumber(vendor.subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Comisión (12%):</span>
-                  <span>-${vendor.commission.toFixed(2)}</span>
+                  <span>-{formatPriceNumber(vendor.commission)}</span>
                 </div>
                 <div className="flex justify-between font-medium text-green-600">
                   <span>Para vendedor:</span>
-                  <span>${vendor.netAmount.toFixed(2)}</span>
+                  <span>{formatPriceNumber(vendor.netAmount)}</span>
                 </div>
               </div>
             </div>
@@ -92,7 +93,7 @@ export function PurchaseSummary({ cartItems, className = "" }: PurchaseSummaryPr
         <div className="space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-sm">Subtotal:</span>
-            <span className="font-medium">${summary.subtotal.toFixed(2)}</span>
+            <span className="font-medium">{formatPriceNumber(summary.subtotal)}</span>
           </div>
           
           <div className="flex justify-between items-center text-purple-600">
@@ -100,7 +101,7 @@ export function PurchaseSummary({ cartItems, className = "" }: PurchaseSummaryPr
               <Calculator className="h-4 w-4" />
               <span className="text-sm">Comisión total (12%):</span>
             </div>
-            <span className="font-medium">${summary.commission.toFixed(2)}</span>
+            <span className="font-medium">{formatPriceNumber(summary.commission)}</span>
           </div>
           
           <Separator />
@@ -110,7 +111,7 @@ export function PurchaseSummary({ cartItems, className = "" }: PurchaseSummaryPr
               <DollarSign className="h-5 w-5" />
               <span>Total a pagar:</span>
             </div>
-            <span>${summary.total.toFixed(2)}</span>
+            <span>{formatPriceNumber(summary.total)}</span>
           </div>
         </div>
 

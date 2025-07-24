@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/contexts/auth-context"
 import type { PaymentItem } from "@/types/payments"
 import { ApiService } from "@/lib/services/api"
+import { formatPriceNumber } from "@/lib/utils"
 
 interface PaymentButtonProps {
   items: PaymentItem[]
@@ -50,7 +51,8 @@ export function PaymentButton({ items, sellerId, className = "" }: PaymentButton
       // Usar el nuevo sistema centralizado con múltiples productos
       const response = await ApiService.createProductPreference({
         products,
-        buyerId: currentUser.firebaseUser.uid
+        buyerId: currentUser.firebaseUser.uid,
+        buyerEmail: currentUser.firebaseUser.email || ''
       })
 
       if (response.error) {
@@ -67,7 +69,7 @@ export function PaymentButton({ items, sellerId, className = "" }: PaymentButton
       
       toast({
         title: "✅ Compra creada",
-        description: `${totalProducts} producto${totalProducts > 1 ? 's' : ''} - $${totalAmount.toFixed(2)}`,
+        description: `${totalProducts} producto${totalProducts > 1 ? 's' : ''} - ${formatPriceNumber(totalAmount)}`,
         duration: 3000,
       })
 
