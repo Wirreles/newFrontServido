@@ -48,7 +48,7 @@ export interface MercadoPagoPreference {
   seller_id: string
 }
 
-// Extendemos el tipo Payment de MercadoPago para agregar los campos que necesitamos
+// Extendemos el tipo Payment de MercadoPago para agregar los campos que necesitamos ...
 export interface ExtendedPaymentResponse {
   id: string
   status: string
