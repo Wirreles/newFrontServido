@@ -168,21 +168,21 @@ export function Header() {
         <div className="flex items-center justify-between">
           {/* Logo - Lado Izquierdo */}
           <div className="flex items-center">
-            <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <Link href="/" className="flex items-center gap-2 lg:gap-3 hover:opacity-80 transition-opacity">
               <Image
                 src="/images/logo.png"
                 alt="Servido Logo"
                 width={120}
                 height={50}
-                className="h-12 w-auto"
+                className="h-8 w-auto lg:h-12"
                 style={{ objectFit: "contain", filter: "brightness(0) invert(1)" }}
               />
-              <span className="text-2xl font-bold text-white">Servido</span>
+              <span className="text-lg lg:text-2xl font-bold text-white hidden sm:block">Servido</span>
             </Link>
           </div>
 
-          {/* Sección Central - Categorías y Búsqueda */}
-          <div className="flex items-center gap-3 flex-1 max-w-2xl mx-8">
+          {/* Sección Central - Categorías y Búsqueda (Oculto en móvil) */}
+          <div className="hidden lg:flex items-center gap-3 flex-1 max-w-2xl mx-8">
             {/* Botón Categorías */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -268,44 +268,66 @@ export function Header() {
             </div>
           </div>
 
-                      {/* Lado Derecho - Título y Acciones de Usuario */}
-            <div className="flex items-center gap-6">
-              {/* Título Principal */}
-              <div className="text-center">
-                <h1 className="text-2xl font-bold text-white">Servido</h1>
-                <div className="flex items-center gap-4 text-sm">
-                  {currentUser ? (
-                    <>
-                      <Link href="/dashboard/buyer" className="text-white hover:text-purple-200 transition-colors">
-                        Mi Panel
+          {/* Lado Derecho - Acciones de Usuario */}
+          <div className="flex items-center gap-2 lg:gap-6">
+            {/* Búsqueda móvil */}
+            <div className="lg:hidden">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="text-white hover:bg-purple-700"
+              >
+                <Search className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Título Principal (Oculto en móvil) */}
+            <div className="text-center hidden lg:block">
+              <h1 className="text-2xl font-bold text-white">Servido</h1>
+              <div className="flex items-center gap-4 text-sm">
+                {currentUser ? (
+                  <>
+                    <Link href="/dashboard/buyer" className="text-white hover:text-purple-200 transition-colors">
+                      Mi Panel
+                    </Link>
+                    {currentUser.role === "seller" && (
+                      <Link href={`/seller/${currentUser.firebaseUser.uid}`} className="text-white hover:text-purple-200 transition-colors">
+                        Mi Tienda
                       </Link>
-                      {currentUser.role === "seller" && (
-                        <Link href={`/seller/${currentUser.firebaseUser.uid}`} className="text-white hover:text-purple-200 transition-colors">
-                          Mi Tienda
-                        </Link>
-                      )}
-                      <button
-                        onClick={handleLogout}
-                        className="text-white hover:text-purple-200 transition-colors"
-                      >
-                        Cerrar Sesión
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <Link href="/login" className="text-white hover:text-purple-200 transition-colors">
-                        Ingresa
-                      </Link>
-                      <Link href="/signup" className="text-white hover:text-purple-200 transition-colors">
-                        Crear cuenta
-                      </Link>
-                    </>
-                  )}
-                </div>
+                    )}
+                    <button
+                      onClick={handleLogout}
+                      className="text-white hover:text-purple-200 transition-colors"
+                    >
+                      Cerrar Sesión
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/login" className="text-white hover:text-purple-200 transition-colors">
+                      Ingresa
+                    </Link>
+                    <Link href="/signup" className="text-white hover:text-purple-200 transition-colors">
+                      Crear cuenta
+                    </Link>
+                  </>
+                )}
               </div>
+            </div>
 
             {/* Carrito */}
             <CartDrawer />
+
+            {/* Menú móvil */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="lg:hidden text-white hover:bg-purple-700"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
           </div>
         </div>
       </div>
@@ -313,18 +335,21 @@ export function Header() {
       {/* Navegación Inferior */}
       <div className="bg-purple-900 border-t border-purple-700">
         <div className="container mx-auto px-4 py-2">
-          <nav className="flex items-center justify-center gap-8 text-sm">
+          <nav className="flex items-center justify-center gap-4 lg:gap-8 text-xs lg:text-sm">
             <Link href="/acerca-de-nosotros" className="text-white hover:text-purple-200 transition-colors flex items-center gap-1">
-              <Users className="h-4 w-4" />
-              Quienes somos?
+              <Users className="h-3 w-3 lg:h-4 lg:w-4" />
+              <span className="hidden sm:inline">Quienes somos?</span>
+              <span className="sm:hidden">Nosotros</span>
             </Link>
             <Link href="/services" className="text-white hover:text-purple-200 transition-colors flex items-center gap-1">
-              <Package className="h-4 w-4" />
-              Servicios
+              <Package className="h-3 w-3 lg:h-4 lg:w-4" />
+              <span className="hidden sm:inline">Servicios</span>
+              <span className="sm:hidden">Servicios</span>
             </Link>
             <Link href="/favorites" className="text-white hover:text-purple-200 transition-colors flex items-center gap-1">
-              <Heart className="h-4 w-4" />
-              Mis favoritos
+              <Heart className="h-3 w-3 lg:h-4 lg:w-4" />
+              <span className="hidden sm:inline">Mis favoritos</span>
+              <span className="sm:hidden">Favoritos</span>
             </Link>
           </nav>
         </div>
@@ -335,6 +360,68 @@ export function Header() {
         <SheetContent side="left" className="w-80 bg-white">
           <SheetTitle className="text-left">Menú</SheetTitle>
           <div className="mt-6 space-y-4">
+            {/* Búsqueda móvil */}
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Búsqueda</div>
+              <form onSubmit={handleSearchSubmit} className="relative">
+                <Input
+                  type="text"
+                  placeholder="Buscar productos, servicios.."
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  className="w-full bg-gray-50 text-gray-900 placeholder-gray-500 border border-gray-200 rounded-md pr-10 pl-4 py-2"
+                />
+                <button
+                  type="submit"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <Search className="h-4 w-4" />
+                </button>
+              </form>
+              
+              {/* Resultados de búsqueda móvil */}
+              {showSearchResults && searchTerm.trim() && (
+                <div className="bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-y-auto">
+                  {isSearching ? (
+                    <div className="p-3 text-center text-gray-500">
+                      <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                      Buscando...
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    <div className="py-2">
+                      {searchResults.map((product) => (
+                        <Link
+                          key={product.id}
+                          href={`/product/${product.id}`}
+                          className="flex items-center gap-3 p-3 hover:bg-gray-50 border-b last:border-b-0"
+                          onClick={() => {
+                            setShowSearchResults(false)
+                            setIsMobileMenuOpen(false)
+                          }}
+                        >
+                          <div className="w-10 h-10 relative rounded-md overflow-hidden bg-gray-100">
+                            <Image
+                              src={getSearchResultImage(product.media, product.imageUrl, product.name)}
+                              alt={product.name}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-sm text-gray-900 truncate">{product.name}</h4>
+                            <p className="text-sm text-gray-600">{formatPrice(product.price)}</p>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-3 text-center text-gray-500">
+                      No se encontraron productos
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             {/* Usuario */}
             {currentUser ? (
               <div className="space-y-2">

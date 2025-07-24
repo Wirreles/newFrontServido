@@ -50,6 +50,7 @@ import { useCart } from "@/contexts/cart-context"
 import { useAuth } from "@/contexts/auth-context"
 import ServiceDetail from "@/components/services/ServiceDetail"
 import { formatPrice, formatPriceNumber } from "@/lib/utils"
+import { ShareButtons } from "@/components/ui/share-buttons"
 
 interface ProductMedia {
   type: "image" | "video"
@@ -962,6 +963,18 @@ export default function ProductDetailPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Share Buttons */}
+            <Card>
+              <CardContent className="p-4">
+                <ShareButtons
+                  productName={product.name}
+                  productUrl={window.location.href}
+                  productPrice={finalPrice}
+                  productImage={productMedia[0]?.url}
+                />
+              </CardContent>
+            </Card>
 
             {/* Shipping and Benefits */}
             <div className="space-y-2 sm:space-y-3">
