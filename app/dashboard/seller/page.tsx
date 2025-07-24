@@ -97,6 +97,7 @@ import { getSellerShipments, updateShippingStatus, initializeShipping } from "@/
 // Los iconos ya están importados arriba
 import * as XLSX from "xlsx"
 import { getDashboardProductImage } from "@/lib/image-utils"
+import { formatPrice, formatPriceNumber } from "@/lib/utils"
 
 interface UserProfile {
   uid: string
@@ -132,6 +133,9 @@ interface Product {
   couponId?: string | null
   couponStartDate?: any | null
   couponEndDate?: any | null
+  condition?: 'nuevo' | 'usado'
+  freeShipping?: boolean
+  shippingCost?: number
 }
 
 interface Category {
@@ -252,6 +256,11 @@ export default function SellerDashboardPage() {
 
   const [productIsService, setProductIsService] = useState(false)
   const [productStock, setProductStock] = useState("")
+  
+  // Estados para condición y envío del producto
+  const [productCondition, setProductCondition] = useState<'nuevo' | 'usado'>('nuevo')
+  const [freeShipping, setFreeShipping] = useState(false)
+  const [shippingCost, setShippingCost] = useState("")
 
   const [isDraggingOver, setIsDraggingOver] = useState(false)
 
@@ -301,6 +310,20 @@ export default function SellerDashboardPage() {
   const [couponApplyEndDate, setCouponApplyEndDate] = useState<Date | undefined>(undefined)
   const [associatingCoupon, setAssociatingCoupon] = useState(false)
   const [isCouponModalOpen, setIsCouponModalOpen] = useState(false)
+
+  // Estados para creación de cupones propios
+  const [myCoupons, setMyCoupons] = useState<Coupon[]>([])
+  const [newCouponCode, setNewCouponCode] = useState("")
+  const [newCouponName, setNewCouponName] = useState("")
+  const [newCouponDescription, setNewCouponDescription] = useState("")
+  const [newCouponDiscountType, setNewCouponDiscountType] = useState<"percentage" | "fixed">("percentage")
+  const [newCouponDiscountValue, setNewCouponDiscountValue] = useState("")
+  const [newCouponMinPurchase, setNewCouponMinPurchase] = useState("")
+  const [newCouponMaxDiscount, setNewCouponMaxDiscount] = useState("")
+  const [newCouponUsageLimit, setNewCouponUsageLimit] = useState("")
+  const [newCouponStartDate, setNewCouponStartDate] = useState<Date | undefined>(undefined)
+  const [newCouponEndDate, setNewCouponEndDate] = useState<Date | undefined>(undefined)
+  const [creatingCoupon, setCreatingCoupon] = useState(false)
 
   // Estados para validación visual de formularios
   const [productFormErrors, setProductFormErrors] = useState<{[key:string]:string}>({})
@@ -757,6 +780,13 @@ export default function SellerDashboardPage() {
     fetchCoupons()
   }, [toast])
 
+  // Fetch my coupons when create-coupons tab is active
+  useEffect(() => {
+    if (activeTab === "create-coupons" && currentUser) {
+      fetchMyCoupons()
+    }
+  }, [activeTab, currentUser])
+
   // 2. Refrescar el perfil del usuario al entrar a la pestaña de añadir servicio
   useEffect(() => {
     if (activeTab === 'addService' && refreshUserProfile) {
@@ -861,6 +891,9 @@ export default function SellerDashboardPage() {
           couponId: data.couponId || null,
           couponStartDate: data.couponStartDate || null,
           couponEndDate: data.couponEndDate || null,
+          condition: data.condition || 'nuevo',
+          freeShipping: data.freeShipping || false,
+          shippingCost: data.shippingCost || 0,
         } as Product
       })
       setMyProducts(products)
@@ -975,6 +1008,161 @@ export default function SellerDashboardPage() {
     }
   }
 
+  // Funciones para creación de cupones propios
+  const fetchMyCoupons = async () => {
+    if (!currentUser) return
+
+    try {
+      const q = query(
+        collection(db, "coupons"),
+        where("sellerId", "==", currentUser.firebaseUser.uid),
+        orderBy("createdAt", "desc")
+      )
+      const querySnapshot = await getDocs(q)
+      const couponsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Coupon[]
+      setMyCoupons(couponsData)
+    } catch (error) {
+      console.error("Error fetching my coupons:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar tus cupones.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleCreateCoupon = async () => {
+    if (!currentUser) return
+
+    if (newCouponCode.trim() === "") {
+      toast({
+        title: "Error",
+        description: "El código del cupón no puede estar vacío.",
+        variant: "destructive",
+      })
+      return
+    }
+    if (newCouponName.trim() === "") {
+      toast({
+        title: "Error",
+        description: "El nombre del cupón no puede estar vacío.",
+        variant: "destructive",
+      })
+      return
+    }
+    if (!newCouponDiscountValue || parseFloat(newCouponDiscountValue) <= 0) {
+      toast({
+        title: "Error",
+        description: "El valor del descuento debe ser mayor a 0.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setCreatingCoupon(true)
+    setError(null)
+
+    try {
+      const couponData: any = {
+        code: newCouponCode.toUpperCase(),
+        name: newCouponName,
+        description: newCouponDescription.trim() || null,
+        discountType: newCouponDiscountType,
+        discountValue: parseFloat(newCouponDiscountValue),
+        minPurchase: newCouponMinPurchase ? parseFloat(newCouponMinPurchase) : null,
+        maxDiscount: newCouponMaxDiscount ? parseFloat(newCouponMaxDiscount) : null,
+        usageLimit: newCouponUsageLimit ? parseInt(newCouponUsageLimit) : null,
+        usedCount: 0,
+        sellerId: currentUser.firebaseUser.uid,
+        applicableTo: "buyers", // Solo para compradores
+        isActive: true,
+        startDate: newCouponStartDate || serverTimestamp(),
+        endDate: newCouponEndDate || null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }
+
+      const docRef = await addDoc(collection(db, "coupons"), couponData)
+      const newCoupon = { id: docRef.id, ...couponData } as Coupon
+      
+      setMyCoupons(prev => [newCoupon, ...prev])
+
+      // Reset form
+      setNewCouponCode("")
+      setNewCouponName("")
+      setNewCouponDescription("")
+      setNewCouponDiscountType("percentage")
+      setNewCouponDiscountValue("")
+      setNewCouponMinPurchase("")
+      setNewCouponMaxDiscount("")
+      setNewCouponUsageLimit("")
+      setNewCouponStartDate(undefined)
+      setNewCouponEndDate(undefined)
+
+      toast({
+        title: "Éxito",
+        description: "Cupón creado correctamente.",
+      })
+    } catch (error) {
+      console.error("Error creating coupon:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo crear el cupón. Inténtalo de nuevo.",
+        variant: "destructive",
+      })
+    } finally {
+      setCreatingCoupon(false)
+    }
+  }
+
+  const handleToggleMyCouponActive = async (couponId: string, currentStatus: boolean) => {
+    try {
+      const couponRef = doc(db, "coupons", couponId)
+      await updateDoc(couponRef, { 
+        isActive: !currentStatus,
+        updatedAt: serverTimestamp()
+      })
+      setMyCoupons(prev => prev.map(coupon => 
+        coupon.id === couponId ? { ...coupon, isActive: !currentStatus } : coupon
+      ))
+      toast({
+        title: "Éxito",
+        description: `Cupón ${!currentStatus ? 'activado' : 'desactivado'} correctamente.`,
+      })
+    } catch (error) {
+      console.error("Error updating coupon status:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el estado del cupón.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteMyCoupon = async (couponId: string, couponName: string) => {
+    if (!window.confirm(`¿Estás seguro de que quieres eliminar el cupón "${couponName}"?`)) {
+      return
+    }
+    try {
+      await deleteDoc(doc(db, "coupons", couponId))
+      setMyCoupons(prev => prev.filter(coupon => coupon.id !== couponId))
+      toast({
+        title: "Éxito",
+        description: "Cupón eliminado correctamente.",
+      })
+    } catch (error) {
+      console.error("Error deleting coupon:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el cupón.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const fetchCategoriesAndBrands = async () => {
     try {
       const categoriesSnapshot = await getDocs(collection(db, "categories"))
@@ -1000,17 +1188,7 @@ export default function SellerDashboardPage() {
       const file = files[i]
 
       if (file.type.startsWith("image/")) {
-        // Validate image has white background
-        try {
-          const hasWhiteBg = await hasWhiteBackground(file)
-          if (!hasWhiteBg) {
-            errors.push(`${file.name}: La imagen debe tener fondo blanco`)
-            continue
-          }
-        } catch (err) {
-          errors.push(`${file.name}: Error al validar la imagen`)
-          continue
-        }
+        // Image validation removed - no longer requiring white background
       } else if (file.type.startsWith("video/")) {
         // Validate video file
         if (!isValidVideoFile(file)) {
@@ -1157,6 +1335,9 @@ export default function SellerDashboardPage() {
     setError(null)
     setSuccessMessage(null)
     setMediaValidationErrors([])
+    setProductCondition('nuevo')
+    setFreeShipping(false)
+    setShippingCost('')
   }
 
   const handleRemoveMedia = (index: number) => {
@@ -1183,6 +1364,9 @@ export default function SellerDashboardPage() {
     setCurrentProductMedia(product.media || [])
     setProductIsService(product.isService)
     setProductStock(product.stock?.toString() || "")
+    setProductCondition(product.condition || 'nuevo')
+    setFreeShipping(product.freeShipping || false)
+    setShippingCost(product.shippingCost ? product.shippingCost.toString() : '')
     setActiveTab("addProduct")
   }
 
@@ -1215,6 +1399,8 @@ export default function SellerDashboardPage() {
     if (!productCategory) errors.category = "La categoría es obligatoria"
     if (!productIsService && (!productStock || isNaN(Number(productStock)) || Number(productStock) < 0)) errors.stock = "El stock es obligatorio y debe ser 0 o mayor"
     if (mediaFiles.length === 0 && currentProductMedia.length === 0) errors.media = "Debes subir al menos una imagen o video"
+    if (!productCondition) errors.condition = "La condición es obligatoria"
+    if (!freeShipping && (!shippingCost || isNaN(Number(shippingCost)) || Number(shippingCost) < 0)) errors.shippingCost = "El costo de envío es obligatorio o selecciona envío gratis"
     return errors
   }
 
@@ -1272,6 +1458,9 @@ export default function SellerDashboardPage() {
         isService: productIsService,
         sellerId: currentUser.firebaseUser.uid,
         updatedAt: serverTimestamp(),
+        condition: productCondition,
+        freeShipping: freeShipping,
+        shippingCost: freeShipping ? 0 : Number.parseFloat(shippingCost || '0'),
       }
 
       // Solo agregar brand si tiene valor
@@ -1633,9 +1822,9 @@ export default function SellerDashboardPage() {
           sale.fechaCompra,
           sale.compraId,
           sale.items.map(item => `${item.productoNombre} x${item.cantidad}`).join('; '),
-          sale.subtotalVendedor.toFixed(2),
-          sale.comisionApp.toFixed(2),
-          sale.montoAPagar.toFixed(2),
+                  formatPriceNumber(sale.subtotalVendedor),
+        formatPriceNumber(sale.comisionApp),
+        formatPriceNumber(sale.montoAPagar),
           sale.estadoPago
         ])
       ].map(row => row.join(',')).join('\n')
@@ -1849,6 +2038,14 @@ export default function SellerDashboardPage() {
                 <Tag className="h-4 w-4" />
                 Cupones
               </Button>
+              <Button
+                variant={activeTab === "create-coupons" ? "secondary" : "ghost"}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
+                onClick={() => setActiveTab("create-coupons")}
+              >
+                <PlusCircle className="h-4 w-4" />
+                Crear Cupones
+              </Button>
 
               <Button
                 variant={activeTab === "profile" ? "secondary" : "ghost"}
@@ -1968,6 +2165,28 @@ export default function SellerDashboardPage() {
                   <MessageSquare className="mr-2 h-5 w-5" />
                   Mis Chats
                 </Button>
+                <Button
+                  variant={activeTab === "coupons" ? "secondary" : "ghost"}
+                  onClick={() => {
+                    setActiveTab("coupons")
+                    closeMobileMenu()
+                  }}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
+                >
+                  <Tag className="mr-2 h-5 w-5" />
+                  Cupones
+                </Button>
+                <Button
+                  variant={activeTab === "create-coupons" ? "secondary" : "ghost"}
+                  onClick={() => {
+                    setActiveTab("create-coupons")
+                    closeMobileMenu()
+                  }}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
+                >
+                  <PlusCircle className="mr-2 h-5 w-5" />
+                  Crear Cupones
+                </Button>
 
                 <Button
                   variant={activeTab === "profile" ? "secondary" : "ghost"}
@@ -2054,7 +2273,7 @@ export default function SellerDashboardPage() {
                     <ListFilter className="w-4 h-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">${totalProductsValue.toFixed(2)}</div>
+                    <div className="text-2xl font-bold">{formatPriceNumber(totalProductsValue)}</div>
                     <p className="text-xs text-muted-foreground">Estimación basada en stock y precio actual.</p>
                   </CardContent>
                 </Card>
@@ -2159,7 +2378,7 @@ export default function SellerDashboardPage() {
                                 </div>
                               </TableCell>
                               <TableCell className="font-medium">{prod.name}</TableCell>
-                              <TableCell>${prod.price.toFixed(2)}</TableCell>
+                              <TableCell>{formatPrice(prod.price)}</TableCell>
                               <TableCell>{prod.isService ? "Servicio" : "Producto"}</TableCell>
                               <TableCell className="text-center hidden md:table-cell">{prod.isService ? "N/A" : (prod.stock ?? 0)}</TableCell>
                               <TableCell className="space-x-1 hidden md:table-cell">
@@ -2234,7 +2453,7 @@ export default function SellerDashboardPage() {
                         <AlertTitle className="text-blue-800">Requisitos importantes:</AlertTitle>
                         <AlertDescription className="text-blue-700">
                           <ul className="list-disc list-inside space-y-1 mt-2">
-                              <li><strong>Imágenes:</strong> Deben tener fondo blanco obligatoriamente</li>
+                              <li><strong>Imágenes:</strong> Se recomienda usar imágenes de alta calidad con fondo blanco para mejores ventas</li>
                               <li><strong>Videos:</strong> Máximo 60 segundos y 50MB de tamaño</li>
                             <li>Formatos soportados: JPG, PNG, WebP para imágenes | MP4, WebM para videos</li>
                           </ul>
@@ -2422,6 +2641,50 @@ export default function SellerDashboardPage() {
                       </Select>
                     </div>
                   </div>
+                  <div>
+                    <Label htmlFor="productCondition" className="text-base">Condición</Label>
+                    <Select value={productCondition} onValueChange={v => setProductCondition(v as 'nuevo' | 'usado')} required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona condición" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="nuevo">Nuevo</SelectItem>
+                        <SelectItem value="usado">Usado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {productFormTouched && productFormErrors.condition && (
+                      <p className="text-xs text-red-600 mt-1">{productFormErrors.condition}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label className="text-base">Envío</Label>
+                    <div className="flex items-center gap-3 mb-2">
+                      <input
+                        type="checkbox"
+                        id="freeShipping"
+                        checked={freeShipping}
+                        onChange={e => setFreeShipping(e.target.checked)}
+                        className="mr-2"
+                      />
+                      <Label htmlFor="freeShipping" className="text-sm">Envío gratis</Label>
+                    </div>
+                    {!freeShipping && (
+                      <div>
+                        <Input
+                          id="shippingCost"
+                          type="number"
+                          step="0.01"
+                          value={shippingCost}
+                          onChange={e => setShippingCost(e.target.value)}
+                          placeholder="Costo de envío ($)"
+                          className={productFormTouched && productFormErrors.shippingCost ? 'border-red-500' : ''}
+                        />
+                        {productFormTouched && productFormErrors.shippingCost && (
+                          <p className="text-xs text-red-600 mt-1">{productFormErrors.shippingCost}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex gap-2 pt-4">
                       <Button type="submit" disabled={submittingProduct}>
                       {submittingProduct ? (
@@ -2505,7 +2768,7 @@ export default function SellerDashboardPage() {
                           <AlertDescription className="text-blue-700">
                             <ul className="list-disc list-inside space-y-1 mt-2">
                               <li>
-                                <strong>Imágenes:</strong> Deben tener fondo blanco obligatoriamente
+                                <strong>Imágenes:</strong> Se recomienda usar imágenes de alta calidad con fondo blanco para mejores ventas
                               </li>
                               <li>
                                 <strong>Videos:</strong> Máximo 60 segundos y 50MB de tamaño
@@ -2977,7 +3240,7 @@ export default function SellerDashboardPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      ${commissionDistribution?.totalEarned.toFixed(2) || '0.00'}
+                      {formatPriceNumber(commissionDistribution?.totalEarned || 0)}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Ingresos brutos de ventas
@@ -2991,7 +3254,7 @@ export default function SellerDashboardPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-yellow-600">
-                      ${commissionDistribution?.pendingAmount.toFixed(2) || '0.00'}
+                      {formatPriceNumber(commissionDistribution?.pendingAmount || 0)}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Cantidad por recibir
@@ -3005,7 +3268,7 @@ export default function SellerDashboardPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-green-600">
-                      ${commissionDistribution?.paidAmount.toFixed(2) || '0.00'}
+                      {formatPriceNumber(commissionDistribution?.paidAmount || 0)}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Pagos recibidos
@@ -3145,7 +3408,7 @@ export default function SellerDashboardPage() {
                           <TableCell>
                             {coupon.discountType === "percentage"
                               ? `${coupon.discountValue}%`
-                              : `$${coupon.discountValue.toFixed(2)}`}
+                              : formatPriceNumber(coupon.discountValue)}
                           </TableCell>
                           <TableCell>{coupon.applicableTo === "all" ? "Todos" : "Vendedores"}</TableCell>
                           <TableCell>
@@ -3185,7 +3448,7 @@ export default function SellerDashboardPage() {
                                   htmlFor={`product-${product.id}`}
                                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                                 >
-                                  {product.name} - ${product.price.toFixed(2)}
+                                  {product.name} - {formatPrice(product.price)}
                                 </label>
                               </div>
                             ))}
@@ -3292,6 +3555,251 @@ export default function SellerDashboardPage() {
                     </TableBody>
                   </Table>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Create Coupons Tab */}
+          {activeTab === "create-coupons" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Crear Cupones de Descuento</CardTitle>
+                <CardDescription>Crea tus propios cupones para promocionar tus productos y servicios.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Formulario para crear cupón */}
+                <div className="border rounded-lg p-6 bg-gray-50">
+                  <h3 className="text-lg font-semibold mb-4">Crear Nuevo Cupón</h3>
+                  <form onSubmit={(e) => { e.preventDefault(); handleCreateCoupon(); }} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="newCouponCode">Código del Cupón *</Label>
+                        <Input
+                          id="newCouponCode"
+                          value={newCouponCode}
+                          onChange={(e) => setNewCouponCode(e.target.value.toUpperCase())}
+                          placeholder="DESCUENTO20"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="newCouponName">Nombre del Cupón *</Label>
+                        <Input
+                          id="newCouponName"
+                          value={newCouponName}
+                          onChange={(e) => setNewCouponName(e.target.value)}
+                          placeholder="Descuento del 20%"
+                          required
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="newCouponDescription">Descripción (Opcional)</Label>
+                      <Textarea
+                        id="newCouponDescription"
+                        value={newCouponDescription}
+                        onChange={(e) => setNewCouponDescription(e.target.value)}
+                        placeholder="Descripción del cupón..."
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="newCouponDiscountType">Tipo de Descuento *</Label>
+                        <Select value={newCouponDiscountType} onValueChange={(value: "percentage" | "fixed") => setNewCouponDiscountType(value)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="percentage">Porcentaje (%)</SelectItem>
+                            <SelectItem value="fixed">Monto Fijo ($)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="newCouponDiscountValue">Valor del Descuento *</Label>
+                        <Input
+                          id="newCouponDiscountValue"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={newCouponDiscountValue}
+                          onChange={(e) => setNewCouponDiscountValue(e.target.value)}
+                          placeholder={newCouponDiscountType === "percentage" ? "20" : "10.00"}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="newCouponUsageLimit">Límite de Uso (Opcional)</Label>
+                        <Input
+                          id="newCouponUsageLimit"
+                          type="number"
+                          min="1"
+                          value={newCouponUsageLimit}
+                          onChange={(e) => setNewCouponUsageLimit(e.target.value)}
+                          placeholder="100"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="newCouponMinPurchase">Compra Mínima (Opcional)</Label>
+                        <Input
+                          id="newCouponMinPurchase"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={newCouponMinPurchase}
+                          onChange={(e) => setNewCouponMinPurchase(e.target.value)}
+                          placeholder="50.00"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="newCouponMaxDiscount">Descuento Máximo (Opcional)</Label>
+                        <Input
+                          id="newCouponMaxDiscount"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={newCouponMaxDiscount}
+                          onChange={(e) => setNewCouponMaxDiscount(e.target.value)}
+                          placeholder="100.00"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Fecha de Inicio (Opcional)</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant={"outline"}
+                              className={`w-full justify-start text-left font-normal ${!newCouponStartDate && "text-muted-foreground"}`}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {newCouponStartDate ? format(newCouponStartDate, "PPP") : <span className="text-gray-500">Selecciona una fecha</span>}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={newCouponStartDate}
+                              onSelect={setNewCouponStartDate}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Fecha de Fin (Opcional)</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant={"outline"}
+                              className={`w-full justify-start text-left font-normal ${!newCouponEndDate && "text-muted-foreground"}`}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {newCouponEndDate ? format(newCouponEndDate, "PPP") : <span className="text-gray-500">Selecciona una fecha</span>}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={newCouponEndDate}
+                              onSelect={setNewCouponEndDate}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+
+                    <Button 
+                      type="submit" 
+                      disabled={creatingCoupon || !newCouponCode.trim() || !newCouponName.trim() || !newCouponDiscountValue}
+                      className="w-full md:w-auto"
+                    >
+                      {creatingCoupon ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creando Cupón...
+                        </>
+                      ) : (
+                        "Crear Cupón"
+                      )}
+                    </Button>
+                  </form>
+                </div>
+
+                {/* Lista de cupones creados */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Mis Cupones Creados</h3>
+                  {myCoupons.length === 0 ? (
+                    <p className="text-gray-500">Aún no has creado ningún cupón.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Código</TableHead>
+                          <TableHead>Nombre</TableHead>
+                          <TableHead>Descuento</TableHead>
+                          <TableHead>Usos</TableHead>
+                          <TableHead>Estado</TableHead>
+                          <TableHead>Acciones</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {myCoupons.map((coupon) => (
+                          <TableRow key={coupon.id}>
+                            <TableCell className="font-mono font-bold">{coupon.code}</TableCell>
+                            <TableCell>
+                              <div className="font-medium">{coupon.name}</div>
+                              {coupon.description && <div className="text-xs text-gray-500">{coupon.description}</div>}
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium">
+                                {coupon.discountType === "percentage" ? `${coupon.discountValue}%` : formatPrice(coupon.discountValue)}
+                              </div>
+                              {coupon.minPurchase && <div className="text-xs text-gray-500">Mín: {formatPrice(coupon.minPurchase)}</div>}
+                              {coupon.maxDiscount && <div className="text-xs text-gray-500">Máx: {formatPrice(coupon.maxDiscount)}</div>}
+                            </TableCell>
+                            <TableCell>
+                              <div>{coupon.usedCount || 0} usos</div>
+                              {coupon.usageLimit && <div className="text-xs text-gray-500">de {coupon.usageLimit}</div>}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={coupon.isActive ? "default" : "secondary"}>
+                                {coupon.isActive ? "Activo" : "Inactivo"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleToggleMyCouponActive(coupon.id, coupon.isActive)}
+                                >
+                                  {coupon.isActive ? "Desactivar" : "Activar"}
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleDeleteMyCoupon(coupon.id, coupon.name)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
               </CardContent>
             </Card>
           )}

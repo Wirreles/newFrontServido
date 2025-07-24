@@ -34,6 +34,9 @@ export interface CartItem {
   sellerId: string
   stock?: number
   appliedCoupon?: Coupon | null // Details of the applied coupon
+  condition?: 'nuevo' | 'usado'
+  freeShipping?: boolean
+  shippingCost?: number
 }
 
 interface CartState {

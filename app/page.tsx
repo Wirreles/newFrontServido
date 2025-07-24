@@ -13,6 +13,7 @@ import { collection, getDocs, limit, query, orderBy, where, documentId } from "f
 import { useAuth } from "@/contexts/auth-context"
 import { Facebook, Instagram, AlertCircle } from "lucide-react"
 import { Dialog } from "@/components/ui/dialog"
+import { formatPrice } from "@/lib/utils"
 
 interface Product {
   id: string
@@ -23,6 +24,9 @@ interface Product {
   category?: string
   description?: string
   media?: { url: string; type: string }[] // Added media property
+  condition?: 'nuevo' | 'usado' // Added condition property
+  freeShipping?: boolean // Added freeShipping property
+  shippingCost?: number // Added shippingCost property
 }
 
 interface CategoryItem {
@@ -213,7 +217,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Sliding Categories - Circular Style */}
+      {/* Categories Carousel */}
       <section className="py-8">
         <div className="container mx-auto px-4 md:px-6">
           <div className="flex justify-between items-center mb-6">
@@ -227,28 +231,31 @@ export default function HomePage() {
           ) : categories.length === 0 ? (
             <p className="text-gray-500">No hay categorías disponibles.</p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
-              {categories.map((category) => (
-                <Link
-                  key={category.id}
-                  href={`/category/${category.id}`}
-                  className="flex flex-col items-center transition-all duration-200 ease-in-out hover:scale-105"
-                >
-                  <div className="relative w-24 h-24 mb-3 rounded-full overflow-hidden bg-white shadow-md hover:shadow-lg flex items-center justify-center">
-                    <Image
-                      src={
-                        category.imageUrl ||
-                        `/placeholder.svg?height=96&width=96&query=${category.iconQuery || category.name + " icon"}`
-                      }
-                      alt={category.name}
-                      fill
-                      className="object-contain p-3"
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-center text-gray-700">{category.name}</span>
-                </Link>
-              ))}
-            </div>
+            <Carousel opts={{ align: "start", dragFree: true }} className="w-full">
+              <CarouselContent className="-ml-4">
+                {categories.map((category) => (
+                  <CarouselItem key={category.id} className="pl-4 basis-[120px] sm:basis-[140px] md:basis-[160px]">
+                    <Link
+                      href={`/category/${category.id}`}
+                      className="flex flex-col items-center transition-all duration-200 ease-in-out hover:scale-105"
+                    >
+                      <div className="relative w-20 h-20 sm:w-24 sm:h-24 mb-3 rounded-full overflow-hidden bg-white shadow-md hover:shadow-lg flex items-center justify-center">
+                        <Image
+                          src={
+                            category.imageUrl ||
+                            `/placeholder.svg?height=96&width=96&query=${category.iconQuery || category.name + " icon"}`
+                          }
+                          alt={category.name}
+                          fill
+                          className="object-contain p-3"
+                        />
+                      </div>
+                      <span className="text-xs sm:text-sm font-medium text-center text-gray-700 leading-tight">{category.name}</span>
+                    </Link>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+            </Carousel>
           )}
         </div>
       </section>
@@ -331,8 +338,19 @@ export default function HomePage() {
                         </div>
                         <CardContent className="p-3 flex flex-col flex-grow">
                           <h3 className="text-sm font-medium mb-1 truncate h-10 leading-tight">{product.name}</h3>
-                          <p className="text-lg font-semibold text-blue-600 mb-2">${product.price.toFixed(2)}</p>
-                          <span className="text-xs text-green-600">Envío gratis</span>
+                          <p className="text-lg font-semibold text-blue-600 mb-2">{formatPrice(product.price)}</p>
+                          {/* Condición */}
+                          {product.condition && (
+                            <span className="text-xs font-medium text-gray-700 mb-1">
+                              {product.condition === 'nuevo' ? 'Nuevo' : 'Usado'}
+                            </span>
+                          )}
+                          {/* Envío */}
+                          {product.freeShipping ? (
+                            <span className="text-xs text-green-600">Envío gratis</span>
+                          ) : (
+                            <span className="text-xs text-gray-600">Envío: {product.shippingCost !== undefined ? formatPrice(product.shippingCost) : '-'}</span>
+                          )}
                         </CardContent>
                       </Card>
                     </Link>
@@ -373,8 +391,19 @@ export default function HomePage() {
                         </div>
                         <CardContent className="p-3 flex flex-col flex-grow">
                           <h3 className="text-sm font-medium mb-1 truncate h-10 leading-tight">{product.name}</h3>
-                          <p className="text-lg font-semibold text-blue-600 mb-2">${product.price.toFixed(2)}</p>
-                          <span className="text-xs text-green-600">Envío gratis</span>
+                          <p className="text-lg font-semibold text-blue-600 mb-2">{formatPrice(product.price)}</p>
+                          {/* Condición */}
+                          {product.condition && (
+                            <span className="text-xs font-medium text-gray-700 mb-1">
+                              {product.condition === 'nuevo' ? 'Nuevo' : 'Usado'}
+                            </span>
+                          )}
+                          {/* Envío */}
+                          {product.freeShipping ? (
+                            <span className="text-xs text-green-600">Envío gratis</span>
+                          ) : (
+                            <span className="text-xs text-gray-600">Envío: {product.shippingCost !== undefined ? formatPrice(product.shippingCost) : '-'}</span>
+                          )}
                         </CardContent>
                       </Card>
                     </Link>
@@ -411,7 +440,7 @@ export default function HomePage() {
                         </div>
                         <CardContent className="p-3 flex flex-col flex-grow">
                           <h3 className="text-sm font-medium mb-1 truncate h-10 leading-tight">{product.name}</h3>
-                          <p className="text-lg font-semibold text-blue-600 mb-2">${product.price.toFixed(2)}</p>
+                          <p className="text-lg font-semibold text-blue-600 mb-2">{formatPrice(product.price)}</p>
                           <span className="text-xs text-green-600">Envío gratis</span>
                         </CardContent>
                       </Card>

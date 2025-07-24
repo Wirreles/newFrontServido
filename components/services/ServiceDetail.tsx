@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { formatPrice } from "@/lib/utils"
 
 // Props extendidos para lógica de favoritos, compartir, reseñas y preguntas
 interface ServiceDetailProps {
@@ -184,7 +185,7 @@ const ServiceDetail: React.FC<ServiceDetailProps> = ({
       </div>
       <p className="text-gray-700 text-base whitespace-pre-line border-l-2 border-blue-200 pl-3">{service.description}</p>
       <div className="text-lg font-semibold text-blue-700">
-        {service.price ? `$${service.price.toFixed(2)}` : "Precio a convenir"}
+        {service.price ? formatPrice(service.price) : "Precio a convenir"}
       </div>
       <div className="flex flex-col gap-2 mt-2">
         <Button onClick={onContactSeller} className="w-full flex items-center gap-2">

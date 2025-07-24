@@ -7,8 +7,19 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    unoptimized: true,
+    unoptimized: false, // Vercel optimiza las imágenes automáticamente
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+        port: '',
+        pathname: '/v0/b/**',
+      },
+    ],
   },
+  // Configuración optimizada para Vercel
+  trailingSlash: false, // Vercel maneja esto automáticamente
+  // Mantener rewrites para la API de MercadoPago
   async rewrites() {
     return [
       {

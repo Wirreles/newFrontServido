@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { db } from "@/lib/firebase"
 import { collection, getDocs, query, where, orderBy, limit } from "firebase/firestore"
 import { getSearchResultImage } from "@/lib/image-utils"
+import { formatPrice } from "@/lib/utils"
 
 interface Product {
   id: string
@@ -177,7 +178,7 @@ export default function SearchPage() {
                   <CardContent className={`p-4 ${viewMode === 'list' ? 'flex items-center gap-4' : ''}`}>
                     <div className="flex-1">
                       <h3 className="font-semibold text-lg mb-2 line-clamp-2">{product.name}</h3>
-                      <p className="text-2xl font-bold text-purple-600 mb-2">${product.price.toFixed(2)}</p>
+                      <p className="text-2xl font-bold text-purple-600 mb-2">{formatPrice(product.price)}</p>
                       {product.category && (
                         <p className="text-sm text-gray-500 mb-2">{product.category}</p>
                       )}

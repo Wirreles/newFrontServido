@@ -49,6 +49,7 @@ import {
 import { useCart } from "@/contexts/cart-context"
 import { useAuth } from "@/contexts/auth-context"
 import ServiceDetail from "@/components/services/ServiceDetail"
+import { formatPrice, formatPriceNumber } from "@/lib/utils"
 
 interface ProductMedia {
   type: "image" | "video"
@@ -74,6 +75,9 @@ interface Product {
   couponId?: string | null
   couponStartDate?: any | null
   couponEndDate?: any | null
+  condition?: 'nuevo' | 'usado' | null;
+  freeShipping?: boolean;
+  shippingCost?: number;
 }
 
 interface Category {
@@ -807,12 +811,12 @@ export default function ProductDetailPage() {
             <div className="space-y-4">
               <div>
                 <span className="text-2xl sm:text-3xl lg:text-4xl font-bold text-blue-600 break-all">
-                  ${finalPrice.toFixed(2)}
+                  {formatPrice(finalPrice)}
                 </span>
                 {appliedCoupon && product && finalPrice < product.price && (
                   <>
                     <span className="text-lg sm:text-xl lg:text-2xl text-gray-400 line-through ml-2">
-                      ${product.price.toFixed(2)}
+                      {formatPrice(product.price)}
                     </span>
                     <Badge className="bg-green-500 text-white ml-2">
                       Cupón Aplicado:
@@ -825,6 +829,30 @@ export default function ProductDetailPage() {
                 <span className="text-sm sm:text-base lg:text-lg text-gray-500 ml-1 sm:ml-2">
                   {product.isService ? "por servicio" : ""}
                 </span>
+              </div>
+
+              {/* Condición y Envío */}
+              <div className="flex flex-col gap-1 text-sm">
+                {product.condition && (
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-700">Condición:</span>
+                    <span className="px-2 py-1 rounded bg-gray-100 text-gray-800 text-xs font-semibold">
+                      {product.condition === 'nuevo' ? 'Nuevo' : 'Usado'}
+                    </span>
+                  </div>
+                )}
+                {product.freeShipping ? (
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-green-600" />
+                    <span className="text-green-700 font-medium">Envío gratis</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-700">Envío: </span>
+                    <span className="font-medium">{product.shippingCost !== undefined ? formatPrice(product.shippingCost) : '-'}</span>
+                  </div>
+                )}
               </div>
 
               {!product.isService && (
@@ -899,22 +927,37 @@ export default function ProductDetailPage() {
                         <Store className="h-5 w-5 text-gray-600" />
                       </div>
                       <div>
-                        <p className="font-medium">Vendido por {seller.name}</p>
+                        <Link href={`/seller/${seller.id}`} className="hover:text-orange-600 transition-colors">
+                          <p className="font-medium">Vendido por {seller.name}</p>
+                        </Link>
                         <p className="text-sm text-gray-600">Vendedor verificado</p>
                       </div>
                     </div>
-                    {currentUser?.firebaseUser.uid !== seller.id && (
-                      <Button
-                        onClick={handleContactSeller}
-                        variant="outline"
-                        size="sm"
-                        className="text-xs sm:text-sm whitespace-nowrap"
-                      >
-                        <MessageSquare className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                        <span className="hidden sm:inline">Contactar Vendedor</span>
-                        <span className="sm:hidden">Contactar</span>
-                      </Button>
-                    )}
+                    <div className="flex gap-2">
+                      <Link href={`/seller/${seller.id}`}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs sm:text-sm whitespace-nowrap"
+                        >
+                          <Store className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                          <span className="hidden sm:inline">Ver Tienda</span>
+                          <span className="sm:hidden">Tienda</span>
+                        </Button>
+                      </Link>
+                      {currentUser?.firebaseUser.uid !== seller.id && (
+                        <Button
+                          onClick={handleContactSeller}
+                          variant="outline"
+                          size="sm"
+                          className="text-xs sm:text-sm whitespace-nowrap"
+                        >
+                          <MessageSquare className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                          <span className="hidden sm:inline">Contactar Vendedor</span>
+                          <span className="sm:hidden">Contactar</span>
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -1204,7 +1247,7 @@ export default function ProductDetailPage() {
                       </div>
                       <CardContent className="p-3">
                         <h3 className="text-sm font-medium truncate mb-1">{relatedProduct.name}</h3>
-                        <p className="text-lg font-bold text-blue-600">${relatedProduct.price.toFixed(2)}</p>
+                        <p className="text-lg font-bold text-blue-600">{formatPrice(relatedProduct.price)}</p>
                       </CardContent>
                     </Card>
                   </Link>

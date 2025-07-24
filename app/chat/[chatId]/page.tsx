@@ -139,9 +139,54 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
+  // Función para detectar números de teléfono en el texto
+  const containsPhoneNumber = (text: string): boolean => {
+    // Patrones para detectar números de teléfono argentinos y internacionales
+    const phonePatterns = [
+      // Números argentinos: +54 9 11 1234-5678, 11 1234-5678, 011 1234-5678
+      /(\+54\s*9?\s*\d{1,2}\s*\d{4}\s*-?\s*\d{4})/g,
+      // Números con espacios y guiones: 11 1234-5678, 011-1234-5678
+      /(\d{1,4}\s*-?\s*\d{1,4}\s*-?\s*\d{1,4})/g,
+      // Números consecutivos de 7-15 dígitos (números internacionales)
+      /(\d{7,15})/g,
+      // Números con paréntesis: (11) 1234-5678
+      /(\(\d{1,4}\)\s*\d{1,4}\s*-?\s*\d{1,4})/g
+    ]
+    
+    return phonePatterns.some(pattern => pattern.test(text))
+  }
+
+  // Función para censurar números de teléfono en el texto mostrado
+  const censorPhoneNumbers = (text: string): string => {
+    // Patrones para detectar y reemplazar números de teléfono
+    const phonePatterns = [
+      // Números argentinos: +54 9 11 1234-5678, 11 1234-5678, 011 1234-5678
+      /(\+54\s*9?\s*\d{1,2}\s*\d{4}\s*-?\s*\d{4})/g,
+      // Números con espacios y guiones: 11 1234-5678, 011-1234-5678
+      /(\d{1,4}\s*-?\s*\d{1,4}\s*-?\s*\d{1,4})/g,
+      // Números consecutivos de 7-15 dígitos (números internacionales)
+      /(\d{7,15})/g,
+      // Números con paréntesis: (11) 1234-5678
+      /(\(\d{1,4}\)\s*\d{1,4}\s*-?\s*\d{1,4})/g
+    ]
+    
+    let censoredText = text
+    phonePatterns.forEach(pattern => {
+      censoredText = censoredText.replace(pattern, '***NÚMERO BLOQUEADO***')
+    })
+    
+    return censoredText
+  }
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newMessage.trim() || !currentUser || !chat) return
+
+    // Verificar si el mensaje contiene números de teléfono
+    if (containsPhoneNumber(newMessage.trim())) {
+      setError("No se permiten números de teléfono en los mensajes por seguridad.")
+      return
+    }
 
     setSending(true)
     setError(null)
@@ -248,7 +293,7 @@ export default function ChatPage() {
               <p className="text-xs font-semibold mb-1">
                 {message.senderId === currentUser?.firebaseUser.uid ? "Tú" : message.senderName}
               </p>
-              <p className="text-sm">{message.text}</p>
+              <p className="text-sm">{censorPhoneNumbers(message.text)}</p>
               <p className="text-xs text-right mt-1 opacity-75">
                 {message.timestamp?.toDate
                   ? message.timestamp.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -262,15 +307,25 @@ export default function ChatPage() {
 
       {/* Message Input */}
       <form onSubmit={handleSendMessage} className="p-4 border-t bg-white flex items-center gap-2">
-        <Input
-          type="text"
-          placeholder="Escribe un mensaje..."
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          className="flex-1"
-          disabled={sending}
-        />
-        <Button type="submit" disabled={sending || !newMessage.trim()}>
+        <div className="flex-1 relative">
+          <Input
+            type="text"
+            placeholder="Escribe un mensaje..."
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            className={`flex-1 ${containsPhoneNumber(newMessage) ? 'border-red-500 focus:border-red-500' : ''}`}
+            disabled={sending}
+          />
+          {containsPhoneNumber(newMessage) && (
+            <div className="absolute -top-8 left-0 text-xs text-red-500 bg-red-50 px-2 py-1 rounded">
+              No se permiten números de teléfono
+            </div>
+          )}
+        </div>
+        <Button 
+          type="submit" 
+          disabled={sending || !newMessage.trim() || containsPhoneNumber(newMessage)}
+        >
           {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-5 w-5" />}
           <span className="sr-only">Enviar</span>
         </Button>

@@ -93,6 +93,7 @@ import {
 import * as XLSX from "xlsx"
 import { useToast } from "@/components/ui/use-toast"
 import { getDashboardProductImage } from "@/lib/image-utils"
+import { formatPrice, formatPriceNumber } from "@/lib/utils"
 
 interface UserData {
   id: string
@@ -239,12 +240,27 @@ export default function AdminDashboard() {
   const [newCategoryImageFile, setNewCategoryImageFile] = useState<File | null>(null)
   const [newCategoryImagePreviewUrl, setNewCategoryImagePreviewUrl] = useState<string | null>(null)
   const [uploadingCategoryImage, setUploadingCategoryImage] = useState(false)
+  
+  // Category Edit State
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const [editCategoryName, setEditCategoryName] = useState("")
+  const [editCategoryDescription, setEditCategoryDescription] = useState("")
+  const [editCategoryImageFile, setEditCategoryImageFile] = useState<File | null>(null)
+  const [editCategoryImagePreviewUrl, setEditCategoryImagePreviewUrl] = useState<string | null>(null)
+  const [uploadingEditCategoryImage, setUploadingEditCategoryImage] = useState(false)
 
   // Brand Form State
   const [newBrandName, setNewBrandName] = useState("")
   const [newBrandImageFile, setNewBrandImageFile] = useState<File | null>(null)
   const [newBrandImagePreviewUrl, setNewBrandImagePreviewUrl] = useState<string | null>(null)
   const [uploadingBrandImage, setUploadingBrandImage] = useState(false)
+  
+  // Brand Edit State
+  const [editingBrand, setEditingBrand] = useState<Brand | null>(null)
+  const [editBrandName, setEditBrandName] = useState("")
+  const [editBrandImageFile, setEditBrandImageFile] = useState<File | null>(null)
+  const [editBrandImagePreviewUrl, setEditBrandImagePreviewUrl] = useState<string | null>(null)
+  const [uploadingEditBrandImage, setUploadingEditBrandImage] = useState(false)
 
   const [loading, setLoading] = useState(true)
   const [addingCategory, setAddingCategory] = useState(false)
@@ -743,7 +759,7 @@ export default function AdminDashboard() {
         userId: vendedorId,
         type: "payment_completed",
         title: "Pago Procesado",
-        description: `Se ha procesado tu pago de $${paymentMarkingModal.monto.toFixed(2)} por ${paymentMethod === 'bank_transfer' ? 'transferencia bancaria' : paymentMethod === 'mercadopago' ? 'MercadoPago' : 'efectivo'}`,
+        description: `Se ha procesado tu pago de ${formatPriceNumber(paymentMarkingModal.monto)} por ${paymentMethod === 'bank_transfer' ? 'transferencia bancaria' : paymentMethod === 'mercadopago' ? 'MercadoPago' : 'efectivo'}`,
         compraId,
         monto: paymentMarkingModal.monto,
         metodoPago: paymentMethod,
@@ -1073,6 +1089,214 @@ export default function AdminDashboard() {
       console.error("Error deleting brand:", err)
       setError(`Error al eliminar la marca "${brandName}".`)
     }
+  }
+
+  // Category Edit Functions
+  const handleEditCategory = (category: Category) => {
+    setEditingCategory(category)
+    setEditCategoryName(category.name)
+    setEditCategoryDescription(category.description || "")
+    setEditCategoryImagePreviewUrl(category.imageUrl || null)
+    setEditCategoryImageFile(null)
+  }
+
+  const handleEditCategoryImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setEditCategoryImageFile(file)
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setEditCategoryImagePreviewUrl(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleRemoveEditCategoryImage = () => {
+    setEditCategoryImageFile(null)
+    setEditCategoryImagePreviewUrl(null)
+  }
+
+  const handleSaveCategoryEdit = async () => {
+    if (!editingCategory || !editCategoryName.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre de la categoría es requerido.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setUploadingEditCategoryImage(true)
+      let imageUrl = editingCategory.imageUrl
+      let imagePath = editingCategory.imagePath
+
+      // Upload new image if selected
+      if (editCategoryImageFile) {
+        // Delete old image if it exists
+        if (editingCategory.imagePath) {
+          try {
+            const oldImageRef = ref(storage, editingCategory.imagePath)
+            await deleteObject(oldImageRef)
+          } catch (error) {
+            console.error("Error deleting old category image:", error)
+          }
+        }
+
+        // Upload new image
+        const { downloadURL, filePath } = await uploadImageToStorage(
+          editCategoryImageFile,
+          "categories"
+        )
+        imageUrl = downloadURL
+        imagePath = filePath
+      }
+
+      // Update category in Firestore
+      const categoryRef = doc(db, "categories", editingCategory.id)
+      await updateDoc(categoryRef, {
+        name: editCategoryName.trim(),
+        description: editCategoryDescription.trim() || null,
+        imageUrl: imageUrl || null,
+        imagePath: imagePath || null,
+        updatedAt: serverTimestamp(),
+      })
+
+      toast({
+        title: "Categoría actualizada",
+        description: `La categoría "${editCategoryName}" ha sido actualizada exitosamente.`,
+      })
+
+      // Reset edit state
+      setEditingCategory(null)
+      setEditCategoryName("")
+      setEditCategoryDescription("")
+      setEditCategoryImageFile(null)
+      setEditCategoryImagePreviewUrl(null)
+      setUploadingEditCategoryImage(false)
+
+      fetchAdminData()
+    } catch (error) {
+      console.error("Error updating category:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la categoría. Por favor, inténtalo de nuevo.",
+        variant: "destructive",
+      })
+      setUploadingEditCategoryImage(false)
+    }
+  }
+
+  const handleCancelCategoryEdit = () => {
+    setEditingCategory(null)
+    setEditCategoryName("")
+    setEditCategoryDescription("")
+    setEditCategoryImageFile(null)
+    setEditCategoryImagePreviewUrl(null)
+    setUploadingEditCategoryImage(false)
+  }
+
+  // Brand Edit Functions
+  const handleEditBrand = (brand: Brand) => {
+    setEditingBrand(brand)
+    setEditBrandName(brand.name)
+    setEditBrandImagePreviewUrl(brand.imageUrl || null)
+    setEditBrandImageFile(null)
+  }
+
+  const handleEditBrandImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setEditBrandImageFile(file)
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setEditBrandImagePreviewUrl(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleRemoveEditBrandImage = () => {
+    setEditBrandImageFile(null)
+    setEditBrandImagePreviewUrl(null)
+  }
+
+  const handleSaveBrandEdit = async () => {
+    if (!editingBrand || !editBrandName.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre de la marca es requerido.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setUploadingEditBrandImage(true)
+      let imageUrl = editingBrand.imageUrl
+      let imagePath = editingBrand.imagePath
+
+      // Upload new image if selected
+      if (editBrandImageFile) {
+        // Delete old image if it exists
+        if (editingBrand.imagePath) {
+          try {
+            const oldImageRef = ref(storage, editingBrand.imagePath)
+            await deleteObject(oldImageRef)
+          } catch (error) {
+            console.error("Error deleting old brand image:", error)
+          }
+        }
+
+        // Upload new image
+        const { downloadURL, filePath } = await uploadImageToStorage(
+          editBrandImageFile,
+          "brands"
+        )
+        imageUrl = downloadURL
+        imagePath = filePath
+      }
+
+      // Update brand in Firestore
+      const brandRef = doc(db, "brands", editingBrand.id)
+      await updateDoc(brandRef, {
+        name: editBrandName.trim(),
+        imageUrl: imageUrl || null,
+        imagePath: imagePath || null,
+        updatedAt: serverTimestamp(),
+      })
+
+      toast({
+        title: "Marca actualizada",
+        description: `La marca "${editBrandName}" ha sido actualizada exitosamente.`,
+      })
+
+      // Reset edit state
+      setEditingBrand(null)
+      setEditBrandName("")
+      setEditBrandImageFile(null)
+      setEditBrandImagePreviewUrl(null)
+      setUploadingEditBrandImage(false)
+
+      fetchAdminData()
+    } catch (error) {
+      console.error("Error updating brand:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la marca. Por favor, inténtalo de nuevo.",
+        variant: "destructive",
+      })
+      setUploadingEditBrandImage(false)
+    }
+  }
+
+  const handleCancelBrandEdit = () => {
+    setEditingBrand(null)
+    setEditBrandName("")
+    setEditBrandImageFile(null)
+    setEditBrandImagePreviewUrl(null)
+    setUploadingEditBrandImage(false)
   }
 
   const handleToggleUserActive = async (userId: string, currentStatus: boolean) => {
@@ -1825,9 +2049,9 @@ export default function AdminDashboard() {
                       <TrendingUp className="w-4 h-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                      <div className="text-2xl font-bold">${salesSummary.totalVentas.toFixed(2)}</div>
+                      <div className="text-2xl font-bold">{formatPriceNumber(salesSummary.totalVentas)}</div>
                       <p className="text-xs text-muted-foreground">
-                        ${salesSummary.totalComisiones.toFixed(2)} en comisiones
+                        {formatPriceNumber(salesSummary.totalComisiones)} en comisiones
                       </p>
                   </CardContent>
                 </Card>
@@ -1948,11 +2172,11 @@ export default function AdminDashboard() {
                                 </div>
                                 <div>
                                   <div className="font-medium">{vendedor.vendedorNombre}</div>
-                                  <div className="text-sm text-gray-500">${vendedor.totalVentas.toFixed(2)} en ventas</div>
+                                  <div className="text-sm text-gray-500">{formatPriceNumber(vendedor.totalVentas)} en ventas</div>
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className="font-semibold text-green-600">${vendedor.totalComisiones.toFixed(2)}</div>
+                                <div className="font-semibold text-green-600">{formatPriceNumber(vendedor.totalComisiones)}</div>
                                 <div className="text-sm text-gray-500">comisiones</div>
                               </div>
                             </div>
@@ -2215,20 +2439,119 @@ export default function AdminDashboard() {
                             <TableCell className="p-1 md:p-2 font-medium">{cat.name}</TableCell>
                             <TableCell className="hidden md:table-cell p-1 md:p-2 text-sm text-muted-foreground truncate max-w-xs">{cat.description || "-"}</TableCell>
                             <TableCell className="p-1 md:p-2">
-                              <Button
-                                variant="destructive"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => handleDeleteCategory(cat.id, cat.name, cat.imagePath)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => handleEditCategory(cat)}
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => handleDeleteCategory(cat.id, cat.name, cat.imagePath)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   </div>
+
+                  {/* Category Edit Form */}
+                  {editingCategory && (
+                    <div className="mt-6 p-4 border rounded-lg bg-gray-50 space-y-3">
+                      <h3 className="text-lg font-medium">Editar Categoría: {editingCategory.name}</h3>
+                      <div>
+                        <Label htmlFor="editCategoryName">Nombre de Categoría</Label>
+                        <Input
+                          id="editCategoryName"
+                          value={editCategoryName}
+                          onChange={(e) => setEditCategoryName(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="editCategoryDescription">Descripción (Opcional)</Label>
+                        <Textarea
+                          id="editCategoryDescription"
+                          value={editCategoryDescription}
+                          onChange={(e) => setEditCategoryDescription(e.target.value)}
+                          placeholder="Breve descripción de la categoría..."
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="editCategoryImage">Imagen de Categoría (Opcional)</Label>
+                        <div className="mt-2 flex flex-col items-center gap-2 p-4 border-2 border-dashed rounded-lg">
+                          <div className="w-24 h-24 relative flex items-center justify-center bg-gray-100 rounded-md overflow-hidden">
+                            {editCategoryImagePreviewUrl ? (
+                              <Image
+                                src={editCategoryImagePreviewUrl}
+                                alt="Vista previa de categoría"
+                                layout="fill"
+                                objectFit="contain"
+                              />
+                            ) : (
+                              <ImageIcon className="h-12 w-12 text-gray-400" />
+                            )}
+                          </div>
+                          <Input
+                            id="editCategoryImage"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleEditCategoryImageChange}
+                            className="block w-full text-sm text-slate-500
+                              file:mr-4 file:py-2 file:px-4
+                              file:rounded-md file:border-0
+                              file:text-sm file:font-semibold
+                              file:bg-purple-50 file:text-purple-700
+                              hover:file:bg-purple-100 cursor-pointer"
+                          />
+                          {editCategoryImagePreviewUrl && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleRemoveEditCategoryImage}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <XCircle className="mr-1 h-4 w-4" /> Quitar Imagen
+                            </Button>
+                          )}
+                        </div>
+                        {uploadingEditCategoryImage && (
+                          <p className="text-sm text-purple-600 mt-2 flex items-center">
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Subiendo imagen...
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          onClick={handleSaveCategoryEdit} 
+                          disabled={uploadingEditCategoryImage}
+                        >
+                          {uploadingEditCategoryImage ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                          )}
+                          Guardar Cambios
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          onClick={handleCancelCategoryEdit}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -2344,20 +2667,110 @@ export default function AdminDashboard() {
                             </TableCell>
                             <TableCell className="font-medium">{brand.name}</TableCell>
                             <TableCell>
-                              <Button
-                                variant="destructive"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => handleDeleteBrand(brand.id, brand.name, brand.imagePath)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => handleEditBrand(brand)}
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => handleDeleteBrand(brand.id, brand.name, brand.imagePath)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   </div>
+
+                  {/* Brand Edit Form */}
+                  {editingBrand && (
+                    <div className="mt-6 p-4 border rounded-lg bg-gray-50 space-y-3">
+                      <h3 className="text-lg font-medium">Editar Marca: {editingBrand.name}</h3>
+                      <div>
+                        <Label htmlFor="editBrandName">Nombre de Marca</Label>
+                        <Input
+                          id="editBrandName"
+                          value={editBrandName}
+                          onChange={(e) => setEditBrandName(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="editBrandImage">Logo de Marca (Opcional)</Label>
+                        <div className="mt-2 flex flex-col items-center gap-2 p-4 border-2 border-dashed rounded-lg">
+                          <div className="w-24 h-24 relative flex items-center justify-center bg-gray-100 rounded-md overflow-hidden">
+                            {editBrandImagePreviewUrl ? (
+                              <Image
+                                src={editBrandImagePreviewUrl}
+                                alt="Vista previa de marca"
+                                layout="fill"
+                                objectFit="contain"
+                              />
+                            ) : (
+                              <ImageIcon className="h-12 w-12 text-gray-400" />
+                            )}
+                          </div>
+                          <Input
+                            id="editBrandImage"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleEditBrandImageChange}
+                            className="block w-full text-sm text-slate-500
+                              file:mr-4 file:py-2 file:px-4
+                              file:rounded-md file:border-0
+                              file:text-sm file:font-semibold
+                              file:bg-purple-50 file:text-purple-700
+                              hover:file:bg-purple-100 cursor-pointer"
+                          />
+                          {editBrandImagePreviewUrl && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleRemoveEditBrandImage}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <XCircle className="mr-1 h-4 w-4" /> Quitar Imagen
+                            </Button>
+                          )}
+                        </div>
+                        {uploadingEditBrandImage && (
+                          <p className="text-sm text-purple-600 mt-2 flex items-center">
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Subiendo imagen...
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          onClick={handleSaveBrandEdit} 
+                          disabled={uploadingEditBrandImage}
+                        >
+                          {uploadingEditBrandImage ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                          )}
+                          Guardar Cambios
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          onClick={handleCancelBrandEdit}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -2488,7 +2901,7 @@ export default function AdminDashboard() {
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell className="p-1 md:p-2 whitespace-nowrap align-middle">${product.price.toFixed(2)}</TableCell>
+                              <TableCell className="p-1 md:p-2 whitespace-nowrap align-middle">{formatPrice(product.price)}</TableCell>
                               <TableCell className="p-1 md:p-2 max-w-[70px] xs:max-w-[90px] align-middle">
                                 <div className="flex items-center gap-1 xs:gap-2 md:gap-2 min-w-0">
                                   <Avatar className="h-4 w-4 xs:h-5 xs:w-5 md:h-8 md:w-8 flex-shrink-0">
@@ -2549,7 +2962,7 @@ export default function AdminDashboard() {
                       <TrendingUp className="w-4 h-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent className="p-2 sm:p-4 md:p-6">
-                      <div className="text-xl xs:text-2xl font-bold">${salesSummary.totalVentas.toFixed(2)}</div>
+                      <div className="text-xl xs:text-2xl font-bold">{formatPriceNumber(salesSummary.totalVentas)}</div>
                       <p className="text-xs text-muted-foreground">Valor bruto de todas las ventas</p>
                     </CardContent>
                   </Card>
@@ -2559,7 +2972,7 @@ export default function AdminDashboard() {
                       <DollarSign className="w-4 h-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent className="p-2 sm:p-4 md:p-6">
-                      <div className="text-xl xs:text-2xl font-bold">${salesSummary.totalComisiones.toFixed(2)}</div>
+                      <div className="text-xl xs:text-2xl font-bold">{formatPriceNumber(salesSummary.totalComisiones)}</div>
                       <p className="text-xs text-muted-foreground">12% de comisión total</p>
                     </CardContent>
                   </Card>
@@ -2569,7 +2982,7 @@ export default function AdminDashboard() {
                       <Clock className="w-4 h-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent className="p-2 sm:p-4 md:p-6">
-                      <div className="text-xl xs:text-2xl font-bold">${salesSummary.totalPendientePago.toFixed(2)}</div>
+                      <div className="text-xl xs:text-2xl font-bold">{formatPriceNumber(salesSummary.totalPendientePago)}</div>
                       <p className="text-xs text-muted-foreground">A pagar a vendedores</p>
                     </CardContent>
                   </Card>
@@ -2579,7 +2992,7 @@ export default function AdminDashboard() {
                       <CheckCircle className="w-4 h-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent className="p-2 sm:p-4 md:p-6">
-                      <div className="text-xl xs:text-2xl font-bold">${salesSummary.totalPagado.toFixed(2)}</div>
+                      <div className="text-xl xs:text-2xl font-bold">{formatPriceNumber(salesSummary.totalPagado)}</div>
                       <p className="text-xs text-muted-foreground">Ya pagado a vendedores</p>
                     </CardContent>
                   </Card>
@@ -2697,7 +3110,7 @@ export default function AdminDashboard() {
                                     </ul>
                                   </TableCell>
                                   <TableCell className="p-1 md:p-2 align-middle max-w-[100px] truncate">{usersMap[compra.buyerId]?.name || compra.buyerId}</TableCell>
-                                  <TableCell className="p-1 md:p-2 align-middle whitespace-nowrap">${compra.totalAmount?.toFixed(2)}</TableCell>
+                                  <TableCell className="p-1 md:p-2 align-middle whitespace-nowrap">{formatPriceNumber(compra.totalAmount || 0)}</TableCell>
                                   <TableCell className="p-1 md:p-2 align-middle">
                                     <Badge variant={compra.status === 'approved' ? 'default' : 'secondary'}>{compra.status}</Badge>
                                   </TableCell>
@@ -3195,9 +3608,9 @@ export default function AdminDashboard() {
                               {coupon.description && <div className="text-xs text-gray-500 truncate">{coupon.description}</div>}
                             </TableCell>
                             <TableCell className="hidden md:table-cell p-1 md:p-2">
-                              <div className="font-medium">{coupon.discountType === "percentage" ? `${coupon.discountValue}%` : `$${coupon.discountValue.toFixed(2)}`}</div>
-                              {coupon.minPurchase && <div className="text-xs text-gray-500">Mín: ${coupon.minPurchase.toFixed(2)}</div>}
-                              {coupon.maxDiscount && <div className="text-xs text-gray-500">Máx: ${coupon.maxDiscount.toFixed(2)}</div>}
+                              <div className="font-medium">{coupon.discountType === "percentage" ? `${coupon.discountValue}%` : formatPriceNumber(coupon.discountValue)}</div>
+                              {coupon.minPurchase && <div className="text-xs text-gray-500">Mín: {formatPriceNumber(coupon.minPurchase)}</div>}
+                              {coupon.maxDiscount && <div className="text-xs text-gray-500">Máx: {formatPriceNumber(coupon.maxDiscount)}</div>}
                             </TableCell>
                             <TableCell className="hidden md:table-cell p-1 md:p-2">
                               <div>{coupon.usedCount} usos</div>
@@ -3251,7 +3664,7 @@ export default function AdminDashboard() {
               <div>
                 <Label className="text-sm font-medium">Monto a Pagar</Label>
                 <p className="text-sm font-semibold text-green-600">
-                  ${paymentMarkingModal.monto.toFixed(2)}
+                  {formatPriceNumber(paymentMarkingModal.monto)}
                 </p>
               </div>
             </div>
@@ -3335,7 +3748,7 @@ export default function AdminDashboard() {
           <div className="space-y-4">
             <p>Fecha: {selectedPurchase?.createdAt ? (selectedPurchase?.createdAt.toDate ? new Date(selectedPurchase.createdAt.toDate()).toLocaleString() : new Date(selectedPurchase.createdAt).toLocaleString()) : ''}</p>
             <p>Comprador: {selectedPurchase?.buyerId ? usersMap[selectedPurchase.buyerId as string]?.name || selectedPurchase.buyerId : ''}</p>
-            <p>Total: ${selectedPurchase?.totalAmount?.toFixed(2)}</p>
+            <p>Total: {formatPriceNumber(selectedPurchase?.totalAmount || 0)}</p>
             {/* Tabla de productos en el modal */}
             <div>
               <Table className="w-full min-w-[900px]">
@@ -3359,10 +3772,10 @@ export default function AdminDashboard() {
                       <TableRow key={idx} className="align-middle">
                         <TableCell className="py-2 px-3 align-middle">{p.nombre || p.productName || p.productoNombre || 'Producto'}</TableCell>
                         <TableCell className="py-2 px-3 align-middle">{p.quantity || p.cantidad || 1}</TableCell>
-                        <TableCell className="py-2 px-3 align-middle">${(p.precio || p.price || 0).toFixed(2)}</TableCell>
-                        <TableCell className="py-2 px-3 align-middle">${((p.precio || p.price || 0) * (p.quantity || p.cantidad || 1)).toFixed(2)}</TableCell>
+                        <TableCell className="py-2 px-3 align-middle">{formatPriceNumber(p.precio || p.price || 0)}</TableCell>
+                        <TableCell className="py-2 px-3 align-middle">{formatPriceNumber((p.precio || p.price || 0) * (p.quantity || p.cantidad || 1))}</TableCell>
                         <TableCell className="py-2 px-3 align-middle">{usersMap[p.vendedorId]?.name || p.vendedorId}</TableCell>
-                        <TableCell className="py-2 px-3 align-middle text-green-700 font-semibold">${amountToPay.toFixed(2)}</TableCell>
+                        <TableCell className="py-2 px-3 align-middle text-green-700 font-semibold">{formatPriceNumber(amountToPay)}</TableCell>
                         <TableCell className="py-2 px-3 align-middle">
                           {isPaid ? (
                             <Badge variant="default">Pagado</Badge>
@@ -3424,6 +3837,9 @@ export default function AdminDashboard() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Datos del Vendedor</DialogTitle>
+            <DialogDescription>
+              Información detallada del vendedor seleccionado
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Avatar>
