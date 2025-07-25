@@ -523,7 +523,7 @@ export function Header() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="text-white hover:text-purple-200 transition-colors flex items-center gap-1 sm:gap-2 cursor-pointer bg-purple-800/50 px-2 sm:px-3 py-1 rounded-md">
+                  <div className="text-white hover:text-purple-200 transition-colors flex items-center gap-1 sm:gap-2 cursor-pointer bg-purple-800/50 px-2 sm:px-3 lg:px-4 py-1 rounded-md">
                     <MapPin className="h-3 w-3 sm:h-4 sm:w-4 text-purple-200" />
                     {loadingLocation ? (
                       <div className="flex items-center gap-1">
@@ -533,7 +533,7 @@ export function Header() {
                       </div>
                     ) : (
                       <div className="flex items-center gap-1 sm:gap-2">
-                        <span className="text-xs sm:text-sm font-medium truncate max-w-20 sm:max-w-32 lg:max-w-48">
+                        <span className="text-xs sm:text-sm font-medium truncate max-w-20 sm:max-w-32 lg:max-w-none">
                           {userLocation}
                         </span>
                         <Button
