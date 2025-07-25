@@ -459,10 +459,14 @@ export function Header() {
             <div className="flex items-center gap-1 sm:gap-2">
               {currentUser ? (
                 <div className="flex items-center gap-1 sm:gap-2">
-                  <Avatar className="h-6 w-6 sm:h-8 sm:w-8">
-                    <AvatarImage src={currentUser.firebaseUser.photoURL || undefined} />
-                    <AvatarFallback className="bg-purple-600 text-white text-xs">
-                      {currentUser.firebaseUser.displayName?.charAt(0) || currentUser.firebaseUser.email?.charAt(0) || 'U'}
+                  <Avatar className="h-6 w-6 sm:h-8 sm:w-8 border-2 border-white/20">
+                    <AvatarImage 
+                      src={currentUser.firebaseUser.photoURL || undefined} 
+                      alt={currentUser.firebaseUser.displayName || 'Usuario'}
+                      className="object-cover"
+                    />
+                    <AvatarFallback className="bg-purple-600 text-white text-xs font-medium">
+                      {currentUser.firebaseUser.displayName?.charAt(0).toUpperCase() || currentUser.firebaseUser.email?.charAt(0).toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="hidden xl:block">
@@ -682,10 +686,14 @@ export function Header() {
             {currentUser ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-gray-50 rounded-lg">
-                  <Avatar className="h-6 w-6 sm:h-8 sm:w-8 flex-shrink-0">
-                    <AvatarImage src={currentUser.firebaseUser.photoURL || undefined} />
-                    <AvatarFallback>
-                      <User className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <Avatar className="h-6 w-6 sm:h-8 sm:w-8 flex-shrink-0 border-2 border-gray-200">
+                    <AvatarImage 
+                      src={currentUser.firebaseUser.photoURL || undefined} 
+                      alt={currentUser.firebaseUser.displayName || 'Usuario'}
+                      className="object-cover"
+                    />
+                    <AvatarFallback className="bg-purple-600 text-white text-xs font-medium">
+                      {currentUser.firebaseUser.displayName?.charAt(0).toUpperCase() || currentUser.firebaseUser.email?.charAt(0).toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
