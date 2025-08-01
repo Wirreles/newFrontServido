@@ -51,6 +51,8 @@ import { useAuth } from "@/contexts/auth-context"
 import ServiceDetail from "@/components/services/ServiceDetail"
 import { formatPrice, formatPriceNumber } from "@/lib/utils"
 import { ShareButtons } from "@/components/ui/share-buttons"
+import { ApiService } from "@/lib/services/api"
+import { useToast } from "@/hooks/use-toast"
 
 interface ProductMedia {
   type: "image" | "video"
@@ -170,6 +172,12 @@ export default function ProductDetailPage() {
   const [submittingReview, setSubmittingReview] = useState(false)
   const [reviewError, setReviewError] = useState<string | null>(null)
   const [reviewSuccess, setReviewSuccess] = useState<string | null>(null)
+
+  // Direct purchase state
+  const [buyingNow, setBuyingNow] = useState(false)
+
+  // Hooks
+  const { toast } = useToast()
 
   // Get product media (with backward compatibility)
   const getProductMedia = (product: Product): ProductMedia[] => {
@@ -414,6 +422,22 @@ export default function ProductDetailPage() {
       return
     }
 
+    // Verificar si el comentario contiene números de teléfono
+    const containsPhoneNumber = (text: string): boolean => {
+      const phonePatterns = [
+        /(\+54\s*9?\s*\d{1,2}\s*\d{4}\s*-?\s*\d{4})/g,
+        /(\d{1,4}\s*-?\s*\d{1,4}\s*-?\s*\d{1,4})/g,
+        /(\d{7,15})/g,
+        /(\(\d{1,4}\)\s*\d{1,4}\s*-?\s*\d{1,4})/g
+      ]
+      return phonePatterns.some(pattern => pattern.test(text))
+    }
+
+    if (containsPhoneNumber(reviewComment.trim())) {
+      setReviewError("No se permiten números de teléfono en los comentarios por seguridad.")
+      return
+    }
+
     setSubmittingReview(true)
     setReviewError(null)
     setReviewSuccess(null)
@@ -459,6 +483,22 @@ export default function ProductDetailPage() {
       return
     }
 
+    // Verificar si la pregunta contiene números de teléfono
+    const containsPhoneNumber = (text: string): boolean => {
+      const phonePatterns = [
+        /(\+54\s*9?\s*\d{1,2}\s*\d{4}\s*-?\s*\d{4})/g,
+        /(\d{1,4}\s*-?\s*\d{1,4}\s*-?\s*\d{1,4})/g,
+        /(\d{7,15})/g,
+        /(\(\d{1,4}\)\s*\d{1,4}\s*-?\s*\d{1,4})/g
+      ]
+      return phonePatterns.some(pattern => pattern.test(text))
+    }
+
+    if (containsPhoneNumber(newQuestion.trim())) {
+      setQuestionError("No se permiten números de teléfono en las preguntas por seguridad.")
+      return
+    }
+
     setSubmittingQuestion(true)
     setQuestionError(null)
     setQuestionSuccess(null)
@@ -498,6 +538,22 @@ export default function ProductDetailPage() {
       return
     }
 
+    // Verificar si la respuesta contiene números de teléfono
+    const containsPhoneNumber = (text: string): boolean => {
+      const phonePatterns = [
+        /(\+54\s*9?\s*\d{1,2}\s*\d{4}\s*-?\s*\d{4})/g,
+        /(\d{1,4}\s*-?\s*\d{1,4}\s*-?\s*\d{1,4})/g,
+        /(\d{7,15})/g,
+        /(\(\d{1,4}\)\s*\d{1,4}\s*-?\s*\d{1,4})/g
+      ]
+      return phonePatterns.some(pattern => pattern.test(text))
+    }
+
+    if (containsPhoneNumber(answerText.trim())) {
+      setQuestionError("No se permiten números de teléfono en las respuestas por seguridad.")
+      return
+    }
+
     setSubmittingAnswer(true)
     setQuestionError(null)
 
@@ -533,58 +589,130 @@ export default function ProductDetailPage() {
     }
   }
 
+  // const handleContactSeller = async () => {
+  //   if (!currentUser) {
+  //     alert("Debes iniciar sesión para contactar al vendedor.")
+  //     router.push("/login")
+  //     return
+  //   }
+  //   if (!product || !seller) {
+  //     setError("No se pudo obtener la información del producto o vendedor.")
+  //     return
+  //   }
+
+  //   const existingChatQuery = query(
+  //     collection(db, "chats"),
+  //     where("productId", "==", product.id),
+  //     where("buyerId", "==", currentUser.firebaseUser.uid),
+  //     where("sellerId", "==", seller.id),
+  //     limit(1),
+  //   )
+  //   const existingChatSnapshot = await getDocs(existingChatQuery)
+
+  //   if (existingChatSnapshot.docs.length > 0) {
+  //     const existingChatId = existingChatSnapshot.docs[0].id
+  //     router.push(`/chat/${existingChatId}`)
+  //   } else {
+  //     try {
+  //       const firstImage = productMedia.find((m) => m.type === "image")
+  //       const newChatData = {
+  //         productId: product.id,
+  //         buyerId: currentUser.firebaseUser.uid,
+  //         sellerId: seller.id,
+  //         buyerName: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email?.split("@")?.[0] || "Comprador",
+  //         sellerName: seller.name || seller.email?.split("@")[0] || "Vendedor",
+  //         productName: product.name,
+  //         productImageUrl: firstImage?.url || product.imageUrl || null,
+  //         lastMessage: "¡Hola! Me interesa este producto.",
+  //         lastMessageTimestamp: serverTimestamp(),
+  //         createdAt: serverTimestamp(),
+  //       }
+  //       const docRef = await addDoc(collection(db, "chats"), newChatData)
+
+  //       await addDoc(collection(db, "chats", docRef.id, "messages"), {
+  //         senderId: currentUser.firebaseUser.uid,
+  //         senderName: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email?.split("@")?.[0] || "Comprador",
+  //         text: "¡Hola! Me interesa este producto.",
+  //         timestamp: serverTimestamp(),
+  //       })
+
+  //       router.push(`/chat/${docRef.id}`)
+  //     } catch (err) {
+  //       console.error("Error creating chat:", err)
+  //       setError("Error al iniciar el chat. Inténtalo de nuevo.")
+  //     }
+  //   }
+  // }
+
   const handleContactSeller = async () => {
+    alert("Funcionalidad de chat temporalmente deshabilitada")
+  }
+
+  // Función para manejar la compra directa
+  const handleBuyNow = async () => {
     if (!currentUser) {
-      alert("Debes iniciar sesión para contactar al vendedor.")
-      router.push("/login")
+      toast({
+        title: "Error",
+        description: "Debes iniciar sesión para realizar la compra",
+        variant: "destructive"
+      })
       return
     }
-    if (!product || !seller) {
-      setError("No se pudo obtener la información del producto o vendedor.")
+
+    if (!product) {
+      toast({
+        title: "Error",
+        description: "No se pudo obtener la información del producto",
+        variant: "destructive"
+      })
       return
     }
 
-    const existingChatQuery = query(
-      collection(db, "chats"),
-      where("productId", "==", product.id),
-      where("buyerId", "==", currentUser.firebaseUser.uid),
-      where("sellerId", "==", seller.id),
-      limit(1),
-    )
-    const existingChatSnapshot = await getDocs(existingChatQuery)
+    if (maxQuantity <= 0) {
+      toast({
+        title: "Error",
+        description: "Producto sin stock disponible",
+        variant: "destructive"
+      })
+      return
+    }
 
-    if (existingChatSnapshot.docs.length > 0) {
-      const existingChatId = existingChatSnapshot.docs[0].id
-      router.push(`/chat/${existingChatId}`)
-    } else {
-      try {
-        const firstImage = productMedia.find((m) => m.type === "image")
-        const newChatData = {
-          productId: product.id,
-          buyerId: currentUser.firebaseUser.uid,
-          sellerId: seller.id,
-          buyerName: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email?.split("@")?.[0] || "Comprador",
-          sellerName: seller.name || seller.email?.split("@")[0] || "Vendedor",
-          productName: product.name,
-          productImageUrl: firstImage?.url || product.imageUrl || null,
-          lastMessage: "¡Hola! Me interesa este producto.",
-          lastMessageTimestamp: serverTimestamp(),
-          createdAt: serverTimestamp(),
-        }
-        const docRef = await addDoc(collection(db, "chats"), newChatData)
+    try {
+      setBuyingNow(true)
 
-        await addDoc(collection(db, "chats", docRef.id, "messages"), {
-          senderId: currentUser.firebaseUser.uid,
-          senderName: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email?.split("@")?.[0] || "Comprador",
-          text: "¡Hola! Me interesa este producto.",
-          timestamp: serverTimestamp(),
-        })
+      // Usar el sistema centralizado para compra directa
+      const response = await ApiService.createSingleProductPurchase({
+        productId: product.id,
+        quantity: quantity,
+        buyerId: currentUser.firebaseUser.uid,
+        buyerEmail: currentUser.firebaseUser.email || ''
+      })
 
-        router.push(`/chat/${docRef.id}`)
-      } catch (err) {
-        console.error("Error creating chat:", err)
-        setError("Error al iniciar el chat. Inténtalo de nuevo.")
+      if (response.error) {
+        throw new Error(response.error)
       }
+
+      if (!response.data?.init_point) {
+        throw new Error("No se recibió el punto de inicio del pago")
+      }
+
+      toast({
+        title: "✅ Compra creada",
+        description: `${product.name} - ${formatPriceNumber(finalPrice * quantity)}`,
+        duration: 3000,
+      })
+
+      // Redirigir a MercadoPago
+      window.location.href = response.data.init_point
+    } catch (error) {
+      console.error("Error al procesar la compra directa:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Error al procesar la compra",
+        variant: "destructive"
+      })
+    } finally {
+      setBuyingNow(false)
     }
   }
 
@@ -737,9 +865,10 @@ export default function ProductDetailPage() {
                 >
                   <Heart className={`h-5 w-5 ${isFavorite ? "fill-red-500 text-red-500" : ""}`} />
                 </Button>
-                <Button variant="secondary" size="icon" className="bg-white/80 hover:bg-white">
+                {/* Botón compartir temporalmente deshabilitado */}
+                {/* <Button variant="secondary" size="icon" className="bg-white/80 hover:bg-white">
                   <Share2 className="h-5 w-5" />
-                </Button>
+                </Button> */}
               </div>
             </div>
 
@@ -912,9 +1041,23 @@ export default function ProductDetailPage() {
                   <ShoppingCart className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                   {maxQuantity <= 0 ? "Sin stock" : "Agregar al carrito"}
                 </Button>
-                <Button variant="outline" size="lg" className="text-sm sm:text-base">
-                  Comprar ahora
-                </Button>
+                {/* Botón Comprar ahora temporalmente deshabilitado */}
+                {/* <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="text-sm sm:text-base"
+                  onClick={handleBuyNow}
+                  disabled={maxQuantity <= 0 || buyingNow}
+                >
+                  {buyingNow ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    "Comprar ahora"
+                  )}
+                </Button> */}
               </div>
             </div>
 
@@ -1096,7 +1239,24 @@ export default function ProductDetailPage() {
                           : "Fecha desconocida"}
                       </span>
                     </div>
-                    <p className="text-gray-700 leading-relaxed">{review.comment}</p>
+                    <p className="text-gray-700 leading-relaxed">
+                      {(() => {
+                        const censorPhoneNumbers = (text: string): string => {
+                          const phonePatterns = [
+                            /(\+54\s*9?\s*\d{1,2}\s*\d{4}\s*-?\s*\d{4})/g,
+                            /(\d{1,4}\s*-?\s*\d{1,4}\s*-?\s*\d{1,4})/g,
+                            /(\d{7,15})/g,
+                            /(\(\d{1,4}\)\s*\d{1,4}\s*-?\s*\d{1,4})/g
+                          ]
+                          let censoredText = text
+                          phonePatterns.forEach(pattern => {
+                            censoredText = censoredText.replace(pattern, '***NÚMERO BLOQUEADO***')
+                          })
+                          return censoredText
+                        }
+                        return censorPhoneNumbers(review.comment)
+                      })()}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -1169,7 +1329,24 @@ export default function ProductDetailPage() {
                             : "Fecha desconocida"}
                         </span>
                       </div>
-                      <p className="text-gray-700 leading-relaxed">{question.question}</p>
+                      <p className="text-gray-700 leading-relaxed">
+                        {(() => {
+                          const censorPhoneNumbers = (text: string): string => {
+                            const phonePatterns = [
+                              /(\+54\s*9?\s*\d{1,2}\s*\d{4}\s*-?\s*\d{4})/g,
+                              /(\d{1,4}\s*-?\s*\d{1,4}\s*-?\s*\d{1,4})/g,
+                              /(\d{7,15})/g,
+                              /(\(\d{1,4}\)\s*\d{1,4}\s*-?\s*\d{1,4})/g
+                            ]
+                            let censoredText = text
+                            phonePatterns.forEach(pattern => {
+                              censoredText = censoredText.replace(pattern, '***NÚMERO BLOQUEADO***')
+                            })
+                            return censoredText
+                          }
+                          return censorPhoneNumbers(question.question)
+                        })()}
+                      </p>
                     </div>
 
                     {question.answer ? (
@@ -1183,7 +1360,24 @@ export default function ProductDetailPage() {
                               : "Fecha desconocida"}
                           </span>
                         </div>
-                        <p className="text-gray-700 leading-relaxed">{question.answer}</p>
+                        <p className="text-gray-700 leading-relaxed">
+                          {(() => {
+                            const censorPhoneNumbers = (text: string): string => {
+                              const phonePatterns = [
+                                /(\+54\s*9?\s*\d{1,2}\s*\d{4}\s*-?\s*\d{4})/g,
+                                /(\d{1,4}\s*-?\s*\d{1,4}\s*-?\s*\d{1,4})/g,
+                                /(\d{7,15})/g,
+                                /(\(\d{1,4}\)\s*\d{1,4}\s*-?\s*\d{1,4})/g
+                              ]
+                              let censoredText = text
+                              phonePatterns.forEach(pattern => {
+                                censoredText = censoredText.replace(pattern, '***NÚMERO BLOQUEADO***')
+                              })
+                              return censoredText
+                            }
+                            return censorPhoneNumbers(question.answer)
+                          })()}
+                        </p>
                       </div>
                     ) : currentUser && currentUser.firebaseUser.uid === product.sellerId ? (
                       <div className="ml-4">

@@ -256,19 +256,23 @@ export default function SellerProfilePage() {
   // Verificar si el usuario actual es el propietario de la tienda
   const isOwner = currentUser?.firebaseUser.uid === sellerId
 
+  // const handleContactSeller = async () => {
+  //   if (!currentUser) {
+  //     window.location.href = "/login"
+  //     return
+  //   }
+
+  //   // No permitir contactarse a sí mismo
+  //   if (isOwner) {
+  //     return
+  //   }
+
+  //   // Aquí implementarías la lógica para iniciar chat
+  //   window.location.href = `/chat/${sellerId}`
+  // }
+
   const handleContactSeller = async () => {
-    if (!currentUser) {
-      window.location.href = "/login"
-      return
-    }
-
-    // No permitir contactarse a sí mismo
-    if (isOwner) {
-      return
-    }
-
-    // Aquí implementarías la lógica para iniciar chat
-    window.location.href = `/chat/${sellerId}`
+    alert("Funcionalidad de chat temporalmente deshabilitada")
   }
 
   const handleDeleteProduct = async (productId: string, isService: boolean) => {

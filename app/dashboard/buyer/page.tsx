@@ -38,7 +38,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage
 import { updateProfile, getAuth } from "firebase/auth" // Import updateProfile
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
-import { ChatList } from "@/components/chat-list"
+// import { ChatList } from "@/components/chat-list"
 import { Input } from "@/components/ui/input" // Import Input
 import type { 
   PurchaseWithShipping, 
@@ -416,58 +416,62 @@ export default function BuyerDashboardPage() {
   }
 
   // Función para manejar el chat con el vendedor
-  const handleChatWithSeller = async (purchase: CompraProductoBuyer) => {
-    if (!currentUser) {
-      alert("Debes iniciar sesión para chatear con el vendedor.")
-      return
-    }
+  // const handleChatWithSeller = async (purchase: CompraProductoBuyer) => {
+  //   if (!currentUser) {
+  //     alert("Debes iniciar sesión para chatear con el vendedor.")
+  //     return
+  //   }
 
-    try {
-      // Buscar si ya existe un chat entre este comprador y vendedor para este producto
-      const existingChatQuery = query(
-        collection(db, "chats"),
-        where("productId", "==", purchase.productId),
-        where("buyerId", "==", currentUser.firebaseUser.uid),
-        where("sellerId", "==", purchase.vendedorId),
-        limit(1)
-      )
-      const existingChatSnapshot = await getDocs(existingChatQuery)
+  //   try {
+  //     // Buscar si ya existe un chat entre este comprador y vendedor para este producto
+  //     const existingChatQuery = query(
+  //       collection(db, "chats"),
+  //       where("productId", "==", purchase.productId),
+  //       where("buyerId", "==", currentUser.firebaseUser.uid),
+  //       where("sellerId", "==", purchase.vendedorId),
+  //       limit(1)
+  //     )
+  //     const existingChatSnapshot = await getDocs(existingChatQuery)
 
-      if (existingChatSnapshot.docs.length > 0) {
-        // Si existe el chat, navegar a él
-        const existingChatId = existingChatSnapshot.docs[0].id
-        router.push(`/chat/${existingChatId}`)
-      } else {
-        // Si no existe, crear un nuevo chat
-        const newChatData = {
-          productId: purchase.productId,
-          buyerId: currentUser.firebaseUser.uid,
-          sellerId: purchase.vendedorId,
-          buyerName: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email?.split("@")?.[0] || "Comprador",
-          sellerName: purchase.vendedorNombre || purchase.vendedorEmail?.split("@")[0] || "Vendedor",
-          productName: purchase.productName,
-          productImageUrl: purchase.productImageUrl || null,
-          lastMessage: "¡Hola! Tengo una consulta sobre mi compra.",
-          lastMessageTimestamp: serverTimestamp(),
-          createdAt: serverTimestamp(),
-        }
+  //     if (existingChatSnapshot.docs.length > 0) {
+  //       // Si existe el chat, navegar a él
+  //       const existingChatId = existingChatSnapshot.docs[0].id
+  //       router.push(`/chat/${existingChatId}`)
+  //     } else {
+  //       // Si no existe, crear un nuevo chat
+  //       const newChatData = {
+  //         productId: purchase.productId,
+  //         buyerId: currentUser.firebaseUser.uid,
+  //         sellerId: purchase.vendedorId,
+  //         buyerName: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email?.split("@")?.[0] || "Comprador",
+  //         sellerName: purchase.vendedorNombre || purchase.vendedorEmail?.split("@")[0] || "Vendedor",
+  //         productName: purchase.productName,
+  //         productImageUrl: purchase.productImageUrl || null,
+  //         lastMessage: "¡Hola! Tengo una consulta sobre mi compra.",
+  //         lastMessageTimestamp: serverTimestamp(),
+  //         createdAt: serverTimestamp(),
+  //       }
         
-        const docRef = await addDoc(collection(db, "chats"), newChatData)
+  //       const docRef = await addDoc(collection(db, "chats"), newChatData)
 
-        // Crear el primer mensaje
-        await addDoc(collection(db, "chats", docRef.id, "messages"), {
-          senderId: currentUser.firebaseUser.uid,
-          senderName: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email?.split("@")?.[0] || "Comprador",
-          text: "¡Hola! Tengo una consulta sobre mi compra.",
-          timestamp: serverTimestamp(),
-        })
+  //       // Crear el primer mensaje
+  //       await addDoc(collection(db, "chats", docRef.id, "messages"), {
+  //         senderId: currentUser.firebaseUser.uid,
+  //         senderName: currentUser.firebaseUser.displayName || currentUser.firebaseUser.email?.split("@")?.[0] || "Comprador",
+  //         text: "¡Hola! Tengo una consulta sobre mi compra.",
+  //         timestamp: serverTimestamp(),
+  //       })
 
-        router.push(`/chat/${docRef.id}`)
-      }
-    } catch (err) {
-      console.error("Error handling chat with seller:", err)
-      alert("Error al iniciar el chat. Inténtalo de nuevo.")
-    }
+  //       router.push(`/chat/${docRef.id}`)
+  //     }
+  //   } catch (err) {
+  //     console.error("Error handling chat with seller:", err)
+  //     alert("Error al iniciar el chat. Inténtalo de nuevo.")
+  //   }
+  // }
+
+  const handleChatWithSeller = async (purchase: CompraProductoBuyer) => {
+    alert("Funcionalidad de chat temporalmente deshabilitada")
   }
 
   // --- Profile Image Functions ---
@@ -648,14 +652,15 @@ export default function BuyerDashboardPage() {
                 <Heart className="h-4 w-4" />
                 Favoritos
               </Button>
-              <Button
+              {/* Chat functionality temporarily disabled */}
+              {/* <Button
                 variant={activeTab === "chats" ? "secondary" : "ghost"}
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-blue-600 justify-start"
                 onClick={() => setActiveTab("chats")}
               >
                 <MessageSquare className="h-4 w-4" />
                 Mis Chats
-              </Button>
+              </Button> */}
               <Button
                 variant={activeTab === "profile" ? "secondary" : "ghost"}
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-blue-600 justify-start"
@@ -739,7 +744,8 @@ export default function BuyerDashboardPage() {
                   <Heart className="mr-2 h-5 w-5" />
                   Favoritos
                 </Button>
-                <Button
+                {/* Chat functionality temporarily disabled */}
+                {/* <Button
                   variant={activeTab === "chats" ? "secondary" : "ghost"}
                   onClick={() => {
                     setActiveTab("chats")
@@ -749,7 +755,7 @@ export default function BuyerDashboardPage() {
                 >
                   <MessageSquare className="mr-2 h-5 w-5" />
                   Mis Chats
-                </Button>
+                </Button> */}
                 <Button
                   variant={activeTab === "profile" ? "secondary" : "ghost"}
                   onClick={() => {
@@ -1126,15 +1132,20 @@ export default function BuyerDashboardPage() {
             </Card>
           )}
 
-          {activeTab === "chats" && (
+          {/* Chat functionality temporarily disabled */}
+          {/* {activeTab === "chats" && (
             <Card>
               <CardHeader>
                 <CardTitle>Mis Chats</CardTitle>
                 <CardDescription>Conversaciones con vendedores.</CardDescription>
               </CardHeader>
-              <CardContent>{currentUser && <ChatList userId={currentUser.firebaseUser.uid} role="buyer" />}</CardContent>
+              <CardContent>
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Funcionalidad de chat temporalmente deshabilitada</p>
+                </div>
+              </CardContent>
             </Card>
-          )}
+          )} */}
 
           {activeTab === "profile" && (
             <Card>

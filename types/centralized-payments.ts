@@ -58,12 +58,12 @@ export interface SellerBankConfig {
   cuit?: string
   
   // Preferencias de cobro
-  preferenciaRetiro: 'inmediato' | 'a_7_dias' | 'a_30_dias'
+  preferenciaRetiro: 'a_7_dias' | 'a_15_dias' | 'a_35_dias'
   
   // Configuración de impuestos (informativa)
-  impuestoInmediato: number // %
   impuesto7Dias: number // %
-  impuesto30Dias: number // %
+  impuesto15Dias: number // %
+  impuesto35Dias: number // %
   
   // Metadatos
   isActive: boolean
@@ -190,9 +190,9 @@ export interface MigrationStats {
 export const COMMISSION_RATE = 0.12 // 12%
 
 export const TAX_RATES = {
-  inmediato: 0.21, // 21% para retiro inmediato
   a_7_dias: 0.105, // 10.5% para retiro a 7 días
-  a_30_dias: 0.0525 // 5.25% para retiro a 30 días
+  a_15_dias: 0.07, // 7% para retiro a 15 días
+  a_35_dias: 0.04 // 4% para retiro a 35 días
 } as const
 
 export const PAYMENT_STATUSES = {
