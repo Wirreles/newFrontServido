@@ -22,7 +22,7 @@ interface Coupon {
   usageLimit?: number | null
   usedCount?: number
   applicableTo: "all" | "sellers" | "buyers"
-  sellerId?: string | null // Campo para cupones específicos de vendedor
+  sellerId?: string | null
   startDate?: any | null
   endDate?: any | null
   isActive: boolean
@@ -35,8 +35,60 @@ interface CouponInputProps {
   appliedCoupon?: Coupon | null
   subtotal: number
   className?: string
-  items?: Array<{ sellerId: string; id: string; name: string }> // Items en el carrito para validar vendedor
+  items?: Array<{ sellerId: string; id: string; name: string }>
 }
+
+// Cupones de ejemplo para desarrollo - puedes expandir esta lista
+const SAMPLE_COUPONS: Coupon[] = [
+  {
+    id: '1',
+    code: 'DESCUENTO20',
+    name: 'Descuento del 20%',
+    description: 'Descuento del 20% en toda la compra',
+    discountType: 'percentage',
+    discountValue: 20,
+    minPurchase: 1000,
+    maxDiscount: 500,
+    usageLimit: 100,
+    usedCount: 50,
+    applicableTo: 'buyers',
+    sellerId: null,
+    isActive: true,
+    createdAt: new Date()
+  },
+  {
+    id: '2',
+    code: 'FIXED50',
+    name: 'Descuento fijo $50',
+    description: 'Descuento fijo de $50 en compras mayores a $500',
+    discountType: 'fixed',
+    discountValue: 50,
+    minPurchase: 500,
+    maxDiscount: null,
+    usageLimit: 50,
+    usedCount: 25,
+    applicableTo: 'buyers',
+    sellerId: null,
+    isActive: true,
+    createdAt: new Date()
+  },
+  {
+    id: '3',
+    code: 'BIENVENIDA10',
+    name: 'Cupón de bienvenida 10%',
+    description: '10% de descuento para nuevos usuarios',
+    discountType: 'percentage',
+    discountValue: 10,
+    minPurchase: 100,
+    maxDiscount: 200,
+    usageLimit: 1000,
+    usedCount: 300,
+    applicableTo: 'buyers',
+    sellerId: null,
+    isActive: true,
+    createdAt: new Date()
+  }
+]
 
 export function CouponInput({ 
   onCouponApplied, 
@@ -51,72 +103,10 @@ export function CouponInput({
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
 
-  const validateCoupon = async (code: string): Promise<Coupon | null> => {
-    try {
-      // Obtener el sellerId del primer item en el carrito (asumiendo que todos son del mismo vendedor)
-      const sellerId = items.length > 0 ? items[0].sellerId : null
-      
-      // Construir la URL con el sellerId si está disponible
-      const url = sellerId 
-        ? `/api/coupons/validate?code=${encodeURIComponent(code)}&sellerId=${encodeURIComponent(sellerId)}`
-        : `/api/coupons/validate?code=${encodeURIComponent(code)}`
-      
-      // Validar cupón usando la API
-      const response = await fetch(url)
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al validar el cupón')
-      }
-      
-      return data.coupon
-    } catch (error) {
-      console.error('Error validating coupon:', error)
-      // Si la API no está disponible, simular validación para desarrollo
-      if (error instanceof Error && error.message.includes('fetch')) {
-        // Simulación para desarrollo - remover en producción
-        const mockCoupons = [
-          {
-            id: '1',
-            code: 'DESCUENTO20',
-            name: 'Descuento del 20%',
-            description: 'Descuento del 20% en toda la compra',
-            discountType: 'percentage' as const,
-            discountValue: 20,
-            minPurchase: 1000,
-            maxDiscount: 500,
-            usageLimit: 100,
-            usedCount: 50,
-            applicableTo: 'buyers' as const,
-            sellerId: null,
-            isActive: true,
-            createdAt: new Date()
-          },
-          {
-            id: '2',
-            code: 'FIXED50',
-            name: 'Descuento fijo $50',
-            description: 'Descuento fijo de $50 en compras mayores a $500',
-            discountType: 'fixed' as const,
-            discountValue: 50,
-            minPurchase: 500,
-            maxDiscount: null,
-            usageLimit: 50,
-            usedCount: 25,
-            applicableTo: 'buyers' as const,
-            sellerId: null,
-            isActive: true,
-            createdAt: new Date()
-          }
-        ]
-        
-        const mockCoupon = mockCoupons.find(c => c.code === code.toUpperCase())
-        if (mockCoupon) {
-          return mockCoupon
-        }
-      }
-      throw error
-    }
+  const validateCoupon = (code: string): Coupon | null => {
+    // Buscar el cupón en la lista de cupones de ejemplo
+    const coupon = SAMPLE_COUPONS.find(c => c.code === code.toUpperCase())
+    return coupon || null
   }
 
   const handleApplyCoupon = async () => {
@@ -140,7 +130,7 @@ export function CouponInput({
     setError(null)
 
     try {
-      const coupon = await validateCoupon(couponCode.trim().toUpperCase())
+      const coupon = validateCoupon(couponCode.trim().toUpperCase())
       
       if (!coupon) {
         setError("Cupón no encontrado")
@@ -341,6 +331,7 @@ export function CouponInput({
               {items.length > 0 && (
                 <p>• Los cupones solo se pueden aplicar a productos del mismo vendedor</p>
               )}
+              <p className="mt-2 font-medium">Cupones de ejemplo: DESCUENTO20, FIXED50, BIENVENIDA10</p>
             </div>
           </div>
         )}
