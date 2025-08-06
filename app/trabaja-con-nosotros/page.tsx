@@ -37,7 +37,7 @@ export default function TrabajaConNosotrosPage() {
         <h2 className="text-2xl font-semibold mb-4">Envía tu CV</h2>
         <p className="text-gray-700 leading-relaxed">
           Si estás listo para unirte a nuestro equipo y ayudarnos a construir el futuro de Servido, envíanos tu currículum vitae y una carta de presentación a:
-          <a href="mailto:rrhh@servido.com" className="text-blue-600 hover:underline ml-2">rrhh@servido.com</a>
+          <a href="mailto:servidoarg@gmail.com" className="text-blue-600 hover:underline ml-2">servidoarg@gmail.com</a>
         </p>
         <p className="text-gray-700 leading-relaxed mt-2">
           ¡Esperamos conocerte!

@@ -585,21 +585,21 @@ export default function HomePage() {
               <ul className="space-y-2 text-sm">
                 <li>
                   Email:{" "}
-                  <a href="mailto:infoservido.com.ar" className="hover:text-blue-400">
-                    infoservido.com.ar
+                  <a href="mailto:servidoarg@gmail.com" className="hover:text-blue-400">
+                    servidoarg@gmail.com
                   </a>
                 </li>
                 <li>
                   Contacto:{" "}
-                  <a href="mailto:contactoservido.com.ar" className="hover:text-blue-400">
-                    contactoservido.com.ar
+                  <a href="mailto:servidoarg@gmail.com" className="hover:text-blue-400">
+                    servidoarg@gmail.com
                   </a>
                 </li>
               </ul>
               <h3 className="text-lg font-semibold mb-3 mt-6">Síguenos</h3>
               <div className="flex gap-4">
                 <Link
-                  href="https://facebook.com/servido"
+                  href="https://www.facebook.com/servido.arg?mibextid=wwXIfr&rdid=HPnI8K6F3ciHfW0I&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F1BsQTJsDLf%2F%3Fmibextid%3DwwXIfr#"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-blue-400"
@@ -608,7 +608,7 @@ export default function HomePage() {
                   <span className="sr-only">Facebook</span>
                 </Link>
                 <Link
-                  href="https://instagram.com/servido"
+                  href="https://www.instagram.com/accounts/login/?next=%2Fservido.ok%2F&source=omni_redirect"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-blue-400"
