@@ -76,10 +76,56 @@ const ProductServiceReviewsAndQuestions: React.FC<Props> = ({
   const [reviewComment, setReviewComment] = useState("")
   const [questionText, setQuestionText] = useState("")
 
+  // Función para detectar números de teléfono en el texto
+  const containsPhoneNumber = (text: string): boolean => {
+    // Patrones para detectar números de teléfono argentinos y internacionales
+    const phonePatterns = [
+      // Números argentinos: +54 9 11 1234-5678, 11 1234-5678, 011 1234-5678
+      /(\+54\s*9?\s*\d{1,2}\s*\d{4}\s*-?\s*\d{4})/g,
+      // Números con espacios y guiones: 11 1234-5678, 011-1234-5678
+      /(\d{1,4}\s*-?\s*\d{1,4}\s*-?\s*\d{1,4})/g,
+      // Números consecutivos de 7-15 dígitos (números internacionales)
+      /(\d{7,15})/g,
+      // Números con paréntesis: (11) 1234-5678
+      /(\(\d{1,4}\)\s*\d{1,4}\s*-?\s*\d{1,4})/g
+    ]
+    
+    return phonePatterns.some(pattern => pattern.test(text))
+  }
+
+  // Función para censurar números de teléfono en el texto mostrado
+  const censorPhoneNumbers = (text: string): string => {
+    // Patrones para detectar y reemplazar números de teléfono
+    const phonePatterns = [
+      // Números argentinos: +54 9 11 1234-5678, 11 1234-5678, 011 1234-5678
+      /(\+54\s*9?\s*\d{1,2}\s*\d{4}\s*-?\s*\d{4})/g,
+      // Números con espacios y guiones: 11 1234-5678, 011-1234-5678
+      /(\d{1,4}\s*-?\s*\d{1,4}\s*-?\s*\d{1,4})/g,
+      // Números consecutivos de 7-15 dígitos (números internacionales)
+      /(\d{7,15})/g,
+      // Números con paréntesis: (11) 1234-5678
+      /(\(\d{1,4}\)\s*\d{1,4}\s*-?\s*\d{1,4})/g
+    ]
+    
+    let censoredText = text
+    phonePatterns.forEach(pattern => {
+      censoredText = censoredText.replace(pattern, '***NÚMERO BLOQUEADO***')
+    })
+    
+    return censoredText
+  }
+
   // Handler local para reseñas
   const handleReview = async (e: React.FormEvent) => {
     e.preventDefault()
     if (reviewRating === 0 || reviewComment.trim().length < 10) return
+    
+    // Verificar si el comentario contiene números de teléfono
+    if (containsPhoneNumber(reviewComment.trim())) {
+      alert("No se permiten números de teléfono en los comentarios por seguridad.")
+      return
+    }
+    
     await onSubmitReview(reviewRating, reviewComment)
     setReviewRating(0)
     setReviewComment("")
@@ -89,6 +135,13 @@ const ProductServiceReviewsAndQuestions: React.FC<Props> = ({
   const handleQuestion = async (e: React.FormEvent) => {
     e.preventDefault()
     if (questionText.trim().length < 10) return
+    
+    // Verificar si la pregunta contiene números de teléfono
+    if (containsPhoneNumber(questionText.trim())) {
+      alert("No se permiten números de teléfono en las preguntas por seguridad.")
+      return
+    }
+    
     await onSubmitQuestion(questionText)
     setQuestionText("")
   }
@@ -133,16 +186,27 @@ const ProductServiceReviewsAndQuestions: React.FC<Props> = ({
               <Label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-1">
                 Comentario
               </Label>
-              <Textarea
-                id="comment"
-                value={reviewComment}
-                onChange={(e) => setReviewComment(e.target.value)}
-                placeholder="Comparte tu experiencia..."
-                rows={4}
-                required
-              />
+              <div className="relative">
+                <Textarea
+                  id="comment"
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="Comparte tu experiencia..."
+                  rows={4}
+                  required
+                  className={`${containsPhoneNumber(reviewComment) ? 'border-red-500 focus:border-red-500' : ''}`}
+                />
+                {containsPhoneNumber(reviewComment) && (
+                  <div className="absolute -top-8 left-0 text-xs text-red-500 bg-red-50 px-2 py-1 rounded">
+                    No se permiten números de teléfono
+                  </div>
+                )}
+              </div>
             </div>
-            <Button type="submit" disabled={submittingReview}>
+            <Button 
+              type="submit" 
+              disabled={submittingReview || containsPhoneNumber(reviewComment)}
+            >
               {submittingReview ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enviando...
@@ -173,7 +237,7 @@ const ProductServiceReviewsAndQuestions: React.FC<Props> = ({
                       : "Fecha desconocida"}
                   </span>
                 </div>
-                <p className="text-gray-700 leading-relaxed">{review.comment}</p>
+                <p className="text-gray-700 leading-relaxed">{censorPhoneNumbers(review.comment)}</p>
               </div>
             ))}
           </div>
@@ -204,16 +268,27 @@ const ProductServiceReviewsAndQuestions: React.FC<Props> = ({
               <Label htmlFor="question" className="block text-sm font-medium text-gray-700 mb-1">
                 Tu pregunta
               </Label>
-              <Textarea
-                id="question"
-                value={questionText}
-                onChange={(e) => setQuestionText(e.target.value)}
-                placeholder="¿Qué te gustaría saber?"
-                rows={3}
-                required
-              />
+              <div className="relative">
+                <Textarea
+                  id="question"
+                  value={questionText}
+                  onChange={(e) => setQuestionText(e.target.value)}
+                  placeholder="¿Qué te gustaría saber?"
+                  rows={3}
+                  required
+                  className={`${containsPhoneNumber(questionText) ? 'border-red-500 focus:border-red-500' : ''}`}
+                />
+                {containsPhoneNumber(questionText) && (
+                  <div className="absolute -top-8 left-0 text-xs text-red-500 bg-red-50 px-2 py-1 rounded">
+                    No se permiten números de teléfono
+                  </div>
+                )}
+              </div>
             </div>
-            <Button type="submit" disabled={submittingQuestion}>
+            <Button 
+              type="submit" 
+              disabled={submittingQuestion || containsPhoneNumber(questionText)}
+            >
               {submittingQuestion ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enviando...
@@ -240,7 +315,7 @@ const ProductServiceReviewsAndQuestions: React.FC<Props> = ({
                         : "Fecha desconocida"}
                     </span>
                   </div>
-                  <p className="text-gray-700 leading-relaxed">{question.question}</p>
+                  <p className="text-gray-700 leading-relaxed">{censorPhoneNumbers(question.question)}</p>
                 </div>
                 {question.answer ? (
                   <div className="ml-4 p-3 bg-blue-50 rounded-lg">
@@ -253,24 +328,31 @@ const ProductServiceReviewsAndQuestions: React.FC<Props> = ({
                           : "Fecha desconocida"}
                       </span>
                     </div>
-                    <p className="text-gray-700 leading-relaxed">{question.answer}</p>
+                    <p className="text-gray-700 leading-relaxed">{censorPhoneNumbers(question.answer)}</p>
                   </div>
                 ) : currentUser && currentUser.firebaseUser.uid === sellerId && setAnsweringQuestionId && setAnswerText && handleSubmitAnswer ? (
                   <div className="ml-4">
                     {answeringQuestionId === question.id ? (
                       <div className="p-3 bg-gray-50 rounded-lg">
-                        <Textarea
-                          value={answerText}
-                          onChange={(e) => setAnswerText(e.target.value)}
-                          placeholder="Escribe tu respuesta..."
-                          rows={2}
-                          className="mb-2"
-                        />
+                        <div className="relative">
+                          <Textarea
+                            value={answerText}
+                            onChange={(e) => setAnswerText(e.target.value)}
+                            placeholder="Escribe tu respuesta..."
+                            rows={2}
+                            className={`mb-2 ${containsPhoneNumber(answerText) ? 'border-red-500 focus:border-red-500' : ''}`}
+                          />
+                          {containsPhoneNumber(answerText) && (
+                            <div className="absolute -top-8 left-0 text-xs text-red-500 bg-red-50 px-2 py-1 rounded">
+                              No se permiten números de teléfono
+                            </div>
+                          )}
+                        </div>
                         <div className="flex gap-2">
                           <Button
                             size="sm"
                             onClick={() => handleSubmitAnswer(question.id)}
-                            disabled={submittingAnswer}
+                            disabled={submittingAnswer || containsPhoneNumber(answerText)}
                           >
                             {submittingAnswer ? (
                               <>

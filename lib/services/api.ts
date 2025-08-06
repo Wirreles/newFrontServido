@@ -7,7 +7,7 @@ interface ApiResponse<T = any> {
 }
 
 export class ApiService {
-  private static baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL
+  private static baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'
 
   private static async fetchApi<T>(endpoint: string, options: RequestInit = {}, authRequired = false): Promise<ApiResponse<T>> {
     try {

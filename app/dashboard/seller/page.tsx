@@ -71,7 +71,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage
 import { Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
-import { ChatList } from "@/components/chat-list"
+// import { ChatList } from "@/components/chat-list"
 import { hasWhiteBackground, isValidVideoFile, getVideoDuration } from "@/lib/image-validation"
 // import { ConnectMercadoPagoButton } from "@/components/ui/connect-mercadopago-button" // ELIMINADO
 import { useToast } from "@/components/ui/use-toast"
@@ -2022,14 +2022,15 @@ export default function SellerDashboardPage() {
                 <Truck className="h-4 w-4" />
                 Gestión de Envíos
               </Button>
-              <Button
+              {/* Chat functionality temporarily disabled */}
+              {/* <Button
                 variant={activeTab === "chats" ? "secondary" : "ghost"}
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
                 onClick={() => setActiveTab("chats")}
               >
                 <MessageSquare className="h-4 w-4" />
                 Chats
-              </Button>
+              </Button> */}
               <Button
                 variant={activeTab === "coupons" ? "secondary" : "ghost"}
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
@@ -2154,7 +2155,8 @@ export default function SellerDashboardPage() {
                   <Truck className="mr-2 h-5 w-5" />
                   Gestión de Envíos
                 </Button>
-                <Button
+                {/* Chat functionality temporarily disabled */}
+                {/* <Button
                   variant={activeTab === "chats" ? "secondary" : "ghost"}
                   onClick={() => {
                     setActiveTab("chats")
@@ -2164,7 +2166,7 @@ export default function SellerDashboardPage() {
                 >
                   <MessageSquare className="mr-2 h-5 w-5" />
                   Mis Chats
-                </Button>
+                </Button> */}
                 <Button
                   variant={activeTab === "coupons" ? "secondary" : "ghost"}
                   onClick={() => {
@@ -3028,19 +3030,21 @@ export default function SellerDashboardPage() {
             </Card>
           )}
 
-          {/* Other tabs - keeping existing code */}
-          {activeTab === "chats" && (
+          {/* Chat functionality temporarily disabled */}
+          {/* {activeTab === "chats" && (
             <Card>
               <CardHeader>
                 <CardTitle>Mis Chats</CardTitle>
                 <CardDescription>Comunícate con tus clientes y resuelve sus dudas.</CardDescription>
               </CardHeader>
               <CardContent>
-                {currentUser?.firebaseUser.uid && <ChatList userId={currentUser.firebaseUser.uid} role="seller" />}
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Funcionalidad de chat temporalmente deshabilitada</p>
+                </div>
                 {!currentUser?.firebaseUser.uid && <p className="text-center text-gray-500">Inicia sesión para ver tus chats.</p>}
               </CardContent>
             </Card>
-          )}
+          )} */}
 
 
 
@@ -3331,47 +3335,35 @@ export default function SellerDashboardPage() {
             
            
 
-              {/* Información del Sistema de Comisiones */}
+              {/* Configuraciones de Pagos y Comisiones */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Información del Sistema</CardTitle>
+                  <CardTitle>Configuraciones de Pagos y Comisiones</CardTitle>
                   <CardDescription>
-                    Detalles sobre cómo funciona el sistema de pagos centralizado
+                    Opciones de retiro y comisiones según el tiempo de espera
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <h4 className="font-medium mb-2">Comisiones</h4>
-                      <ul className="text-sm text-gray-600 space-y-1">
-                        <li>• Comisión del 12% sobre cada venta</li>
-                        <li>• Deducción automática del total</li>
-                        <li>• Transparencia total en el cálculo</li>
-                      </ul>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div>
+                        <h4 className="font-medium text-yellow-800">Retiro a 7 días</h4>
+                        <p className="text-sm text-yellow-600">10,50% de comisión</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-medium mb-2">Pagos</h4>
-                      <ul className="text-sm text-gray-600 space-y-1">
-                        <li>• Pagos semanales automáticos</li>
-                        <li>• Transferencia a tu cuenta bancaria</li>
-                        <li>• Notificaciones por cada pago</li>
-                      </ul>
+                    
+                    <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div>
+                        <h4 className="font-medium text-blue-800">Retiro a 15 días</h4>
+                        <p className="text-sm text-blue-600">7% de comisión</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-medium mb-2">Impuestos</h4>
-                      <ul className="text-sm text-gray-600 space-y-1">
-                        <li>• Retención según configuración</li>
-                        <li>• Facturas automáticas disponibles</li>
-                        <li>• Reportes mensuales incluidos</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <h4 className="font-medium mb-2">Soporte</h4>
-                      <ul className="text-sm text-gray-600 space-y-1">
-                        <li>• Consultas sobre pagos</li>
-                        <li>• Historial completo disponible</li>
-                        <li>• Descarga de facturas</li>
-                      </ul>
+                    
+                    <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div>
+                        <h4 className="font-medium text-green-800">Retiro a 35 días</h4>
+                        <p className="text-sm text-green-600">4% de comisión</p>
+                      </div>
                     </div>
                   </div>
                 </CardContent>

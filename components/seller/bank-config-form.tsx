@@ -41,9 +41,9 @@ export function BankConfigForm({ sellerId, onConfigSaved }: BankConfigFormProps)
     titular: "",
     cuit: "",
     preferenciaRetiro: "a_7_dias",
-    impuestoInmediato: TAX_RATES.inmediato * 100,
     impuesto7Dias: TAX_RATES.a_7_dias * 100,
-    impuesto30Dias: TAX_RATES.a_30_dias * 100,
+    impuesto15Dias: TAX_RATES.a_15_dias * 100,
+    impuesto35Dias: TAX_RATES.a_35_dias * 100,
     isActive: true
   })
   
@@ -72,9 +72,9 @@ export function BankConfigForm({ sellerId, onConfigSaved }: BankConfigFormProps)
             cuit: existing.cuit ? String(existing.cuit) : '',
             tipoCuenta: existing.tipoCuenta || 'ahorro',
             preferenciaRetiro: existing.preferenciaRetiro || 'a_7_dias',
-            impuestoInmediato: Number(existing.impuestoInmediato || TAX_RATES.inmediato * 100),
             impuesto7Dias: Number(existing.impuesto7Dias || TAX_RATES.a_7_dias * 100),
-            impuesto30Dias: Number(existing.impuesto30Dias || TAX_RATES.a_30_dias * 100),
+            impuesto15Dias: Number(existing.impuesto15Dias || TAX_RATES.a_15_dias * 100),
+            impuesto35Dias: Number(existing.impuesto35Dias || TAX_RATES.a_35_dias * 100),
             isActive: Boolean(existing.isActive)
           })
         }
@@ -164,20 +164,20 @@ export function BankConfigForm({ sellerId, onConfigSaved }: BankConfigFormProps)
   // Obtener información de impuestos según preferencia
   const getTaxInfo = (preference: string) => {
     switch (preference) {
-      case "inmediato":
-        return {
-          rate: TAX_RATES.inmediato * 100,
-          description: "Retiro inmediato - Mayor impuesto pero disponibilidad inmediata"
-        }
       case "a_7_dias":
         return {
-          rate: TAX_RATES.a_7_dias * 100,
-          description: "Retiro a 7 días - Impuesto moderado"
+          rate: Math.round(TAX_RATES.a_7_dias * 100 * 100) / 100,
+          description: "Retiro a 7 días - Comisión moderada"
         }
-      case "a_30_dias":
+      case "a_15_dias":
         return {
-          rate: TAX_RATES.a_30_dias * 100,
-          description: "Retiro a 30 días - Menor impuesto"
+          rate: Math.round(TAX_RATES.a_15_dias * 100 * 100) / 100,
+          description: "Retiro a 15 días - Comisión reducida"
+        }
+      case "a_35_dias":
+        return {
+          rate: Math.round(TAX_RATES.a_35_dias * 100 * 100) / 100,
+          description: "Retiro a 35 días - Menor comisión"
         }
       default:
         return { rate: 0, description: "" }
@@ -331,9 +331,9 @@ export function BankConfigForm({ sellerId, onConfigSaved }: BankConfigFormProps)
           <Label>Preferencia de retiro *</Label>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
-              { value: "inmediato", label: "Inmediato", icon: Clock },
               { value: "a_7_dias", label: "7 días", icon: Calendar },
-              { value: "a_30_dias", label: "30 días", icon: Calendar }
+              { value: "a_15_dias", label: "15 días", icon: Calendar },
+              { value: "a_35_dias", label: "35 días", icon: Calendar }
             ].map((option) => {
               const taxInfo = getTaxInfo(option.value)
               const isSelected = config.preferenciaRetiro === option.value
@@ -357,7 +357,7 @@ export function BankConfigForm({ sellerId, onConfigSaved }: BankConfigFormProps)
                     {taxInfo.description}
                   </p>
                   <Badge variant={isSelected ? "default" : "secondary"}>
-                    {taxInfo.rate}% impuesto
+                    {taxInfo.rate}% de comisión
                   </Badge>
                 </div>
               )
@@ -373,7 +373,7 @@ export function BankConfigForm({ sellerId, onConfigSaved }: BankConfigFormProps)
             <ul className="list-disc list-inside space-y-1 mt-2">
               <li>Los pagos se procesan manualmente desde el panel de administración</li>
               <li>Se aplica una comisión del 12% sobre cada venta</li>
-              <li>Los impuestos varían según la preferencia de retiro seleccionada</li>
+              <li>Las comisiones varían según la preferencia de retiro seleccionada</li>
               <li>Asegúrate de que los datos bancarios sean correctos para evitar demoras</li>
             </ul>
           </AlertDescription>
