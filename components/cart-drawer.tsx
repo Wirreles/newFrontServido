@@ -5,7 +5,7 @@ import type React from "react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ShoppingCart, Plus, Minus, Trash2, X, Loader2, ShoppingBag, ArrowLeft } from "lucide-react"
+import { ShoppingCart, Plus, Minus, Trash2, X, Loader2, ShoppingBag, ArrowLeft, Truck, CreditCard, Shield } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
 import Image from "next/image"
 import Link from "next/link"
@@ -17,6 +17,7 @@ import type { CartItem } from "@/contexts/cart-context"
 import { getCartItemImage } from "@/lib/image-utils"
 import { formatPrice, formatPriceNumber } from "@/lib/utils"
 import { ShippingForm, type ShippingAddress } from "@/components/cart/shipping-form"
+import { CouponInput } from "@/components/ui/coupon-input"
 
 interface GroupedItems {
   [sellerId: string]: CartItem[]
@@ -29,6 +30,11 @@ export function CartDrawer() {
     clearCart, 
     getItemQuantity, 
     getTotalPrice,
+    getSubtotal,
+    getDiscountAmount,
+    appliedCoupon,
+    applyCoupon,
+    removeCoupon,
     getItemsByVendor,
     getVendorCount,
     getTotalCommission,
@@ -201,17 +207,8 @@ export function CartDrawer() {
       return
     }
 
-    if (items.length === 0) {
-      toast({
-        title: "Carrito vacío",
-        description: "No hay productos en el carrito",
-        variant: "destructive"
-      })
-      return
-    }
-
     setPurchaseType('all')
-    setPurchaseData({})
+    setPurchaseData(null)
     setShowShippingForm(true)
   }
 
@@ -272,22 +269,18 @@ export function CartDrawer() {
     }
   }
 
-  // Función para manejar el envío del formulario de dirección
   const handleShippingFormSubmit = (address: ShippingAddress) => {
-    switch (purchaseType) {
-      case 'individual':
-        processIndividualPurchase(address)
-        break
-      case 'vendor':
-        processVendorPurchase(address)
-        break
-      case 'all':
-        processAllItemsPurchase(address)
-        break
+    setShippingAddress(address)
+    
+    if (purchaseType === 'individual' && purchaseData?.item) {
+      processIndividualPurchase(address)
+    } else if (purchaseType === 'vendor' && purchaseData?.sellerItems && purchaseData?.sellerId) {
+      processVendorPurchase(address)
+    } else if (purchaseType === 'all') {
+      processAllItemsPurchase(address)
     }
   }
 
-  // Función para cancelar el formulario de dirección
   const handleShippingFormCancel = () => {
     setShowShippingForm(false)
     setPurchaseType(null)
@@ -306,164 +299,276 @@ export function CartDrawer() {
             )}
           </Button>
       </SheetTrigger>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>Carrito de Compras</SheetTitle>
-        </SheetHeader>
-        {/* Contenido scrollable */}
-        <div className="mt-8 max-h-[70vh] overflow-y-auto pr-2">
-          {showShippingForm ? (
-            <div className="p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleShippingFormCancel}
-                  className="p-1"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <h3 className="font-semibold">Información de Envío</h3>
+      <SheetContent className="w-full sm:max-w-md lg:max-w-lg xl:max-w-xl p-0">
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b bg-white sticky top-0 z-20">
+            <div className="flex items-center gap-3">
+              <ShoppingCart className="h-6 w-6 text-purple-600" />
+              <div>
+                <h2 className="font-semibold text-lg">Carrito de compras</h2>
+                <p className="text-sm text-gray-500">
+                  {items.length} {items.length === 1 ? 'producto' : 'productos'}
+                </p>
               </div>
-              <ShippingForm
-                onSubmit={handleShippingFormSubmit}
-                onCancel={handleShippingFormCancel}
-                loading={loading}
-              />
             </div>
-          ) : (
-            <>
-              {Object.entries(groupedItems).map(([sellerId, sellerItems]) => (
-                <div key={sellerId} className="mb-8 border-b pb-4">
-                  <h3 className="font-semibold mb-4 text-sm text-gray-600">Vendedor</h3>
-                  {sellerItems.map((item) => (
-                    <div key={item.id} className="flex justify-between items-center mb-4">
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className="w-12 h-12 relative rounded-md overflow-hidden">
-                          <Image
-                            src={getCartItemImage(item.media, item.imageUrl)}
-                            alt={item.name}
-                            layout="fill"
-                            objectFit="cover"
-                          />
+            <Button variant="ghost" size="sm" className="text-gray-400 hover:text-gray-600">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto cart-drawer">
+            {showShippingForm ? (
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleShippingFormCancel}
+                    className="p-1"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <h3 className="font-semibold">Información de Envío</h3>
+                </div>
+                <ShippingForm
+                  onSubmit={handleShippingFormSubmit}
+                  onCancel={handleShippingFormCancel}
+                  loading={loading}
+                />
+              </div>
+            ) : (
+              <div className="p-4 space-y-6">
+                {/* Cupón de descuento */}
+                {items.length > 0 && (
+                  <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border border-purple-200 p-4">
+                    <CouponInput
+                      onCouponApplied={applyCoupon}
+                      onCouponRemoved={removeCoupon}
+                      appliedCoupon={appliedCoupon}
+                      subtotal={getSubtotal()}
+                      items={items.map(item => ({
+                        sellerId: item.sellerId,
+                        id: item.id,
+                        name: item.name
+                      }))}
+                    />
+                  </div>
+                )}
+
+                {/* Productos */}
+                {items.length > 0 ? (
+                  <div className="space-y-4">
+                    {Object.entries(groupedItems).map(([sellerId, sellerItems]) => (
+                      <div key={sellerId} className="space-y-3">
+                        {/* Header del vendedor */}
+                        <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                          <span className="text-sm font-medium text-gray-700">Vendedor</span>
                         </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{item.name}</p>
-                          <p className="text-sm text-gray-500">
-                            {item.appliedCoupon && item.discountedPrice < item.price ? (
-                              <>
-                                <span className="line-through mr-1">{formatPrice(item.price)}</span>
-                                <span className="text-green-600 font-medium">{formatPrice(item.discountedPrice)}</span>
-                              </>
-                            ) : (
-                              `$${formatPrice(item.price)}`
-                            )}
-                          </p>
-                          {/* Condición */}
-                          {item.condition && (
-                            <p className="text-xs text-gray-500">
-                              Condición: {item.condition === 'nuevo' ? 'Nuevo' : 'Usado'}
-                            </p>
-                          )}
-                          {/* Envío */}
-                          {item.freeShipping ? (
-                            <p className="text-xs text-green-600">Envío gratis</p>
-                          ) : (
-                            <p className="text-xs text-gray-500">
-                              Envío: {item.shippingCost !== undefined ? formatPrice(item.shippingCost) : '-'}
-                            </p>
-                          )}
-                          <p className="text-xs text-gray-400">Cantidad: {item.quantity}</p>
+                        
+                        {/* Productos del vendedor */}
+                        {sellerItems.map((item) => (
+                          <div key={item.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow cart-item">
+                            <div className="flex gap-4">
+                              {/* Imagen del producto */}
+                              <div className="flex-shrink-0">
+                                <div className="w-20 h-20 sm:w-24 sm:h-24 relative rounded-lg overflow-hidden bg-gray-100 cart-item-image">
+                                  <Image
+                                    src={getCartItemImage(item.media, item.imageUrl)}
+                                    alt={item.name}
+                                    layout="fill"
+                                    objectFit="cover"
+                                    className="rounded-lg"
+                                  />
+                                </div>
+                              </div>
+                              
+                              {/* Información del producto */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-start gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className="font-medium text-gray-900 text-sm line-clamp-2">
+                                      {item.name}
+                                    </h3>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      Cantidad: {item.quantity}
+                                    </p>
+                                  </div>
+                                  
+                                  {/* Botón eliminar */}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (confirm(`¿Estás seguro de que quieres eliminar "${item.name}" del carrito?`)) {
+                                        removeFromCart(item.id)
+                                        toast({
+                                          title: "Producto eliminado",
+                                          description: `${item.name} ha sido eliminado del carrito`,
+                                          duration: 2000,
+                                        })
+                                      }
+                                    }}
+                                    className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1 min-w-[40px] min-h-[40px]"
+                                    title="Eliminar del carrito"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                
+                                {/* Precio */}
+                                <div className="mt-2">
+                                  {item.appliedCoupon && item.discountedPrice < item.price ? (
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-lg font-bold text-gray-900">
+                                        {formatPrice(item.discountedPrice)}
+                                      </span>
+                                      <span className="text-sm text-gray-500 line-through">
+                                        {formatPrice(item.price)}
+                                      </span>
+                                      <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                                        {Math.round(((item.price - item.discountedPrice) / item.price) * 100)}% OFF
+                                      </Badge>
+                                    </div>
+                                  ) : (
+                                    <span className="text-lg font-bold text-gray-900">
+                                      {formatPrice(item.price)}
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                {/* Información adicional */}
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                  {item.condition && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {item.condition === 'nuevo' ? 'Nuevo' : 'Usado'}
+                                    </Badge>
+                                  )}
+                                  {item.freeShipping ? (
+                                    <Badge variant="outline" className="text-xs text-green-600 border-green-200">
+                                      <Truck className="h-3 w-3 mr-1" />
+                                      Envío gratis
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-xs text-gray-600">
+                                      <Truck className="h-3 w-3 mr-1" />
+                                      {item.shippingCost !== undefined ? formatPrice(item.shippingCost) : 'Envío'}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {/* Subtotal del vendedor */}
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium text-gray-700">Subtotal vendedor:</span>
+                            <span className="font-bold text-gray-900">{formatPriceNumber(getVendorSubtotal(sellerId))}</span>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {/* Botón de eliminar */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeFromCart(item.id)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  /* Carrito vacío */
+                  <div className="text-center py-12">
+                    <div className="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                      <ShoppingBag className="h-12 w-12 text-gray-400" />
                     </div>
-                  ))}
-                  {/* Subtotal por vendedor (solo visual, sin botón de compra por vendedor) */}
-                  <div className="bg-gray-50 p-3 rounded-lg mt-4">
-                    <div className="flex justify-between items-center font-semibold text-base mb-2">
-                      <span>Subtotal Vendedor:</span>
-                      <span>{formatPriceNumber(getVendorSubtotal(sellerId))}</span>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Tu carrito está vacío</h3>
+                    <p className="text-gray-500 mb-6">Agrega productos para comenzar a comprar</p>
+                    <Link href="/products">
+                      <Button className="bg-purple-600 hover:bg-purple-700 cart-button">
+                        <ShoppingBag className="h-4 w-4 mr-2" />
+                        Ver productos
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Footer con resumen y botones */}
+          {items.length > 0 && !showShippingForm && (
+            <div className="border-t bg-white p-4 space-y-4">
+              {/* Resumen de compra */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  Resumen de compra
+                </h4>
+                
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Productos ({items.length})</span>
+                    <span className="font-medium">{formatPriceNumber(getSubtotal())}</span>
+                  </div>
+                  
+                  {appliedCoupon && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Descuento ({appliedCoupon.discountType === "percentage" ? `${appliedCoupon.discountValue}%` : `$${appliedCoupon.discountValue}`})</span>
+                      <span className="font-medium">-{formatPriceNumber(getDiscountAmount())}</span>
+                    </div>
+                  )}
+                  
+                  <div className="border-t pt-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-lg">Total</span>
+                      <span className="font-bold text-2xl text-gray-900">{formatPriceNumber(getTotalPrice())}</span>
                     </div>
                   </div>
                 </div>
-              ))}
-              {items.length === 0 && (
-                <div className="text-center py-8">
-                  <ShoppingBag className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <p className="text-gray-500">Tu carrito está vacío</p>
-                  <Link href="/products">
-                    <Button className="mt-4">Ver productos</Button>
-                  </Link>
+              </div>
+
+              {/* Botones de acción */}
+              <div className="space-y-3">
+                <Button
+                  onClick={handleBuyAllItems}
+                  disabled={loading}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl text-lg cart-button"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="mr-2 h-5 w-5" />
+                      Comprar ahora
+                    </>
+                  )}
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={clearCart}
+                  className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 py-3 rounded-xl cart-button"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Limpiar carrito
+                </Button>
+              </div>
+
+              {/* Información adicional */}
+              <div className="text-xs text-gray-500 space-y-1">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-3 w-3 text-green-500" />
+                  <span>Compra segura con MercadoPago</span>
                 </div>
-              )}
-            </>
-          )}
-        </div>
-        {/* Botones de acción fijos abajo */}
-        {items.length > 0 && !showShippingForm && (
-          <div className="mt-6 pt-4 border-t bg-white sticky bottom-0 z-10">
-            <div className="bg-purple-50 p-4 rounded-lg mb-4">
-              <h4 className="font-semibold text-sm text-purple-800 mb-2">
-                🛒 Compra Centralizada
-              </h4>
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span>Vendedores:</span>
-                  <span className="font-medium">{getVendorCount()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Productos:</span>
-                  <span className="font-medium">{items.length}</span>
-                </div>
-                <div className="flex justify-between font-bold text-lg border-t pt-2">
-                  <span>Total:</span>
-                  <span>{formatPriceNumber(getTotalPrice())}</span>
+                <div className="flex items-center gap-2">
+                  <Truck className="h-3 w-3 text-blue-500" />
+                  <span>Envío a todo el país</span>
                 </div>
               </div>
             </div>
-            <div className="space-y-2">
-              <Button
-                onClick={handleBuyAllItems}
-                disabled={loading}
-                className="w-full bg-purple-600 hover:bg-purple-700"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Procesando...
-                  </>
-                ) : (
-                  <>
-                    <ShoppingBag className="mr-2 h-4 w-4" />
-                    Comprar Todo ({formatPriceNumber(getTotalPrice())})
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={clearCart}
-                className="w-full"
-              >
-                Limpiar carrito
-              </Button>
-            </div>
-            <div className="mt-4 text-xs text-gray-500">
-              <p>💡 Ahora solo puedes realizar compras centralizadas de todos los productos del carrito.</p>
-              <p>El sistema centralizado permite múltiples productos en una sola transacción.</p>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </SheetContent>
     </Sheet>
   )

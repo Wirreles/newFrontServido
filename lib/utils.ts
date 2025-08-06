@@ -30,6 +30,48 @@ export function formatPriceNumber(price: number): string {
   }).format(price)
 }
 
+// Función para formatear precios con decimales reducidos (estilo MercadoLibre)
+export function formatPriceReduced(price: number): string {
+  const formatted = new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(price)
+  
+  // Si termina en ,00, remover los decimales
+  if (formatted.endsWith(',00')) {
+    return formatted.replace(',00', '')
+  }
+  
+  // Si termina en ,0, remover el 0
+  if (formatted.endsWith(',0')) {
+    return formatted.replace(',0', '')
+  }
+  
+  return formatted
+}
+
+// Función para formatear precios con decimales reducidos sin símbolo de moneda
+export function formatPriceNumberReduced(price: number): string {
+  const formatted = new Intl.NumberFormat('es-AR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(price)
+  
+  // Si termina en ,00, remover los decimales
+  if (formatted.endsWith(',00')) {
+    return formatted.replace(',00', '')
+  }
+  
+  // Si termina en ,0, remover el 0
+  if (formatted.endsWith(',0')) {
+    return formatted.replace(',0', '')
+  }
+  
+  return formatted
+}
+
 export function encrypt(text: string): string {
   const iv = crypto.randomBytes(IV_LENGTH)
   const salt = crypto.randomBytes(SALT_LENGTH)

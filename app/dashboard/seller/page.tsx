@@ -77,6 +77,8 @@ import { hasWhiteBackground, isValidVideoFile, getVideoDuration } from "@/lib/im
 import { useToast } from "@/components/ui/use-toast"
 import { ApiService } from "@/lib/services/api"
 import { BankConfigForm } from "@/components/seller/bank-config-form"
+import { PaymentDateButton } from "@/components/ui/payment-date-button"
+import { PriceFormatToggle } from "@/components/ui/price-format-toggle"
 import { 
   getSellerSales, 
   calculateCommissionDistribution, 
@@ -2058,14 +2060,14 @@ export default function SellerDashboardPage() {
                 <MessageSquare className="h-4 w-4" />
                 Chats
               </Button> */}
-              <Button
+              {/* <Button
                 variant={activeTab === "coupons" ? "secondary" : "ghost"}
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
                 onClick={() => setActiveTab("coupons")}
               >
                 <Tag className="h-4 w-4" />
                 Cupones
-              </Button>
+              </Button> */}
               <Button
                 variant={activeTab === "create-coupons" ? "secondary" : "ghost"}
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
@@ -2194,7 +2196,7 @@ export default function SellerDashboardPage() {
                   <MessageSquare className="mr-2 h-5 w-5" />
                   Mis Chats
                 </Button> */}
-                <Button
+                {/* <Button
                   variant={activeTab === "coupons" ? "secondary" : "ghost"}
                   onClick={() => {
                     setActiveTab("coupons")
@@ -2204,7 +2206,7 @@ export default function SellerDashboardPage() {
                 >
                   <Tag className="mr-2 h-5 w-5" />
                   Cupones
-                </Button>
+                </Button> */}
                 <Button
                   variant={activeTab === "create-coupons" ? "secondary" : "ghost"}
                   onClick={() => {
@@ -3086,6 +3088,7 @@ export default function SellerDashboardPage() {
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="profile">Mi Perfil</TabsTrigger>
                     <TabsTrigger value="subscription">Suscripción</TabsTrigger>
+                    <TabsTrigger value="settings">Configuración General</TabsTrigger>
                     {/* <TabsTrigger value="mercadopago">MercadoPago</TabsTrigger>  */}
                   </TabsList>
                   
@@ -3227,21 +3230,34 @@ export default function SellerDashboardPage() {
                     </div>
                   </TabsContent>
                   
-                  {/* <TabsContent value="mercadopago" className="space-y-6 mt-6">
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">Configuración de Pagos</h3>
-                      <div className="bg-blue-100 text-blue-800 p-3 rounded flex items-center gap-2">
-                        <span className="font-semibold">ℹ️ Sistema de pagos centralizado activo.</span>
-                        <span className="text-xs">Los pagos se procesan de forma centralizada. Configura tus datos bancarios para recibir pagos.</span>
-                      </div>
-                      <div className="mt-4">
-                        <p className="text-sm text-gray-600">
-                          El nuevo sistema de pagos centralizado permite una mejor gestión de comisiones y distribución de fondos.
-                          Los pagos se procesan a través de nuestra cuenta oficial de MercadoPago.
-                        </p>
-                      </div>
+                  <TabsContent value="settings" className="space-y-6 mt-6">
+                    <div className="space-y-6">
+                      <h3 className="text-lg font-semibold">Configuración General</h3>
+                      
+                      {/* Configuración de formato de precios */}
+                      <PriceFormatToggle 
+                        onFormatChange={(useReducedDecimals) => {
+                          // Aquí se puede agregar lógica adicional si es necesario
+                          console.log('Formato de precios actualizado:', useReducedDecimals)
+                        }}
+                      />
+                      
+                      {/* Otras configuraciones pueden ir aquí */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Otras Configuraciones</CardTitle>
+                          <CardDescription>
+                            Configuraciones adicionales de la aplicación
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-gray-600">
+                            Más configuraciones estarán disponibles próximamente.
+                          </p>
+                        </CardContent>
+                      </Card>
                     </div>
-                  </TabsContent> */}
+                  </TabsContent>
                 </Tabs>
                   </CardContent>
                 </Card>
@@ -3398,7 +3414,7 @@ export default function SellerDashboardPage() {
             </div>
           )}
 
-          {activeTab === "coupons" && (
+          {/* {activeTab === "coupons" && (
             <Card>
               <CardHeader>
                 <CardTitle>Gestionar Cupones de Descuento</CardTitle>
@@ -3576,7 +3592,7 @@ export default function SellerDashboardPage() {
                 )}
               </CardContent>
             </Card>
-          )}
+          )} */}
 
           {/* Create Coupons Tab */}
           {activeTab === "create-coupons" && (
@@ -3839,6 +3855,7 @@ export default function SellerDashboardPage() {
                       <TableHead>Comprador</TableHead>
                       <TableHead>Fecha</TableHead>
                       <TableHead>Estado de Envío</TableHead>
+                      <TableHead>Fecha de Pago</TableHead>
                       <TableHead>Acción</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -3865,6 +3882,14 @@ export default function SellerDashboardPage() {
                               <SelectItem value="cancelado">Cancelado</SelectItem>
                             </SelectContent>
                           </Select>
+                        </TableCell>
+                        <TableCell>
+                          <PaymentDateButton
+                            paymentDate={venta.fechaPago || null}
+                            productName={venta.productName}
+                            amount={venta.productPrice * venta.quantity}
+                            status={venta.status === 'approved' ? 'pagado' : 'pendiente'}
+                          />
                         </TableCell>
                         <TableCell>
                           <Button 

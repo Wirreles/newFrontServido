@@ -88,6 +88,51 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  /* Cart drawer specific styles */
+  .cart-drawer {
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+  }
+
+  .cart-drawer::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .cart-drawer::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .cart-drawer::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+    border-radius: 3px;
+  }
+
+  .cart-drawer::-webkit-scrollbar-thumb:hover {
+    background-color: #9ca3af;
+  }
+
+  /* Smooth transitions for cart items */
+  .cart-item {
+    transition: all 0.2s ease-in-out;
+  }
+
+  .cart-item:hover {
+    transform: translateY(-1px);
+  }
+
+  /* Improved button styles for mobile */
+  @media (max-width: 768px) {
+    .cart-button {
+      min-height: 48px;
+      font-size: 16px;
+    }
+    
+    .cart-item-image {
+      min-width: 80px;
+      min-height: 80px;
+    }
+  }
 }
 
 @keyframes spin-slow {
