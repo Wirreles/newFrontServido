@@ -69,15 +69,7 @@ export function SubscriptionNotification({ status, onClose }: SubscriptionNotifi
             <div className="mt-4 pt-4 border-t border-green-200">
               <div className="flex items-center gap-2 text-sm text-green-700">
                 <CheckCircle className="w-4 h-4" />
-                <span>Límite de productos aumentado</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-green-700 mt-1">
-                <CheckCircle className="w-4 h-4" />
-                <span>Acceso a funciones premium</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-green-700 mt-1">
-                <CheckCircle className="w-4 h-4" />
-                <span>Soporte prioritario</span>
+                <span>Ya tienes disponible la creacion de los servicios</span>
               </div>
             </div>
           )}
