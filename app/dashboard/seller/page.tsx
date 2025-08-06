@@ -69,7 +69,7 @@ import {
 } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"
 import { Loader2 } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 // import { ChatList } from "@/components/chat-list"
 import { hasWhiteBackground, isValidVideoFile, getVideoDuration } from "@/lib/image-validation"
@@ -98,6 +98,7 @@ import { getSellerShipments, updateShippingStatus, initializeShipping } from "@/
 import * as XLSX from "xlsx"
 import { getDashboardProductImage } from "@/lib/image-utils"
 import { formatPrice, formatPriceNumber } from "@/lib/utils"
+import { SubscriptionNotification } from "@/components/subscription-notification"
 
 interface UserProfile {
   uid: string
@@ -224,6 +225,7 @@ export default function SellerDashboardPage() {
   const { currentUser, authLoading, handleLogout, refreshUserProfile } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
+  const searchParams = useSearchParams()
 
   const [activeTab, setActiveTab] = useState("dashboard")
   const [myProducts, setMyProducts] = useState<Product[]>([])
@@ -302,6 +304,12 @@ export default function SellerDashboardPage() {
 
   // 1. Añadir estado para controlar el loading de suscripción
   const [subscribing, setSubscribing] = useState(false)
+  
+  // Estado para notificación de suscripción
+  const [subscriptionNotification, setSubscriptionNotification] = useState<{
+    show: boolean
+    status: 'success' | 'failure'
+  }>({ show: false, status: 'success' })
 
   // Estado para gestión de cupones
   const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null)
@@ -410,6 +418,25 @@ export default function SellerDashboardPage() {
     }
     fetchData()
   }, [currentUser])
+
+  // useEffect para manejar parámetros de suscripción en la URL
+  useEffect(() => {
+    const subscriptionStatus = searchParams.get('subscription')
+    
+    if (subscriptionStatus === 'success') {
+      setSubscriptionNotification({ show: true, status: 'success' })
+      // Limpiar el parámetro de la URL
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('subscription')
+      window.history.replaceState({}, '', newUrl.toString())
+    } else if (subscriptionStatus === 'failure') {
+      setSubscriptionNotification({ show: true, status: 'failure' })
+      // Limpiar el parámetro de la URL
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('subscription')
+      window.history.replaceState({}, '', newUrl.toString())
+    }
+  }, [searchParams])
 
   // Mostrar todas las ventas del vendedor sin filtros
   const filteredSales = sales;
@@ -3861,6 +3888,14 @@ export default function SellerDashboardPage() {
           )}
         </main>
       </div>
+      
+      {/* Notificación de suscripción */}
+      {subscriptionNotification.show && (
+        <SubscriptionNotification
+          status={subscriptionNotification.status}
+          onClose={() => setSubscriptionNotification({ show: false, status: 'success' })}
+        />
+      )}
     </div>
   )
 }
