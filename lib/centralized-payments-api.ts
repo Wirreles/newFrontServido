@@ -1,4 +1,4 @@
-// 🧱 FUNCIONES PARA SISTEMA DE PAGOS CENTRALIZADOS - FIREBASE + API CALLS
+// 🧱 FUNCIONES PARA SISTEMA DE PAGOS CENTRALIZADOS - FIREBASE + API CALLS 1
 import { ApiService } from '@/lib/services/api'
 import { 
   collection, 
