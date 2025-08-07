@@ -1,19 +1,14 @@
 "use client"
 
-import type React from "react"
-
-import Link from "next/link"
-import Image from "next/image"
-import { Button } from "@/components/ui/button"
-import { Carousel, CarouselContent, CarouselItem } from "@/components/ui/carousel"
-import { Card, CardContent } from "@/components/ui/card"
-import { useEffect, useState } from "react"
-import { db } from "@/lib/firebase"
-import { collection, getDocs, limit, query, orderBy, where, documentId } from "firebase/firestore" // Import documentId
-import { useAuth } from "@/contexts/auth-context"
-import { Facebook, Instagram, AlertCircle } from "lucide-react"
-import { Dialog } from "@/components/ui/dialog"
-import { formatPrice } from "@/lib/utils"
+import React, { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { Card, CardContent } from '@/components/ui/card'
+import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel'
+import { AlertCircle } from 'lucide-react'
+import { formatPrice } from '@/lib/utils'
+import { SimpleImage } from '@/components/ui/simple-image'
+import { collection, getDocs, query, orderBy, limit, where } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 
 interface Product {
   id: string
@@ -63,98 +58,124 @@ interface OfferAlert {
 }
 
 export default function HomePage() {
-  const { currentUser, authLoading, getVenderLink, getDashboardLink } = useAuth()
-
-  const [categories, setCategories] = useState<CategoryItem[]>([])
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([])
   const [newProducts, setNewProducts] = useState<Product[]>([])
-  const [recentlyViewedProducts, setRecentlyViewedProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<CategoryItem[]>([])
   const [brands, setBrands] = useState<BrandItem[]>([])
   const [banners, setBanners] = useState<Banner[]>([])
+  const [recentlyViewedProducts, setRecentlyViewedProducts] = useState<Product[]>([])
   const [loadingData, setLoadingData] = useState(true)
-  const [offerAlerts, setOfferAlerts] = useState<OfferAlert[]>([])
-  const [showAlert, setShowAlert] = useState(false)
   const [activeAlert, setActiveAlert] = useState<OfferAlert | null>(null)
+  const [showAlert, setShowAlert] = useState(false)
 
   useEffect(() => {
-    if (authLoading) return
-
     const fetchData = async () => {
       setLoadingData(true)
       try {
-        const categoriesQuery = query(collection(db, "categories"), orderBy("name"), limit(12))
-        const categorySnapshot = await getDocs(categoriesQuery)
-        setCategories(categorySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as CategoryItem))
+        // Fetch featured products - simplificado
+        const featuredQuery = query(
+          collection(db, 'products'),
+          orderBy('createdAt', 'desc'),
+          limit(10)
+        )
+        const featuredSnapshot = await getDocs(featuredQuery)
+        const featuredData = featuredSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Product[]
+        setFeaturedProducts(featuredData)
+
+        // Fetch new products - simplificado
+        const newQuery = query(
+          collection(db, 'products'),
+          orderBy('createdAt', 'desc'),
+          limit(10)
+        )
+        const newSnapshot = await getDocs(newQuery)
+        const newData = newSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Product[]
+        setNewProducts(newData)
+
+        // Fetch categories
+        const categoriesQuery = query(collection(db, 'categories'), orderBy('name'))
+        const categoriesSnapshot = await getDocs(categoriesQuery)
+        const categoriesData = categoriesSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as CategoryItem[]
+        setCategories(categoriesData)
+
+        // Fetch brands
+        const brandsQuery = query(collection(db, 'brands'), orderBy('name'))
+        const brandsSnapshot = await getDocs(brandsQuery)
+        const brandsData = brandsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as BrandItem[]
+        setBrands(brandsData)
 
         // Fetch banners
         const bannersQuery = query(
-          collection(db, "banners"), 
-          where("isActive", "==", true), 
-          orderBy("order"), 
-          limit(10)
+          collection(db, 'banners'),
+          orderBy('order')
         )
-        const bannerSnapshot = await getDocs(bannersQuery)
-        setBanners(bannerSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Banner))
+        const bannersSnapshot = await getDocs(bannersQuery)
+        const bannersData = bannersSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Banner[]
+        setBanners(bannersData)
 
-        // Fetch a larger set of latest products and then slice them
-        const latestProductsQuery = query(collection(db, "products"), orderBy("createdAt", "desc"), limit(20))
-        const latestProductSnapshot = await getDocs(latestProductsQuery)
-        const allLatestProducts = latestProductSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Product)
-
-        setFeaturedProducts(allLatestProducts.slice(0, 10)) // First 10 for featured
-        setNewProducts(allLatestProducts.slice(10, 20)) // Next 10 for new products
-
-        const brandsQuery = query(collection(db, "brands"), orderBy("name"), limit(8))
-        const brandSnapshot = await getDocs(brandsQuery)
-        setBrands(brandSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as BrandItem))
-
-        // Fetch recently viewed products
-        const storedRecentlyViewedIds = JSON.parse(localStorage.getItem("servido-recently-viewed") || "[]")
-        if (storedRecentlyViewedIds.length > 0) {
-          // Firestore 'in' query has a limit of 10, so we might need multiple queries if more than 10 IDs
-          // For simplicity, we'll query for up to 10.
-          const recentlyViewedQuery = query(
-            collection(db, "products"),
-            where(documentId(), "in", storedRecentlyViewedIds.slice(0, 10)),
-          )
-          const recentlyViewedSnapshot = await getDocs(recentlyViewedQuery)
-          const fetchedRecentlyViewed = recentlyViewedSnapshot.docs.map(
-            (doc) => ({ id: doc.id, ...doc.data() }) as Product,
-          )
-
-          // Sort fetched products to match the order in localStorage
-          const orderedRecentlyViewed = storedRecentlyViewedIds
-            .map((id: string) => fetchedRecentlyViewed.find((p) => p.id === id))
-            .filter(Boolean) as Product[] // Filter out any null/undefined if product not found
-
-          setRecentlyViewedProducts(orderedRecentlyViewed)
+        // Fetch recently viewed products from localStorage
+        const recentlyViewed = localStorage.getItem('recentlyViewedProducts')
+        if (recentlyViewed) {
+          const recentIds = JSON.parse(recentlyViewed).slice(0, 5)
+          if (recentIds.length > 0) {
+            const recentProducts = await Promise.all(
+              recentIds.map(async (id: string) => {
+                const doc = await getDocs(query(collection(db, 'products'), where('__name__', '==', id)))
+                if (!doc.empty) {
+                  return { id: doc.docs[0].id, ...doc.docs[0].data() } as Product
+                }
+                return null
+              })
+            )
+            setRecentlyViewedProducts(recentProducts.filter(Boolean) as Product[])
+          }
         }
 
-        // Fetch offer alerts
-        const alertsQuery = query(collection(db, "offerAlerts"), where("isActive", "==", true))
-        const alertSnapshot = await getDocs(alertsQuery)
-        const alerts = alertSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as OfferAlert)
-        setOfferAlerts(alerts)
+        // Fetch active alerts
+        const alertsQuery = query(
+          collection(db, 'alerts'),
+          orderBy('createdAt', 'desc'),
+          limit(1)
+        )
+        const alertsSnapshot = await getDocs(alertsQuery)
+        if (!alertsSnapshot.empty) {
+          const alertData = alertsSnapshot.docs[0].data() as OfferAlert
+          const now = new Date()
+          const startDate = alertData.startDate?.toDate?.() || new Date(0)
+          const endDate = alertData.endDate?.toDate?.() || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+          
+          if (now >= startDate && now <= endDate) {
+            const seen = localStorage.getItem(`servido-alert-${alertsSnapshot.docs[0].id}`)
+            if (!seen) {
+              setActiveAlert({ ...alertData, id: alertsSnapshot.docs[0].id })
+            }
+          }
+        }
+
       } catch (error) {
-        console.error("Error fetching homepage data:", error)
+        console.error('Error fetching data:', error)
       } finally {
         setLoadingData(false)
       }
     }
-    fetchData()
-  }, [authLoading])
 
-  // Lógica para mostrar solo alertas no vistas
-  useEffect(() => {
-    if (offerAlerts.length === 0) return
-    const unseen = offerAlerts.find((alert) => {
-      const key = `servido-alert-${alert.id}`
-      return !localStorage.getItem(key)
-    })
-    if (unseen) {
-      setActiveAlert(unseen)
-    }
-  }, [offerAlerts])
+    fetchData()
+  }, [])
 
   const handleOpenAlert = () => {
     setShowAlert(true)
@@ -162,6 +183,7 @@ export default function HomePage() {
       localStorage.setItem(`servido-alert-${activeAlert.id}`, "seen")
     }
   }
+  
   const handleCloseAlert = () => {
     setShowAlert(false)
     setActiveAlert(null)
@@ -180,21 +202,17 @@ export default function HomePage() {
                     <div className="aspect-[16/5] md:aspect-[16/4] relative">
                       {banner.linkUrl ? (
                         <Link href={banner.linkUrl}>
-                          <Image
+                          <SimpleImage
                             src={banner.imageUrl}
                             alt={banner.title}
-                            fill
-                            className="object-cover rounded-md"
-                            priority={banner.order === 1}
+                            className="w-full h-full object-cover rounded-md"
                           />
                         </Link>
                       ) : (
-                        <Image
+                        <SimpleImage
                           src={banner.imageUrl}
                           alt={banner.title}
-                          fill
-                          className="object-cover rounded-md"
-                          priority={banner.order === 1}
+                          className="w-full h-full object-cover rounded-md"
                         />
                       )}
                     </div>
@@ -205,12 +223,10 @@ export default function HomePage() {
           ) : (
             // Fallback to default banners if no dynamic banners
             <div className="aspect-[16/5] md:aspect-[16/4] relative">
-              <Image
+              <SimpleImage
                 src="/images/banner-1.png"
                 alt="Servido - Para cada momento un producto ideal."
-                fill
-                className="object-cover rounded-md"
-                priority
+                className="w-full h-full object-cover rounded-md"
               />
             </div>
           )}
@@ -240,14 +256,13 @@ export default function HomePage() {
                       className="flex flex-col items-center transition-all duration-200 ease-in-out hover:scale-105"
                     >
                       <div className="relative w-20 h-20 sm:w-24 sm:h-24 mb-3 rounded-full overflow-hidden bg-white shadow-md hover:shadow-lg flex items-center justify-center">
-                        <Image
+                        <SimpleImage
                           src={
                             category.imageUrl ||
                             `/placeholder.svg?height=96&width=96&query=${category.iconQuery || category.name + " icon"}`
                           }
                           alt={category.name}
-                          fill
-                          className="object-contain p-3"
+                          className="w-full h-full object-contain p-3"
                         />
                       </div>
                       <span className="text-xs sm:text-sm font-medium text-center text-gray-700 leading-tight">{category.name}</span>
@@ -271,19 +286,17 @@ export default function HomePage() {
                     <div className="aspect-[16/5] md:aspect-[16/4] relative">
                       {banner.linkUrl ? (
                         <Link href={banner.linkUrl}>
-                          <Image
+                          <SimpleImage
                             src={banner.imageUrl}
                             alt={banner.title}
-                            fill
-                            className="object-cover rounded-md"
+                            className="w-full h-full object-cover rounded-md"
                           />
                         </Link>
                       ) : (
-                        <Image
+                        <SimpleImage
                           src={banner.imageUrl}
                           alt={banner.title}
-                          fill
-                          className="object-cover rounded-md"
+                          className="w-full h-full object-cover rounded-md"
                         />
                       )}
                     </div>
@@ -299,18 +312,17 @@ export default function HomePage() {
       {banners.length <= 1 && (
         <section className="w-full py-8">
           <div className="w-full max-w-screen-xl mx-auto aspect-[16/5] md:aspect-[16/4] relative">
-            <Image
+            <SimpleImage
               src="/images/banner-2.png"
               alt="Servido - Todo lo que necesitas para tu auto lo encontras acá."
-              fill
-              className="object-cover rounded-md"
+              className="w-full h-full object-cover rounded-md"
             />
           </div>
         </section>
       )}
 
       {/* Featured Products */}
-      <section className="py-8 bg-white">
+      <section className="py-8">
         <div className="container mx-auto px-4 md:px-6">
           <h2 className="text-2xl font-semibold mb-6">Productos Destacados</h2>
           {loadingData && featuredProducts.length === 0 ? (
@@ -325,15 +337,14 @@ export default function HomePage() {
                     <Link href={`/product/${product.id}`} className="block">
                       <Card className="overflow-hidden hover:shadow-xl transition-shadow h-full flex flex-col">
                         <div className="aspect-square relative w-full">
-                          <Image
+                          <SimpleImage
                             src={
                               (product.media && product.media.length > 0 && product.media[0].url) ||
                               product.imageUrl ||
                               `/placeholder.svg?height=200&width=200&query=${product.imageQuery || product.name}`
                             }
                             alt={product.name}
-                            layout="fill"
-                            objectFit="cover"
+                            className="w-full h-full object-cover"
                           />
                         </div>
                         <CardContent className="p-3 flex flex-col flex-grow">
@@ -378,15 +389,14 @@ export default function HomePage() {
                     <Link href={`/product/${product.id}`} className="block">
                       <Card className="overflow-hidden hover:shadow-xl transition-shadow h-full flex flex-col">
                         <div className="aspect-square relative w-full">
-                          <Image
+                          <SimpleImage
                             src={
                               (product.media && product.media.length > 0 && product.media[0].url) ||
                               product.imageUrl ||
                               `/placeholder.svg?height=200&width=200&query=${product.imageQuery || product.name}`
                             }
                             alt={product.name}
-                            layout="fill"
-                            objectFit="cover"
+                            className="w-full h-full object-cover"
                           />
                         </div>
                         <CardContent className="p-3 flex flex-col flex-grow">
@@ -427,15 +437,14 @@ export default function HomePage() {
                     <Link href={`/product/${product.id}`} className="block">
                       <Card className="overflow-hidden hover:shadow-xl transition-shadow h-full flex flex-col">
                         <div className="aspect-square relative w-full">
-                          <Image
+                          <SimpleImage
                             src={
                               (product.media && product.media.length > 0 && product.media[0].url) ||
                               product.imageUrl ||
                               `/placeholder.svg?height=200&width=200&query=${product.imageQuery || product.name}`
                             }
                             alt={product.name}
-                            layout="fill"
-                            objectFit="cover"
+                            className="w-full h-full object-cover"
                           />
                         </div>
                         <CardContent className="p-3 flex flex-col flex-grow">
@@ -453,32 +462,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* Registration Banner */}
-      {!currentUser && (
-        <section className="py-12 bg-purple-600 text-white">
-          <div className="container mx-auto px-4 md:px-6 text-center">
-            <h2 className="text-3xl font-bold mb-4">¿Nuevo en Servido?</h2>
-            <p className="text-lg mb-6">
-              Regístrate para acceder a ofertas exclusivas, guardar tus favoritos y mucho más.
-            </p>
-            <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-              <Button asChild size="lg" className="bg-white text-purple-700 hover:bg-gray-100 w-full sm:w-auto">
-                <Link href="/signup?role=buyer">Crear cuenta de Comprador</Link>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                size="lg"
-                className="border-white text-purple-700 hover:bg-white hover:text-purple-700 w-full sm:w-auto"
-              >
-                <Link href={getVenderLink()}>Crear cuenta de Vendedor</Link>
-              </Button>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Rotating Brands (now horizontal scroll) */}
+      {/* Brands Section */}
       <section className="py-12">
         <div className="container mx-auto px-4 md:px-6">
           <h2 className="text-2xl font-semibold mb-8 text-center">Nuestras Marcas</h2>
@@ -495,7 +479,7 @@ export default function HomePage() {
                 {/* Duplicate brands to create a seamless loop */}
                 {brands.concat(brands).map((brand, index) => (
                   <div key={`${brand.id}-${index}`} className="flex-shrink-0 px-4" style={{ width: "150px" }}>
-                    <Image
+                    <SimpleImage
                       src={
                         brand.imageUrl ||
                         `/placeholder.svg?height=60&width=100&query=${brand.logoQuery || brand.name + " logo"}&color=gray`
@@ -503,8 +487,7 @@ export default function HomePage() {
                       alt={brand.name}
                       width={100}
                       height={60}
-                      objectFit="contain"
-                      className="mx-auto"
+                      className="mx-auto object-contain"
                     />
                   </div>
                 ))}
@@ -526,145 +509,20 @@ export default function HomePage() {
       )}
 
       {/* Modal de alerta */}
-      {activeAlert && (
-        <Dialog open={showAlert} onOpenChange={setShowAlert}>
-          <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-xl">
-              <div className="flex items-center gap-3 mb-2">
-                <AlertCircle className="w-6 h-6 text-purple-600" />
-                <h2 className="text-lg font-bold">{activeAlert.title}</h2>
-              </div>
-              <p className="mb-4">{activeAlert.message}</p>
-              <button
-                onClick={handleCloseAlert}
-                className="mt-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </Dialog>
-      )}
-
-      {/* Footer */}
-      <footer className="bg-gray-800 text-white pt-12 pb-8">
-        <div className="container mx-auto px-4 md:px-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
-            {/* Servido Info */}
-            <div>
-              <div className="mb-3">
-                <Image src="/images/logo.png" alt="Servido Logo" width={120} height={40} />
-              </div>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <Link href="/acerca-de-nosotros" className="hover:text-blue-400">
-                    Acerca de Nosotros
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/trabaja-con-nosotros" className="hover:text-blue-400">
-                    Trabaja con Nosotros
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/terminos-y-condiciones" className="hover:text-blue-400">
-                    Términos y Condiciones
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/politicas-de-privacidad" className="hover:text-blue-400">
-                    Políticas de Privacidad
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            {/* Contact Info */}
-            <div>
-              <h3 className="text-lg font-semibold mb-3">Contacto</h3>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  Email:{" "}
-                  <a href="mailto:servidoarg@gmail.com" className="hover:text-blue-400">
-                    servidoarg@gmail.com
-                  </a>
-                </li>
-                <li>
-                  Contacto:{" "}
-                  <a href="mailto:servidoarg@gmail.com" className="hover:text-blue-400">
-                    servidoarg@gmail.com
-                  </a>
-                </li>
-              </ul>
-              <h3 className="text-lg font-semibold mb-3 mt-6">Síguenos</h3>
-              <div className="flex gap-4">
-                <Link
-                  href="https://www.facebook.com/servido.arg?mibextid=wwXIfr&rdid=HPnI8K6F3ciHfW0I&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F1BsQTJsDLf%2F%3Fmibextid%3DwwXIfr#"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-blue-400"
-                >
-                  <Facebook className="h-6 w-6" />
-                  <span className="sr-only">Facebook</span>
-                </Link>
-                <Link
-                  href="https://www.instagram.com/accounts/login/?next=%2Fservido.ok%2F&source=omni_redirect"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-blue-400"
-                >
-                  <Instagram className="h-6 w-6" />
-                  <span className="sr-only">Instagram</span>
-                </Link>
-              </div>
-            </div>
-
-            {/* Quick Links */}
-            <div>
-              <h3 className="text-lg font-semibold mb-3">Enlaces Rápidos</h3>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <Link href="/dashboard/buyer" className="hover:text-blue-400">
-                    Mis Compras
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-blue-400">
-                    Ofertas
-                  </Link>
-                </li>
-                <li>
-                  <Link href={getVenderLink()} className="hover:text-blue-400">
-                    Vender
-                  </Link>
-                </li>
-                <li>
-                  <Link href={getDashboardLink()} className="hover:text-blue-400">
-                    Mi Cuenta
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-blue-400">
-                    Historial
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            {/* Motivational Quote */}
-            <div className="col-span-full lg:col-span-1 flex flex-col justify-end">
-              <p className="text-sm italic text-gray-400 mb-2">
-                "La clave para un día productivo es empezar con una mentalidad positiva"
-              </p>
-              <p className="text-sm font-semibold text-gray-300">Jonathan CEO</p>
-            </div>
-          </div>
-          <div className="border-t border-gray-700 pt-8 text-center text-sm">
-            <p>&copy; {new Date().getFullYear()} Servido. Todos los derechos reservados.</p>
-            <p>Creado por Atenea Software.</p>
+      {showAlert && activeAlert && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-2">{activeAlert.title}</h3>
+            <p className="text-gray-600 mb-4">{activeAlert.message}</p>
+            <button
+              onClick={handleCloseAlert}
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
+            >
+              Entendido
+            </button>
           </div>
         </div>
-      </footer>
+      )}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import Image from "next/image"
+import { SimpleImage } from '@/components/ui/simple-image'
 import Link from "next/link"
 import {
   doc,
@@ -848,11 +848,7 @@ export default function ProductDetailPage() {
                   Tu navegador no soporta videos.
                 </video>
               ) : (
-                <Image
-                  src={productMedia[selectedMediaIndex]?.url || "/placeholder.svg"}
-                  alt={product.name}
-                  layout="fill"
-                  objectFit="cover"
+                <SimpleImage src={productMedia[selectedMediaIndex]?.url || "/placeholder.svg"} alt={product.name} className="w-full h-full object-cover" objectFit="cover"
                   className="transition-all duration-300"
                 />
               )}
@@ -899,9 +895,7 @@ export default function ProductDetailPage() {
                       </div>
                     </div>
                   ) : (
-                    <Image
-                      src={media.url || "/placeholder.svg"}
-                      alt={`${product.name} ${index + 1}`}
+                    <SimpleImage src={media.url || "/placeholder.svg"} alt={`${product.name} ${index + 1}`}
                       layout="fill"
                       objectFit="cover"
                     />
@@ -1445,11 +1439,7 @@ export default function ProductDetailPage() {
                   <Link key={relatedProduct.id} href={`/product/${relatedProduct.id}`}>
                     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
                       <div className="aspect-square relative">
-                        <Image
-                          src={firstImage?.url || relatedProduct.imageUrl || "/placeholder.svg"}
-                          alt={relatedProduct.name}
-                          layout="fill"
-                          objectFit="cover"
+                        <SimpleImage src={firstImage?.url || relatedProduct.imageUrl || "/placeholder.svg"} alt={relatedProduct.name} className="w-full h-full object-cover" objectFit="cover"
                         />
                       </div>
                       <CardContent className="p-3">

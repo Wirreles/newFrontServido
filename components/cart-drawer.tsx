@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ShoppingCart, Plus, Minus, Trash2, X, Loader2, ShoppingBag, ArrowLeft, Truck, CreditCard, Shield } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
-import Image from "next/image"
+import { SimpleImage } from '@/components/ui/simple-image'
 import Link from "next/link"
 import { useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
@@ -375,11 +375,7 @@ export function CartDrawer() {
                               {/* Imagen del producto */}
                               <div className="flex-shrink-0">
                                 <div className="w-20 h-20 sm:w-24 sm:h-24 relative rounded-lg overflow-hidden bg-gray-100 cart-item-image">
-                                  <Image
-                                    src={getCartItemImage(item.media, item.imageUrl)}
-                                    alt={item.name}
-                                    layout="fill"
-                                    objectFit="cover"
+                                  <SimpleImage src={getCartItemImage(item.media, item.imageUrl)} alt={item.name} className="w-full h-full object-cover" objectFit="cover"
                                     className="rounded-lg"
                                   />
                                 </div>
