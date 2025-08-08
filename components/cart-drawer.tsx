@@ -39,7 +39,9 @@ export function CartDrawer() {
     getVendorCount,
     getTotalCommission,
     getVendorSubtotal,
-    canCreateCentralizedPurchase
+    canCreateCentralizedPurchase,
+    getTotalShipping,
+    getTotalWithShipping
   } = useCart()
   const { currentUser } = useAuth()
   const { toast } = useToast()
@@ -512,10 +514,17 @@ export function CartDrawer() {
                     </div>
                   )}
                   
+                  {getTotalShipping() > 0 && (
+                    <div className="flex justify-between text-blue-600">
+                      <span>Envío</span>
+                      <span className="font-medium">{formatPriceNumber(getTotalShipping())}</span>
+                    </div>
+                  )}
+                  
                   <div className="border-t pt-2">
                     <div className="flex justify-between items-center">
                       <span className="font-semibold text-lg">Total</span>
-                      <span className="font-bold text-2xl text-gray-900">{formatPriceNumber(getTotalPrice())}</span>
+                      <span className="font-bold text-2xl text-gray-900">{formatPriceNumber(getTotalWithShipping())}</span>
                     </div>
                   </div>
                 </div>

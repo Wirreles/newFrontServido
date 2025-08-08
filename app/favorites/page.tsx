@@ -8,8 +8,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Heart, Star, MapPin, Clock, User, Package, ShoppingCart } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
+import { useCart } from "@/contexts/cart-context"
 import { db } from "@/lib/firebase"
-import { collection, getDocs, query, where, doc, deleteDoc, addDoc, serverTimestamp } from "firebase/firestore"
+import { collection, getDocs, query, where, doc, deleteDoc } from "firebase/firestore"
 import { formatPrice } from "@/lib/utils"
 import { getProductThumbnail } from "@/lib/image-utils"
 import { useToast } from "@/components/ui/use-toast"
@@ -38,6 +39,7 @@ interface FavoriteProduct {
 
 export default function FavoritesPage() {
   const { currentUser, authLoading } = useAuth()
+  const { addItem } = useCart()
   const { toast } = useToast()
   const [favorites, setFavorites] = useState<FavoriteProduct[]>([])
   const [loading, setLoading] = useState(true)
@@ -125,7 +127,7 @@ export default function FavoritesPage() {
     }
   }
 
-  const addToCart = async (product: FavoriteProduct) => {
+  const addToCart = (product: FavoriteProduct) => {
     if (!currentUser) {
       toast({
         title: "Error",
@@ -136,29 +138,20 @@ export default function FavoritesPage() {
     }
 
     try {
-      // Verificar si el producto ya está en el carrito
-      const cartQuery = query(
-        collection(db, "cart"),
-        where("userId", "==", currentUser.firebaseUser.uid),
-        where("productId", "==", product.id)
-      )
-      const cartSnapshot = await getDocs(cartQuery)
-      
-      if (!cartSnapshot.empty) {
-        toast({
-          title: "Producto ya en carrito",
-          description: "Este producto ya está en tu carrito",
-          duration: 3000,
-        })
-        return
-      }
-
-      // Agregar al carrito
-      await addDoc(collection(db, "cart"), {
-        userId: currentUser.firebaseUser.uid,
-        productId: product.id,
+      addItem({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        discountedPrice: product.price, // Sin descuento por defecto
         quantity: 1,
-        addedAt: serverTimestamp()
+        imageUrl: product.imageUrl,
+        media: product.media,
+        isService: product.isService,
+        sellerId: product.sellerId,
+        condition: product.condition,
+        freeShipping: product.freeShipping,
+        shippingCost: product.shippingCost,
       })
 
       toast({
@@ -267,12 +260,12 @@ export default function FavoritesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {favorites.map((product) => (
               <Card key={product.favoriteId} className="h-full hover:shadow-lg transition-shadow duration-200 group">
-                <div className="aspect-square relative overflow-hidden rounded-t-lg">
+                <div className="aspect-square relative overflow-hidden rounded-t-lg bg-white">
                   <Image
                     src={getProductThumbnail(product.media, product.imageUrl, product.name)}
                     alt={product.name}
                     fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-200"
+                    className="object-contain group-hover:scale-105 transition-transform duration-200"
                   />
                   <div className="absolute top-2 left-2">
                     <Badge className="bg-purple-600 text-white">

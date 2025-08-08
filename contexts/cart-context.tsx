@@ -72,6 +72,8 @@ interface CartContextType {
   getTotalCommission: () => number
   getVendorSubtotal: (sellerId: string) => number
   canCreateCentralizedPurchase: () => boolean
+  getTotalShipping: () => number
+  getTotalWithShipping: () => number
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
@@ -300,6 +302,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
     )
   }
 
+  const getTotalShipping = (): number => {
+    return state.items.reduce((total, item) => {
+      // Si el producto tiene envío gratis, no agregar costo
+      if (item.freeShipping) {
+        return total
+      }
+      // Si tiene costo de envío definido, agregarlo
+      if (item.shippingCost !== undefined && item.shippingCost > 0) {
+        return total + item.shippingCost
+      }
+      // Si no tiene envío gratis ni costo definido, no agregar nada
+      return total
+    }, 0)
+  }
+
+  const getTotalWithShipping = (): number => {
+    return getTotalPrice() + getTotalShipping()
+  }
+
   return (
     <CartContext.Provider
       value={{
@@ -320,6 +341,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         getTotalCommission,
         getVendorSubtotal,
         canCreateCentralizedPurchase,
+        getTotalShipping,
+        getTotalWithShipping,
       }}
     >
       {children}

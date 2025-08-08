@@ -194,7 +194,12 @@ export default function HomePage() {
       {/* Dynamic Banner Carousel */}
       <section className="w-full pt-4 pb-8">
         <div className="w-full max-w-screen-xl mx-auto">
-          {banners.length > 0 ? (
+          {loadingData ? (
+            // Mostrar loading mientras se cargan los banners
+            <div className="aspect-[16/5] md:aspect-[16/4] relative bg-gray-200 rounded-md flex items-center justify-center">
+              <div className="text-gray-500">Cargando banners...</div>
+            </div>
+          ) : banners.length > 0 ? (
             <Carousel opts={{ align: "start", loop: true }} className="w-full">
               <CarouselContent>
                 {banners.map((banner) => (
@@ -221,7 +226,7 @@ export default function HomePage() {
               </CarouselContent>
             </Carousel>
           ) : (
-            // Fallback to default banners if no dynamic banners
+            // Fallback to default banners only if no dynamic banners in database
             <div className="aspect-[16/5] md:aspect-[16/4] relative">
               <SimpleImage
                 src="/images/banner-1.png"
@@ -276,7 +281,7 @@ export default function HomePage() {
       </section>
 
       {/* Second Dynamic Banner Carousel */}
-      {banners.length > 1 && (
+      {!loadingData && banners.length > 1 && (
         <section className="w-full py-8">
           <div className="w-full max-w-screen-xl mx-auto">
             <Carousel opts={{ align: "start", loop: true }} className="w-full">
@@ -309,7 +314,7 @@ export default function HomePage() {
       )}
       
       {/* Fallback Second Banner if no dynamic banners */}
-      {banners.length <= 1 && (
+      {!loadingData && banners.length <= 1 && (
         <section className="w-full py-8">
           <div className="w-full max-w-screen-xl mx-auto aspect-[16/5] md:aspect-[16/4] relative">
             <SimpleImage
@@ -321,100 +326,132 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* Featured Products */}
-      <section className="py-8">
-        <div className="container mx-auto px-4 md:px-6">
-          <h2 className="text-2xl font-semibold mb-6">Productos Destacados</h2>
-          {loadingData && featuredProducts.length === 0 ? (
-            <p>Cargando productos destacados...</p>
-          ) : featuredProducts.length === 0 ? (
-            <p>No hay productos destacados en este momento.</p>
-          ) : (
-            <Carousel opts={{ align: "start", dragFree: true }} className="w-full">
-              <CarouselContent className="-ml-4">
-                {featuredProducts.map((product) => (
-                  <CarouselItem key={product.id} className="pl-4 basis-[45%] sm:basis-1/3 md:basis-1/4 lg:basis-1/5">
-                    <Link href={`/product/${product.id}`} className="block">
-                      <Card className="overflow-hidden hover:shadow-xl transition-shadow h-full flex flex-col">
-                        <div className="aspect-square relative w-full">
-                          <SimpleImage
-                            src={
-                              (product.media && product.media.length > 0 && product.media[0].url) ||
-                              product.imageUrl ||
-                              `/placeholder.svg?height=200&width=200&query=${product.imageQuery || product.name}`
-                            }
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <CardContent className="p-3 flex flex-col flex-grow">
-                          <h3 className="text-sm font-medium mb-1 truncate h-10 leading-tight">{product.name}</h3>
-                          <p className="text-lg font-semibold text-blue-600 mb-2">{formatPrice(product.price)}</p>
-                          {/* Condición */}
-                          {product.condition && (
-                            <span className="text-xs font-medium text-gray-700 mb-1">
-                              {product.condition === 'nuevo' ? 'Nuevo' : 'Usado'}
-                            </span>
-                          )}
-                          {/* Envío */}
-                          {product.freeShipping ? (
-                            <span className="text-xs text-green-600">Envío gratis</span>
-                          ) : (
-                            <span className="text-xs text-gray-600">Envío: {product.shippingCost !== undefined ? formatPrice(product.shippingCost) : '-'}</span>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-            </Carousel>
-          )}
-        </div>
-      </section>
+                    {/* Featured Products */}
+        <section className="py-8">
+          <div className="container mx-auto px-4 md:px-6">
+            <h2 className="text-2xl font-semibold mb-6">Productos Destacados</h2>
+            {loadingData && featuredProducts.length === 0 ? (
+              <p>Cargando productos destacados...</p>
+            ) : featuredProducts.length === 0 ? (
+              <p>No hay productos destacados en este momento.</p>
+            ) : (
+              <Carousel opts={{ align: "start", dragFree: true }} className="w-full">
+                <CarouselContent className="-ml-4">
+                  {featuredProducts.map((product) => (
+                    <CarouselItem key={product.id} className="pl-4 basis-[45%] sm:basis-1/3 md:basis-1/4 lg:basis-1/5">
+                      <Link href={`/product/${product.id}`} className="block">
+                                               <Card className="overflow-hidden hover:shadow-xl transition-shadow product-card-fixed">
+                          <div className="product-image-container relative">
+                            <SimpleImage
+                              src={
+                                (product.media && product.media.length > 0 && product.media[0].url) ||
+                                product.imageUrl ||
+                                `/placeholder.svg?height=200&width=200&query=${product.imageQuery || product.name}`
+                              }
+                              alt={product.name}
+                              className="product-image"
+                            />
+                            {/* Badges superpuestos */}
+                            <div className="absolute top-2 right-2 flex flex-col gap-1">
+                              {/* Estado del producto */}
+                              {product.condition && (
+                                <span className={`px-2 py-1 text-xs font-bold rounded-full ${
+                                  product.condition === 'nuevo' 
+                                    ? 'bg-green-500 text-white' 
+                                    : 'bg-orange-500 text-white'
+                                }`}>
+                                  {product.condition === 'nuevo' ? 'NUEVO' : 'USADO'}
+                                </span>
+                              )}
+                              {/* Envío */}
+                              {product.freeShipping ? (
+                                <span className="px-2 py-1 text-xs font-bold rounded-full bg-blue-500 text-white">
+                                  ENVÍO GRATIS
+                                </span>
+                              ) : product.shippingCost !== undefined ? (
+                                <span className="px-2 py-1 text-xs font-bold rounded-full bg-gray-700 text-white">
+                                  ENVÍO ${product.shippingCost}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                                                  <CardContent className="p-3 flex flex-col flex-grow justify-between h-[120px]">
+                            <div className="flex-grow">
+                              <h3 className="text-sm font-medium mb-1 line-clamp-2 leading-tight min-h-[2.5rem]">{product.name}</h3>
+                              <p className="text-lg font-semibold text-blue-600 mb-2">{formatPrice(product.price)}</p>
+                            </div>
+                            <div className="space-y-1 mt-auto">
+                              {/* Aquí puedes agregar información adicional si es necesario */}
+                            </div>
+                          </CardContent>
+                       </Card>
+                     </Link>
+                   </CarouselItem>
+                 ))}
+               </CarouselContent>
+             </Carousel>
+           )}
+         </div>
+       </section>
 
-      {/* New Products */}
-      <section className="py-8">
-        <div className="container mx-auto px-4 md:px-6">
-          <h2 className="text-2xl font-semibold mb-6">Productos Nuevos</h2>
-          {loadingData && newProducts.length === 0 ? (
-            <p>Cargando productos nuevos...</p>
-          ) : newProducts.length === 0 ? (
-            <p>No hay productos nuevos en este momento.</p>
-          ) : (
-            <Carousel opts={{ align: "start", dragFree: true }} className="w-full">
-              <CarouselContent className="-ml-4">
-                {newProducts.map((product) => (
-                  <CarouselItem key={product.id} className="pl-4 basis-[45%] sm:basis-1/3 md:basis-1/4 lg:basis-1/5">
-                    <Link href={`/product/${product.id}`} className="block">
-                      <Card className="overflow-hidden hover:shadow-xl transition-shadow h-full flex flex-col">
-                        <div className="aspect-square relative w-full">
-                          <SimpleImage
-                            src={
-                              (product.media && product.media.length > 0 && product.media[0].url) ||
-                              product.imageUrl ||
-                              `/placeholder.svg?height=200&width=200&query=${product.imageQuery || product.name}`
-                            }
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <CardContent className="p-3 flex flex-col flex-grow">
-                          <h3 className="text-sm font-medium mb-1 truncate h-10 leading-tight">{product.name}</h3>
-                          <p className="text-lg font-semibold text-blue-600 mb-2">{formatPrice(product.price)}</p>
-                          {/* Condición */}
-                          {product.condition && (
-                            <span className="text-xs font-medium text-gray-700 mb-1">
-                              {product.condition === 'nuevo' ? 'Nuevo' : 'Usado'}
-                            </span>
-                          )}
-                          {/* Envío */}
-                          {product.freeShipping ? (
-                            <span className="text-xs text-green-600">Envío gratis</span>
-                          ) : (
-                            <span className="text-xs text-gray-600">Envío: {product.shippingCost !== undefined ? formatPrice(product.shippingCost) : '-'}</span>
-                          )}
-                        </CardContent>
+             {/* New Products */}
+       <section className="py-8">
+         <div className="container mx-auto px-4 md:px-6">
+           <h2 className="text-2xl font-semibold mb-6">Productos Nuevos</h2>
+           {loadingData && newProducts.length === 0 ? (
+             <p>Cargando productos nuevos...</p>
+           ) : newProducts.length === 0 ? (
+             <p>No hay productos nuevos en este momento.</p>
+           ) : (
+                                       <Carousel opts={{ align: "start", dragFree: true }} className="w-full">
+               <CarouselContent className="-ml-4">
+                 {newProducts.map((product) => (
+                   <CarouselItem key={product.id} className="pl-4 basis-[45%] sm:basis-1/3 md:basis-1/4 lg:basis-1/5">
+                     <Link href={`/product/${product.id}`} className="block">
+                       <Card className="overflow-hidden hover:shadow-xl transition-shadow product-card-fixed">
+                         <div className="product-image-container relative">
+                           <SimpleImage
+                             src={
+                               (product.media && product.media.length > 0 && product.media[0].url) ||
+                               product.imageUrl ||
+                               `/placeholder.svg?height=200&width=200&query=${product.imageQuery || product.name}`
+                             }
+                             alt={product.name}
+                             className="product-image"
+                           />
+                           {/* Badges superpuestos */}
+                           <div className="absolute top-2 right-2 flex flex-col gap-1">
+                             {/* Estado del producto */}
+                             {product.condition && (
+                               <span className={`px-2 py-1 text-xs font-bold rounded-full ${
+                                 product.condition === 'nuevo' 
+                                   ? 'bg-green-500 text-white' 
+                                   : 'bg-orange-500 text-white'
+                               }`}>
+                                 {product.condition === 'nuevo' ? 'NUEVO' : 'USADO'}
+                               </span>
+                             )}
+                             {/* Envío */}
+                             {product.freeShipping ? (
+                               <span className="px-2 py-1 text-xs font-bold rounded-full bg-blue-500 text-white">
+                                 ENVÍO GRATIS
+                               </span>
+                             ) : product.shippingCost !== undefined ? (
+                               <span className="px-2 py-1 text-xs font-bold rounded-full bg-gray-700 text-white">
+                                 ENVÍO ${product.shippingCost}
+                               </span>
+                             ) : null}
+                           </div>
+                         </div>
+                                                                          <CardContent className="p-3 flex flex-col flex-grow justify-between h-[120px]">
+                            <div className="flex-grow">
+                              <h3 className="text-sm font-medium mb-1 line-clamp-2 leading-tight min-h-[2.5rem]">{product.name}</h3>
+                              <p className="text-lg font-semibold text-blue-600 mb-2">{formatPrice(product.price)}</p>
+                            </div>
+                            <div className="space-y-1 mt-auto">
+                              {/* Aquí puedes agregar información adicional si es necesario */}
+                            </div>
+                          </CardContent>
                       </Card>
                     </Link>
                   </CarouselItem>
@@ -435,23 +472,50 @@ export default function HomePage() {
                 {recentlyViewedProducts.map((product) => (
                   <CarouselItem key={product.id} className="pl-4 basis-[45%] sm:basis-1/3 md:basis-1/4 lg:basis-1/5">
                     <Link href={`/product/${product.id}`} className="block">
-                      <Card className="overflow-hidden hover:shadow-xl transition-shadow h-full flex flex-col">
-                        <div className="aspect-square relative w-full">
-                          <SimpleImage
-                            src={
-                              (product.media && product.media.length > 0 && product.media[0].url) ||
-                              product.imageUrl ||
-                              `/placeholder.svg?height=200&width=200&query=${product.imageQuery || product.name}`
-                            }
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <CardContent className="p-3 flex flex-col flex-grow">
-                          <h3 className="text-sm font-medium mb-1 truncate h-10 leading-tight">{product.name}</h3>
-                          <p className="text-lg font-semibold text-blue-600 mb-2">{formatPrice(product.price)}</p>
-                          <span className="text-xs text-green-600">Envío gratis</span>
-                        </CardContent>
+                                             <Card className="overflow-hidden hover:shadow-xl transition-shadow product-card-fixed">
+                                                   <div className="product-image-container relative">
+                            <SimpleImage
+                              src={
+                                (product.media && product.media.length > 0 && product.media[0].url) ||
+                                product.imageUrl ||
+                                `/placeholder.svg?height=200&width=200&query=${product.imageQuery || product.name}`
+                              }
+                              alt={product.name}
+                              className="product-image"
+                            />
+                            {/* Badges superpuestos */}
+                            <div className="absolute top-2 right-2 flex flex-col gap-1">
+                              {/* Estado del producto */}
+                              {product.condition && (
+                                <span className={`px-2 py-1 text-xs font-bold rounded-full ${
+                                  product.condition === 'nuevo' 
+                                    ? 'bg-green-500 text-white' 
+                                    : 'bg-orange-500 text-white'
+                                }`}>
+                                  {product.condition === 'nuevo' ? 'NUEVO' : 'USADO'}
+                                </span>
+                              )}
+                              {/* Envío */}
+                              {product.freeShipping ? (
+                                <span className="px-2 py-1 text-xs font-bold rounded-full bg-blue-500 text-white">
+                                  ENVÍO GRATIS
+                                </span>
+                              ) : product.shippingCost !== undefined ? (
+                                <span className="px-2 py-1 text-xs font-bold rounded-full bg-gray-700 text-white">
+                                  ENVÍO ${product.shippingCost}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                                                 <CardContent className="p-3 flex flex-col flex-grow justify-between h-[120px]">
+                           <div className="flex-grow">
+                             <h3 className="text-sm font-medium mb-1 line-clamp-2 leading-tight min-h-[2.5rem]">{product.name}</h3>
+                             <p className="text-lg font-semibold text-blue-600 mb-2">{formatPrice(product.price)}</p>
+                           </div>
+                           <div className="space-y-1 mt-auto">
+                             {/* Aquí puedes agregar información adicional si es necesario */}
+                           </div>
+                         </CardContent>
                       </Card>
                     </Link>
                   </CarouselItem>

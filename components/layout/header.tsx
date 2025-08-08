@@ -443,18 +443,6 @@ export function Header() {
           {/* Lado Derecho - Acciones de Usuario */}
           <div className="flex items-center gap-1 sm:gap-2 lg:gap-3 xl:gap-4 flex-shrink-0">
 
-            {/* Botón de menú móvil */}
-            <div className="lg:hidden">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsMobileMenuOpen(true)}
-                className="text-white hover:bg-purple-700 p-2"
-              >
-                <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
-              </Button>
-            </div>
-
             {/* Información del usuario */}
             <div className="flex items-center gap-1 sm:gap-2">
               {currentUser ? (
@@ -506,14 +494,14 @@ export function Header() {
             {/* Carrito */}
             <CartDrawer />
 
-            {/* Menú móvil */}
+            {/* Botón de menú móvil */}
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden text-white hover:bg-purple-700"
+              className="lg:hidden text-white hover:bg-purple-700 p-2"
             >
-              <Menu className="h-5 w-5" />
+              <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
           </div>
         </div>
@@ -599,9 +587,9 @@ export function Header() {
 
       {/* Menú Móvil */}
       <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-        <SheetContent side="left" className="w-full max-w-sm sm:w-80 bg-white">
+        <SheetContent side="left" className="w-full max-w-sm sm:w-80 bg-white overflow-y-auto">
           <SheetTitle className="text-left text-lg sm:text-xl">Menú</SheetTitle>
-          <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
+          <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4 pb-6">
             {/* Búsqueda móvil */}
             <div className="space-y-2">
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-1">Búsqueda</div>

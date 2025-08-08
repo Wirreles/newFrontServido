@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ShoppingCart, Users, Calculator, DollarSign } from "lucide-react"
+import { ShoppingCart, Users, Calculator, DollarSign, Truck } from "lucide-react"
 import { getCartPurchaseSummary } from "@/lib/centralized-payments-api"
 import { formatPrice, formatPriceNumber } from "@/lib/utils"
 
@@ -15,12 +15,28 @@ interface PurchaseSummaryProps {
     discountedPrice: number
     quantity: number
     sellerId: string
+    freeShipping?: boolean
+    shippingCost?: number
   }>
   className?: string
 }
 
 export function PurchaseSummary({ cartItems, className = "" }: PurchaseSummaryProps) {
   const summary = getCartPurchaseSummary(cartItems)
+  
+  // Calcular envío total
+  const totalShipping = cartItems.reduce((total, item) => {
+    // Si el producto tiene envío gratis, no agregar costo
+    if (item.freeShipping) {
+      return total
+    }
+    // Si tiene costo de envío definido, agregarlo
+    if (item.shippingCost !== undefined && item.shippingCost > 0) {
+      return total + item.shippingCost
+    }
+    // Si no tiene envío gratis ni costo definido, no agregar nada
+    return total
+  }, 0)
 
   return (
     <Card className={className}>
@@ -96,6 +112,16 @@ export function PurchaseSummary({ cartItems, className = "" }: PurchaseSummaryPr
             <span className="font-medium">{formatPriceNumber(summary.subtotal)}</span>
           </div>
           
+          {totalShipping > 0 && (
+            <div className="flex justify-between items-center text-blue-600">
+              <div className="flex items-center gap-1">
+                <Truck className="h-4 w-4" />
+                <span className="text-sm">Envío:</span>
+              </div>
+              <span className="font-medium">{formatPriceNumber(totalShipping)}</span>
+            </div>
+          )}
+          
           <div className="flex justify-between items-center text-purple-600">
             <div className="flex items-center gap-1">
               <Calculator className="h-4 w-4" />
@@ -111,7 +137,7 @@ export function PurchaseSummary({ cartItems, className = "" }: PurchaseSummaryPr
               <DollarSign className="h-5 w-5" />
               <span>Total a pagar:</span>
             </div>
-            <span>{formatPriceNumber(summary.total)}</span>
+            <span>{formatPriceNumber(summary.total + totalShipping)}</span>
           </div>
         </div>
 

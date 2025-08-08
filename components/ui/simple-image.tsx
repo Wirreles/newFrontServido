@@ -11,6 +11,7 @@ interface SimpleImageProps {
   className?: string
   priority?: boolean
   onError?: () => void
+  onLoad?: () => void
   fallbackSrc?: string
   placeholderText?: string
 }
@@ -23,6 +24,7 @@ export function SimpleImage({
   className = "",
   priority = false,
   onError,
+  onLoad,
   fallbackSrc = "/placeholder.svg",
   placeholderText
 }: SimpleImageProps) {
@@ -32,6 +34,7 @@ export function SimpleImage({
 
   const handleLoad = () => {
     setIsLoading(false)
+    onLoad?.()
   }
 
   const handleError = () => {

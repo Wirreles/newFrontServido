@@ -181,11 +181,14 @@ export default function ProductDetailPage() {
 
   // Get product media (with backward compatibility)
   const getProductMedia = (product: Product): ProductMedia[] => {
+    console.log('getProductMedia called with product:', product)
     if (product.media && product.media.length > 0) {
+      console.log('Using product.media:', product.media)
       return product.media
     }
     // Backward compatibility: convert old imageUrl to media format
     if (product.imageUrl) {
+      console.log('Using product.imageUrl:', product.imageUrl)
       return [
         {
           type: "image",
@@ -194,6 +197,7 @@ export default function ProductDetailPage() {
         },
       ]
     }
+    console.log('Using placeholder image')
     return [
       {
         type: "image",
@@ -204,12 +208,31 @@ export default function ProductDetailPage() {
   }
 
   const productMedia = product ? getProductMedia(product) : []
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('productMedia updated:', productMedia)
+    console.log('selectedMediaIndex:', selectedMediaIndex)
+    console.log('Current selected media:', productMedia[selectedMediaIndex])
+  }, [productMedia, selectedMediaIndex])
 
   useEffect(() => {
     if (params.id && !authLoading) {
       fetchProductDetails(params.id as string)
     }
   }, [params.id, currentUser, authLoading])
+
+  // Reset selectedMediaIndex when product changes
+  useEffect(() => {
+    setSelectedMediaIndex(0)
+  }, [product?.id])
+
+  // Ensure selectedMediaIndex is within bounds when productMedia changes
+  useEffect(() => {
+    if (productMedia.length > 0 && selectedMediaIndex >= productMedia.length) {
+      setSelectedMediaIndex(0)
+    }
+  }, [productMedia, selectedMediaIndex])
 
   const fetchProductDetails = async (productId: string) => {
     setLoading(true)
@@ -351,10 +374,14 @@ export default function ProductDetailPage() {
       discountedPrice: finalPrice,
       quantity: quantity,
       imageUrl: firstImage?.url || product.imageUrl,
+      media: product.media,
       isService: product.isService,
       sellerId: product.sellerId,
       stock: product.stock,
       appliedCoupon: appliedCoupon,
+      condition: product.condition,
+      freeShipping: product.freeShipping,
+      shippingCost: product.shippingCost,
     })
 
     setQuantity(1)
@@ -848,8 +875,12 @@ export default function ProductDetailPage() {
                   Tu navegador no soporta videos.
                 </video>
               ) : (
-                <SimpleImage src={productMedia[selectedMediaIndex]?.url || "/placeholder.svg"} alt={product.name} className="w-full h-full object-cover" objectFit="cover"
-                  className="transition-all duration-300"
+                <SimpleImage 
+                  src={productMedia[selectedMediaIndex]?.url || "/placeholder.svg"} 
+                  alt={product.name} 
+                  className="w-full h-full object-contain bg-gray-50 transition-all duration-300" 
+                  onLoad={() => console.log('Main image loaded:', productMedia[selectedMediaIndex]?.url, 'Index:', selectedMediaIndex)}
+                  key={`main-image-${selectedMediaIndex}`}
                 />
               )}
               <div className="absolute top-4 right-4 flex gap-2">
@@ -873,7 +904,11 @@ export default function ProductDetailPage() {
               {productMedia.map((media, index) => (
                 <button
                   key={index}
-                  onClick={() => setSelectedMediaIndex(index)}
+                  onClick={() => {
+                    console.log('Thumbnail clicked:', index, 'Current selectedMediaIndex:', selectedMediaIndex)
+                    console.log('productMedia array:', productMedia)
+                    setSelectedMediaIndex(index)
+                  }}
                   className={`flex-shrink-0 w-20 h-20 relative rounded-md overflow-hidden border-2 transition-colors ${
                     selectedMediaIndex === index ? "border-blue-500" : "border-gray-200"
                   }`}
@@ -881,11 +916,10 @@ export default function ProductDetailPage() {
                   {media.type === "video" ? (
                     <div className="w-full h-full bg-gray-200 flex items-center justify-center relative">
                       {media.thumbnail ? (
-                        <Image
+                        <SimpleImage
                           src={media.thumbnail || "/placeholder.svg"}
                           alt={`Video ${index + 1}`}
-                          layout="fill"
-                          objectFit="cover"
+                          className="w-full h-full object-contain bg-gray-50"
                         />
                       ) : (
                         <Video className="h-8 w-8 text-gray-600" />
@@ -895,9 +929,10 @@ export default function ProductDetailPage() {
                       </div>
                     </div>
                   ) : (
-                    <SimpleImage src={media.url || "/placeholder.svg"} alt={`${product.name} ${index + 1}`}
-                      layout="fill"
-                      objectFit="cover"
+                    <SimpleImage 
+                      src={media.url || "/placeholder.svg"} 
+                      alt={`${product.name} ${index + 1}`}
+                      className="w-full h-full object-contain bg-gray-50"
                     />
                   )}
                 </button>
@@ -1113,24 +1148,10 @@ export default function ProductDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Shipping and Benefits */}
-            <div className="space-y-2 sm:space-y-3">
-              <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
-                <Truck className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
-                <span>Envío gratis a todo el país</span>
-              </div>
-              <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
-                <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
-                <span>Compra protegida</span>
-              </div>
-              <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
-                <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0" />
-                <span>Devolución gratis</span>
-              </div>
-              <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
-                <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 flex-shrink-0" />
-                <span>Llega mañana</span>
-              </div>
+            {/* Compra Protegida */}
+            <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
+              <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
+              <span>Compra Protegida</span>
             </div>
           </div>
         </div>
@@ -1439,7 +1460,10 @@ export default function ProductDetailPage() {
                   <Link key={relatedProduct.id} href={`/product/${relatedProduct.id}`}>
                     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
                       <div className="aspect-square relative">
-                        <SimpleImage src={firstImage?.url || relatedProduct.imageUrl || "/placeholder.svg"} alt={relatedProduct.name} className="w-full h-full object-cover" objectFit="cover"
+                        <SimpleImage 
+                          src={firstImage?.url || relatedProduct.imageUrl || "/placeholder.svg"} 
+                          alt={relatedProduct.name} 
+                          className="w-full h-full object-contain bg-gray-50"
                         />
                       </div>
                       <CardContent className="p-3">
