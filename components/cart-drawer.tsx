@@ -85,6 +85,7 @@ export function CartDrawer() {
         quantity: purchaseData.item.quantity,
         buyerId: currentUser.firebaseUser.uid,
         buyerEmail: currentUser.firebaseUser.email || '',
+        shippingCost: purchaseData.item.shippingCost, // 🆕 Agregado: costo de envío
         shippingAddress: address
       })
 
@@ -155,10 +156,20 @@ export function CartDrawer() {
         quantity: item.quantity
       }))
 
+      // Calcular costo total de envío para este vendedor
+      const totalShippingCost = purchaseData.sellerItems.reduce((total, item) => {
+        if (item.freeShipping) return total
+        if (item.shippingCost !== undefined && item.shippingCost > 0) {
+          return total + item.shippingCost
+        }
+        return total
+      }, 0)
+
       const response = await ApiService.createMultipleProductsPurchase({
         products,
         buyerId: currentUser.firebaseUser.uid,
         buyerEmail: currentUser.firebaseUser.email || '',
+        shippingCost: totalShippingCost, // 🆕 Agregado: costo total de envío
         shippingAddress: address
       })
 
@@ -227,10 +238,20 @@ export function CartDrawer() {
         quantity: item.quantity
       }))
 
+      // Calcular costo total de envío para todos los items
+      const totalShippingCost = items.reduce((total, item) => {
+        if (item.freeShipping) return total
+        if (item.shippingCost !== undefined && item.shippingCost > 0) {
+          return total + item.shippingCost
+        }
+        return total
+      }, 0)
+
       const response = await ApiService.createMultipleProductsPurchase({
         products,
         buyerId: currentUser.firebaseUser.uid,
         buyerEmail: currentUser.firebaseUser.email || '',
+        shippingCost: totalShippingCost, // 🆕 Agregado: costo total de envío
         shippingAddress: address
       })
 

@@ -712,7 +712,8 @@ export default function ProductDetailPage() {
         productId: product.id,
         quantity: quantity,
         buyerId: currentUser.firebaseUser.uid,
-        buyerEmail: currentUser.firebaseUser.email || ''
+        buyerEmail: currentUser.firebaseUser.email || '',
+        shippingCost: product.shippingCost // <--- AGREGADO
       })
 
       if (response.error) {
