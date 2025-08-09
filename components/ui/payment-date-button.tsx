@@ -119,7 +119,7 @@ export function PaymentDateButton({
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-800">
                 <strong>Nota:</strong> El pago se procesará según la configuración establecida. 
-                Los vendedores reciben sus pagos descontando la comisión del 12%.
+                Los vendedores reciben sus pagos descontando la comisión del 8%.
               </p>
             </div>
           )}

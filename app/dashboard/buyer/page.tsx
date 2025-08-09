@@ -25,7 +25,8 @@ import {
   Menu, 
   Loader2, 
   Truck, 
-  CheckCircle
+  CheckCircle,
+  PackageCheck
 } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -472,6 +473,163 @@ export default function BuyerDashboardPage() {
 
   const handleChatWithSeller = async (purchase: CompraProductoBuyer) => {
     alert("Funcionalidad de chat temporalmente deshabilitada")
+  }
+
+  // 🆕 NUEVA FUNCIÓN: Confirmar entrega del producto
+  const handleConfirmDelivery = async (purchase: CompraProductoBuyer) => {
+    if (!currentUser) {
+      setError("Debes iniciar sesión para confirmar la entrega.")
+      return
+    }
+
+    if (!window.confirm("¿Confirmas que has recibido el producto en perfectas condiciones?")) {
+      return
+    }
+
+    try {
+      setLoadingData(true)
+      setError(null)
+
+      // Buscar la compra en la colección purchases
+      const purchaseRef = doc(db, "purchases", purchase.compraId)
+      const purchaseDoc = await getDoc(purchaseRef)
+
+      if (!purchaseDoc.exists()) {
+        setError("No se encontró la compra especificada.")
+        return
+      }
+
+      const purchaseData = purchaseDoc.data()
+      
+      // Buscar el producto específico en la compra
+      if (purchaseData.products && Array.isArray(purchaseData.products)) {
+        const productIndex = purchaseData.products.findIndex(
+          (prod: any) => prod.productId === purchase.productId
+        )
+
+        if (productIndex !== -1) {
+          // Actualizar el estado de envío del producto específico
+          const updatedProducts = [...purchaseData.products]
+          updatedProducts[productIndex] = {
+            ...updatedProducts[productIndex],
+            shippingStatus: 'entregado',
+            shippingUpdatedAt: serverTimestamp(),
+            shippingUpdatedBy: currentUser.firebaseUser.uid
+          }
+
+          // Actualizar el documento de la compra
+          await updateDoc(purchaseRef, {
+            products: updatedProducts
+          })
+
+          // Actualizar el estado local
+          setProductosComprados(prev => 
+            prev.map(p => 
+              p.compraId === purchase.compraId && p.productId === purchase.productId
+                ? { ...p, shippingStatus: 'entregado' }
+                : p
+            )
+          )
+
+          setSuccessMessage("¡Entrega confirmada exitosamente! El vendedor ha sido notificado.")
+        } else {
+          setError("No se encontró el producto en la compra.")
+        }
+      } else {
+        setError("Estructura de compra inválida.")
+      }
+    } catch (err) {
+      console.error("Error confirming delivery:", err)
+      if (err instanceof Error) {
+        setError(`Error al confirmar la entrega: ${err.message}`)
+      } else {
+        setError("Error al confirmar la entrega. Inténtalo de nuevo.")
+      }
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  // 🆕 NUEVA FUNCIÓN: Verificar si se puede confirmar la entrega
+  const canConfirmDelivery = (purchase: CompraProductoBuyer) => {
+    // Solo se puede confirmar si:
+    // 1. No es un servicio
+    // 2. El estado de envío es "enviado"
+    // 3. El pago está aprobado
+    return !purchase.isService && 
+           purchase.shippingStatus === 'enviado' && 
+           purchase.estadoPago === 'pagado'
+  }
+
+  // 🆕 NUEVA FUNCIÓN: Confirmar entrega para compras centralizadas
+  const handleConfirmDeliveryCentralized = async (purchaseId: string, item: PurchaseItem) => {
+    if (!currentUser) {
+      setError("Debes iniciar sesión para confirmar la entrega.")
+      return
+    }
+
+    if (!window.confirm("¿Confirmas que has recibido el producto en perfectas condiciones?")) {
+      return
+    }
+
+    try {
+      setLoadingData(true)
+      setError(null)
+
+      // Buscar la compra centralizada
+      const purchaseRef = doc(db, "centralizedPurchases", purchaseId)
+      const purchaseDoc = await getDoc(purchaseRef)
+
+      if (!purchaseDoc.exists()) {
+        setError("No se encontró la compra centralizada especificada.")
+        return
+      }
+
+      const purchaseData = purchaseDoc.data()
+      
+      // Buscar el producto específico en la compra centralizada
+      const productIndex = purchaseData.items.findIndex(
+        (prod: PurchaseItem) => prod.productoId === item.productoId
+      )
+
+      if (productIndex !== -1) {
+        // Actualizar el estado de envío del producto específico
+        const updatedItems = [...purchaseData.items]
+        updatedItems[productIndex] = {
+          ...updatedItems[productIndex],
+          shippingStatus: 'entregado',
+          shippingUpdatedAt: serverTimestamp(),
+          shippingUpdatedBy: currentUser.firebaseUser.uid
+        }
+
+        // Actualizar el documento de la compra centralizada
+        await updateDoc(purchaseRef, {
+          items: updatedItems
+        })
+
+        // Actualizar el estado local
+        setCentralizedPurchases(prev => 
+          prev.map(p => 
+            p.id === purchaseId 
+              ? { ...p, items: updatedItems }
+              : p
+          )
+        )
+
+        setSuccessMessage("¡Entrega confirmada exitosamente! El vendedor ha sido notificado.")
+      } else {
+        setError("No se encontró el producto en la compra centralizada.")
+      }
+    } catch (err) {
+      console.error("Error confirming delivery centralized:", err)
+      if (err instanceof Error) {
+        setError(`Error al confirmar la entrega: ${err.message}`)
+      } else {
+        setError("Error al confirmar la entrega. Inténtalo de nuevo.")
+      }
+    } finally {
+      setLoadingData(false)
+    }
   }
 
   // --- Profile Image Functions ---
@@ -1062,6 +1220,32 @@ export default function BuyerDashboardPage() {
                                     Chatear con el vendedor
                                   </Button>
                                 </div>
+                                
+                                {/* 🆕 NUEVO: Botón para confirmar entrega */}
+                                {canConfirmDelivery(purchase) && (
+                                  <div className="flex items-center gap-2 mt-2 w-full">
+                                    <Button
+                                      variant="default"
+                                      size="sm"
+                                      onClick={() => handleConfirmDelivery(purchase)}
+                                      className="flex items-center gap-2 w-full text-[11px] sm:text-xs whitespace-nowrap bg-green-600 hover:bg-green-700"
+                                      disabled={loadingData}
+                                    >
+                                      <PackageCheck className="h-4 w-4 shrink-0" />
+                                      {loadingData ? "Confirmando..." : "Confirmar Entrega"}
+                                    </Button>
+                                  </div>
+                                )}
+                                
+                                {/* 🆕 NUEVO: Mensaje cuando ya está entregado */}
+                                {purchase.shippingStatus === 'entregado' && (
+                                  <div className="flex items-center gap-2 mt-2 w-full">
+                                    <div className="flex items-center gap-2 w-full text-[11px] sm:text-xs text-green-700 bg-green-50 px-3 py-2 rounded-md">
+                                      <CheckCircle className="h-4 w-4 shrink-0" />
+                                      Entrega confirmada
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </CardContent>
                           </Card>
@@ -1350,7 +1534,7 @@ export default function BuyerDashboardPage() {
                     <div className="flex justify-center items-center py-10">
                       <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
                     </div>
-                  ) : productosComprados.length === 0 ? (
+                  ) : productosComprados.length === 0 && centralizedPurchases.length === 0 ? (
                     <div className="text-center py-10">
                       <p className="text-lg text-muted-foreground mb-6">Aún no tienes transacciones registradas.</p>
                       <Button asChild>
@@ -1359,6 +1543,103 @@ export default function BuyerDashboardPage() {
                     </div>
                   ) : (
                     <div className="space-y-4 w-full">
+                      {/* 🆕 NUEVO: Mostrar compras centralizadas primero */}
+                      {centralizedPurchases.map((purchase) => (
+                        <Card key={purchase.id} className="overflow-hidden w-full">
+                          <CardContent className="p-3 sm:p-4 w-full">
+                            <div className="space-y-3">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
+                                <div className="flex items-center space-x-4 w-full">
+                                  <div className="h-12 w-12 relative flex-shrink-0 bg-blue-100 rounded-md flex items-center justify-center">
+                                    <ShoppingBag className="h-6 w-6 text-blue-600" />
+                                  </div>
+                                  <div className="flex-1 min-w-0 w-full">
+                                    <p className="text-sm font-medium truncate break-all max-w-full">
+                                      Compra Centralizada #{purchase.id.slice(-8)}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground truncate break-all max-w-full">
+                                      {purchase.items.length} producto{purchase.items.length > 1 ? 's' : ''} • Múltiples vendedores
+                                    </p>
+                                    <p className="text-xs text-muted-foreground break-all max-w-full">
+                                      Fecha: {new Date(purchase.fecha).toLocaleDateString("es-ES", {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric'
+                                      })}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex flex-col sm:items-end gap-2 w-full sm:w-auto">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg font-semibold">{formatPriceNumber(purchase.total)}</span>
+                                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                      Centralizada
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* 🆕 NUEVO: Mostrar items individuales con estado de envío */}
+                              <div className="space-y-2 ml-16">
+                                {purchase.items.map((item, index) => (
+                                  <div key={`${item.productoId}-${index}`} className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
+                                    <div className="flex items-center space-x-3">
+                                      <div className="h-8 w-8 relative flex-shrink-0">
+                                        <Image
+                                          src={item.productoImagen || "/placeholder.svg"}
+                                          alt={item.productoNombre || "Producto"}
+                                          width={32}
+                                          height={32}
+                                          className="rounded-md object-cover"
+                                        />
+                                      </div>
+                                      <div>
+                                        <p className="text-xs font-medium">{item.productoNombre || "Producto"}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          Vendedor: {item.vendedorNombre || "Desconocido"}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-medium">{formatPriceNumber(item.subtotal)}</span>
+                                      <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getShippingBadgeClass(item.estadoEnvio || 'pendiente')}`}>
+                                        {getShippingIcon(item.estadoEnvio || 'pendiente')}
+                                        {getShippingStatusText(item.estadoEnvio || 'pendiente')}
+                                      </span>
+                                      
+                                      {/* 🆕 NUEVO: Botón para confirmar entrega en compras centralizadas */}
+                                      {!item.productoIsService && 
+                                       item.estadoEnvio === 'enviado' && 
+                                       item.estadoPagoVendedor === 'pagado' && (
+                                        <Button
+                                          variant="default"
+                                          size="sm"
+                                          onClick={() => handleConfirmDeliveryCentralized(purchase.id, item)}
+                                          className="flex items-center gap-1 text-xs bg-green-600 hover:bg-green-700 h-6 px-2"
+                                          disabled={loadingData}
+                                        >
+                                          <PackageCheck className="h-3 w-3" />
+                                          {loadingData ? "..." : "Entregado"}
+                                        </Button>
+                                      )}
+                                      
+                                      {/* 🆕 NUEVO: Mensaje cuando ya está entregado */}
+                                      {item.estadoEnvio === 'entregado' && (
+                                        <div className="flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-1 rounded-md">
+                                          <CheckCircle className="h-3 w-3" />
+                                          Entregado
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                      
+                      {/* Mostrar compras legacy */}
                       {productosComprados.map((purchase, index) => (
                         <Card key={`${purchase.compraId || 'sin-compra'}-${purchase.productId || 'sin-prod'}-${index}`} className="overflow-hidden w-full">
                           <CardContent className="p-3 sm:p-4 w-full">

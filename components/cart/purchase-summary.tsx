@@ -91,7 +91,7 @@ export function PurchaseSummary({ cartItems, className = "" }: PurchaseSummaryPr
                   <span>{formatPriceNumber(vendor.subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Comisión (12%):</span>
+                  <span>Comisión (8%):</span>
                   <span>-{formatPriceNumber(vendor.commission)}</span>
                 </div>
                 <div className="flex justify-between font-medium text-green-600">
@@ -125,7 +125,7 @@ export function PurchaseSummary({ cartItems, className = "" }: PurchaseSummaryPr
           <div className="flex justify-between items-center text-purple-600">
             <div className="flex items-center gap-1">
               <Calculator className="h-4 w-4" />
-              <span className="text-sm">Comisión total (12%):</span>
+              <span className="text-sm">Comisión total (8%):</span>
             </div>
             <span className="font-medium">{formatPriceNumber(summary.commission)}</span>
           </div>
@@ -145,7 +145,7 @@ export function PurchaseSummary({ cartItems, className = "" }: PurchaseSummaryPr
         <div className="bg-blue-50 p-3 rounded-lg">
           <p className="text-xs text-blue-800">
             <strong>Sistema centralizado:</strong> Los pagos se procesan a través de nuestra cuenta oficial de MercadoPago. 
-            Los vendedores recibirán sus pagos según la configuración establecida, descontando la comisión del 12%.
+            Los vendedores recibirán sus pagos según la configuración establecida, descontando la comisión del 8%.
           </p>
         </div>
       </CardContent>

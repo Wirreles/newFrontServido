@@ -281,7 +281,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const getTotalCommission = (): number => {
     const total = getTotalPrice()
-    return Math.round(total * 0.12 * 100) / 100 // 12% comisión
+    return Math.round(total * 0.08 * 100) / 100 // 8% comisión
   }
 
   const getVendorSubtotal = (sellerId: string): number => {
