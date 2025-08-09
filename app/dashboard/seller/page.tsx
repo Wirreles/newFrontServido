@@ -78,6 +78,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { ApiService } from "@/lib/services/api"
 import { BankConfigForm } from "@/components/seller/bank-config-form"
 import { PaymentDateButton } from "@/components/ui/payment-date-button"
+import { ShippingAddressButton } from "@/components/ui/shipping-address-button"
 import { PriceFormatToggle } from "@/components/ui/price-format-toggle"
 import { 
   getSellerSales, 
@@ -221,6 +222,17 @@ interface VentaProductoSeller {
   vendedorId: string;
   vendedorNombre: string;
   vendedorEmail: string;
+  shippingAddress?: {
+    fullName: string;
+    phone: string;
+    address: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    dni?: string;
+    additionalInfo?: string;
+  };
+  fechaPago?: string;
 }
 
 export default function SellerDashboardPage() {
@@ -384,11 +396,41 @@ export default function SellerDashboardPage() {
       productsSnap.forEach(doc => { products[doc.id] = doc.data() })
       setProductsMap(products)
       console.log('PRODUCTS:', products)
-      // Fetch purchases
+      
+      // Fetch centralized purchases (sistema nuevo)
+      const centralizedPurchasesSnap = await getDocs(collection(db, 'centralizedPurchases'))
+      const centralizedPurchases: any[] = centralizedPurchasesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      
+      // Desglosar productos vendidos por el vendedor actual desde compras centralizadas
+      const ventasCentralizadas: VentaProductoSeller[] = centralizedPurchases.flatMap((compra: any) => {
+        if (!Array.isArray(compra.items)) return []
+        return compra.items
+          .filter((item: any) => item.vendedorId === currentUser.firebaseUser.uid)
+          .map((item: any) => ({
+            compraId: compra.id || '',
+            paymentId: compra.mercadoPagoPaymentId || '',
+            status: compra.estadoPago || '',
+            totalAmount: compra.total || 0,
+            fechaCompra: compra.fecha || '',
+            buyerId: compra.compradorId || '',
+            compradorNombre: users[compra.compradorId]?.displayName || users[compra.compradorId]?.name || '',
+            compradorEmail: users[compra.compradorId]?.email || '',
+            productId: item?.productoId || '',
+            productName: item?.productoNombre || products[item?.productoId]?.name || 'Producto sin nombre',
+            productPrice: item?.precioUnitario || 0,
+            quantity: item?.cantidad || 0,
+            vendedorId: item?.vendedorId || '',
+            vendedorNombre: item?.vendedorNombre || '',
+            vendedorEmail: item?.vendedorEmail || '',
+            shippingAddress: compra.shippingAddress,
+            fechaPago: item?.fechaPagoVendedor || ''
+          }))
+      })
+      
+      // También obtener ventas del sistema antiguo (purchases)
       const purchasesSnap = await getDocs(collection(db, 'purchases'))
       const purchases: any[] = purchasesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      // Desglosar productos vendidos por el vendedor actual
-      const ventasPorProducto: VentaProductoSeller[] = purchases.flatMap((compra: any) => {
+      const ventasAntiguas: VentaProductoSeller[] = purchases.flatMap((compra: any) => {
         if (!Array.isArray(compra.products)) return []
         return compra.products
           .filter((prod: any) => prod.vendedorId === currentUser.firebaseUser.uid)
@@ -410,8 +452,13 @@ export default function SellerDashboardPage() {
             vendedorEmail: users[prod?.vendedorId]?.email || '',
           }))
       })
-      console.log('VENTAS POR PRODUCTO DEL VENDEDOR:', ventasPorProducto)
-      setSales(ventasPorProducto)
+      
+      // Combinar ventas de ambos sistemas
+      const todasLasVentas = [...ventasCentralizadas, ...ventasAntiguas]
+      console.log('VENTAS CENTRALIZADAS:', ventasCentralizadas)
+      console.log('VENTAS ANTIGUAS:', ventasAntiguas)
+      console.log('TODAS LAS VENTAS:', todasLasVentas)
+      setSales(todasLasVentas)
       setLoadingSales(false)
       // Debug filteredSales
       setTimeout(() => {
@@ -3847,67 +3894,94 @@ export default function SellerDashboardPage() {
                 <CardDescription>Administra el estado de envío de tus productos vendidos</CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Producto</TableHead>
-                      <TableHead>Cantidad</TableHead>
-                      <TableHead>Comprador</TableHead>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Estado de Envío</TableHead>
-                      <TableHead>Fecha de Pago</TableHead>
-                      <TableHead>Acción</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredSales.map((venta) => (
-                      <TableRow key={venta.compraId + '-' + venta.productId}>
-                        <TableCell>{venta.productName}</TableCell>
-                        <TableCell>{venta.quantity}</TableCell>
-                        <TableCell>{venta.compradorNombre} ({venta.compradorEmail})</TableCell>
-                        <TableCell>{venta.fechaCompra ? new Date(venta.fechaCompra).toLocaleDateString() : ''}</TableCell>
-                        <TableCell>
-                          <Select
-                            value={shippingStates[venta.compraId + '-' + venta.productId] || 'pendiente'}
-                            onValueChange={(value) => handleShippingStateChange(venta.compraId + '-' + venta.productId, value)}
-                          >
-                            <SelectTrigger className="w-[140px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pendiente">Pendiente</SelectItem>
-                              <SelectItem value="preparacion">En preparación</SelectItem>
-                              <SelectItem value="enviado">Enviado</SelectItem>
-                              <SelectItem value="entregado">Entregado</SelectItem>
-                              <SelectItem value="cancelado">Cancelado</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <PaymentDateButton
-                            paymentDate={venta.fechaPago || null}
-                            productName={venta.productName}
-                            amount={venta.productPrice * venta.quantity}
-                            status={venta.status === 'approved' ? 'pagado' : 'pendiente'}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => {
-                              console.log('🔘 BOTÓN CLICKEADO - Guardar Estado');
-                              console.log('Venta a guardar:', venta);
-                              handleSaveShippingState(venta);
-                            }}
-                          >
-                            Guardar Estado
-                          </Button>
-                        </TableCell>
+                {/* Tabla responsive con scroll horizontal */}
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="min-w-[150px]">Producto</TableHead>
+                        <TableHead className="min-w-[80px] text-center">Cant.</TableHead>
+                        <TableHead className="min-w-[140px]">Comprador</TableHead>
+                        <TableHead className="min-w-[140px]">Dirección</TableHead>
+                        <TableHead className="min-w-[100px]">Fecha</TableHead>
+                        <TableHead className="min-w-[140px]">Estado</TableHead>
+                        <TableHead className="min-w-[120px]">Acción</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredSales.map((venta) => {
+                        console.log('Venta en tabla:', venta)
+                        return (
+                          <TableRow key={venta.compraId + '-' + venta.productId}>
+                          <TableCell className="max-w-[150px]">
+                            <div className="truncate font-medium" title={venta.productName}>
+                              {venta.productName || 'Producto sin nombre'}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">{venta.quantity}</TableCell>
+                          <TableCell className="max-w-[140px]">
+                            <div>
+                              <div className="font-medium truncate" title={venta.compradorNombre}>
+                                {venta.compradorNombre}
+                              </div>
+                              <div className="text-sm text-gray-500 truncate" title={venta.compradorEmail}>
+                                {venta.compradorEmail}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-[140px]">
+                            <ShippingAddressButton
+                              shippingAddress={venta.shippingAddress}
+                              productName={venta.productName}
+                            />
+                          </TableCell>
+                          <TableCell className="max-w-[100px] text-sm">
+                            {venta.fechaCompra ? new Date(venta.fechaCompra).toLocaleDateString() : ''}
+                          </TableCell>
+                          <TableCell className="max-w-[140px]">
+                            <Select
+                              value={shippingStates[venta.compraId + '-' + venta.productId] || 'pendiente'}
+                              onValueChange={(value) => handleShippingStateChange(venta.compraId + '-' + venta.productId, value)}
+                            >
+                              <SelectTrigger className="w-full min-w-[120px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pendiente">Pendiente</SelectItem>
+                                <SelectItem value="preparacion">En preparación</SelectItem>
+                                <SelectItem value="enviado">Enviado</SelectItem>
+                                <SelectItem value="entregado">Entregado</SelectItem>
+                                <SelectItem value="cancelado">Cancelado</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="max-w-[120px]">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="w-full"
+                              onClick={() => {
+                                console.log('🔘 BOTÓN CLICKEADO - Guardar Estado');
+                                console.log('Venta a guardar:', venta);
+                                handleSaveShippingState(venta);
+                              }}
+                            >
+                              Guardar
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+                
+                {/* Mensaje cuando no hay ventas */}
+                {filteredSales.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    No hay ventas para mostrar en este momento.
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

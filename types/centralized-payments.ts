@@ -16,6 +16,16 @@ export interface CentralizedPurchase {
   estadoEnvio: 'pendiente' | 'en_preparacion' | 'enviado' | 'entregado' | 'cancelado'
   mediosPago: string
   mercadoPagoPaymentId: string // ID del pago en la cuenta centralizada
+  shippingAddress?: {
+    fullName: string
+    phone: string
+    dni: string
+    address: string
+    city: string
+    state: string
+    zipCode: string
+    additionalInfo?: string
+  }
   createdAt: any
   updatedAt: any
 }

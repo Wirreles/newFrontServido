@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { MapPin, Phone, User, Home } from "lucide-react"
+import { MapPin, Phone, User, Home, FileText } from "lucide-react"
 
 export interface ShippingAddress {
   fullName: string
   phone: string
+  dni: string
   address: string
   city: string
   state: string
@@ -28,6 +29,7 @@ export function ShippingForm({ onSubmit, onCancel, loading = false }: ShippingFo
   const [formData, setFormData] = useState<ShippingAddress>({
     fullName: "",
     phone: "",
+    dni: "",
     address: "",
     city: "",
     state: "",
@@ -48,6 +50,12 @@ export function ShippingForm({ onSubmit, onCancel, loading = false }: ShippingFo
       newErrors.phone = "El número de teléfono es requerido"
     } else if (!/^[\d\s\-\+\(\)]+$/.test(formData.phone)) {
       newErrors.phone = "Ingresa un número de teléfono válido"
+    }
+
+    if (!formData.dni.trim()) {
+      newErrors.dni = "El DNI es requerido"
+    } else if (!/^\d{7,8}$/.test(formData.dni.replace(/\D/g, ''))) {
+      newErrors.dni = "Ingresa un DNI válido (7 u 8 dígitos)"
     }
 
     if (!formData.address.trim()) {
@@ -131,6 +139,24 @@ export function ShippingForm({ onSubmit, onCancel, loading = false }: ShippingFo
             />
             {errors.phone && (
               <p className="text-sm text-red-600">{errors.phone}</p>
+            )}
+          </div>
+
+          {/* DNI */}
+          <div className="space-y-2">
+            <Label htmlFor="dni" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              DNI *
+            </Label>
+            <Input
+              id="dni"
+              value={formData.dni}
+              onChange={(e) => handleInputChange("dni", e.target.value)}
+              placeholder="12345678"
+              className={errors.dni ? "border-red-500" : ""}
+            />
+            {errors.dni && (
+              <p className="text-sm text-red-600">{errors.dni}</p>
             )}
           </div>
 

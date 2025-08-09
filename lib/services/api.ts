@@ -67,6 +67,7 @@ export class ApiService {
     shippingAddress?: {
       fullName: string
       phone: string
+      dni: string
       address: string
       city: string
       state: string
@@ -134,6 +135,7 @@ export class ApiService {
     shippingAddress?: {
       fullName: string
       phone: string
+      dni: string
       address: string
       city: string
       state: string
@@ -160,6 +162,7 @@ export class ApiService {
     shippingAddress?: {
       fullName: string
       phone: string
+      dni: string
       address: string
       city: string
       state: string
