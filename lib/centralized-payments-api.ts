@@ -273,7 +273,8 @@ export async function getSellerSales(sellerId: string): Promise<AdminSaleRecord[
           estadoPago: sellerItems[0].estadoPagoVendedor,
           estadoEnvio: purchase.estadoEnvio || 'pendiente',
           fechaCompra: purchase.fecha,
-          fechaPago: sellerItems[0].fechaPagoVendedor
+          fechaPago: sellerItems[0].fechaPagoVendedor,
+          shippingAddress: purchase.shippingAddress // <--- AGREGADO
         })
       }
     }
