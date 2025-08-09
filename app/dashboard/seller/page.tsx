@@ -244,10 +244,18 @@ function getFechaCompra(compra: any): string {
     fechaType: typeof compra.fecha
   })
   
+  // Firestore Timestamp object (nuevo formato)
+  if (compra.createdAt && compra.createdAt.seconds) {
+    console.log('DEBUG: Usando createdAt.seconds (Firestore):', compra.createdAt.seconds)
+    return new Date(compra.createdAt.seconds * 1000).toISOString();
+  }
+  
+  // Firestore Timestamp object (formato antiguo con _seconds)
   if (compra.createdAt && compra.createdAt._seconds) {
-    console.log('DEBUG: Usando createdAt._seconds:', compra.createdAt._seconds)
+    console.log('DEBUG: Usando createdAt._seconds (formato antiguo):', compra.createdAt._seconds)
     return new Date(compra.createdAt._seconds * 1000).toISOString();
   }
+  
   if (typeof compra.createdAt === 'string' && !isNaN(Date.parse(compra.createdAt))) {
     console.log('DEBUG: Usando createdAt como string:', compra.createdAt)
     return compra.createdAt;
