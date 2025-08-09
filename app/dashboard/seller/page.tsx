@@ -498,25 +498,27 @@ export default function SellerDashboardPage() {
           fechaCompraResult: fechaCompra
         })
         
-        return compra.products.map((item: any) => ({
-          compraId: compra.id || '',
-          paymentId: compra.paymentId || '',
-          status: compra.status || '',
-          totalAmount: compra.totalAmount || 0,
-          fechaCompra,
-          buyerId: compra.buyerId || '',
-          compradorNombre: users[compra.buyerId]?.displayName || users[compra.buyerId]?.name || '',
-          compradorEmail: users[compra.buyerId]?.email || '',
-          productId: item.productId || '',
-          productName: item.name || 'Producto sin nombre',
-          productPrice: item.price || 0,
-          quantity: item.quantity || 0,
-          vendedorId: item.vendedorId || '',
-          vendedorNombre: '',
-          vendedorEmail: '',
-          shippingAddress: compra.shippingAddress || null,
-          fechaPago: ''
-        }))
+        return compra.products
+          .filter((item: any) => item.vendedorId === currentUser.firebaseUser.uid) // Solo productos del vendedor actual
+          .map((item: any) => ({
+            compraId: compra.id || '',
+            paymentId: compra.paymentId || '',
+            status: compra.status || '',
+            totalAmount: compra.totalAmount || 0,
+            fechaCompra,
+            buyerId: compra.buyerId || '',
+            compradorNombre: users[compra.buyerId]?.displayName || users[compra.buyerId]?.name || '',
+            compradorEmail: compra.buyerId || '',
+            productId: item.productId || '',
+            productName: item.name || 'Producto sin nombre',
+            productPrice: item.price || 0,
+            quantity: item.quantity || 0,
+            vendedorId: item.vendedorId || '',
+            vendedorNombre: '',
+            vendedorEmail: '',
+            shippingAddress: compra.shippingAddress || null,
+            fechaPago: ''
+          }))
       })
       
       // Combinar ventas de ambos sistemas
