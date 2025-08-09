@@ -5,6 +5,7 @@ import "./globals.css"
 import { CartProvider } from "@/contexts/cart-context"
 import { AuthProvider } from "@/contexts/auth-context"
 import { Header } from "@/components/layout/header"
+import { Footer } from "@/components/layout/footer"
 import { TabBar } from "@/components/layout/tab-bar"
 import { NProgressProvider } from "@/components/providers/nprogress-provider";
 
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <CartProvider>
               <Header /> {/* Global Header */}
               <main className="flex-1 pb-16 md:pb-16">{children}</main> {/* Adjusted padding for mobile header */}
+              <Footer /> {/* Global Footer */}
               <TabBar /> {/* Global Tab Bar */}
             </CartProvider>
           </AuthProvider>

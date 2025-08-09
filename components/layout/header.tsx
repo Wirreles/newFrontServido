@@ -279,35 +279,35 @@ export function Header() {
       <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-3">
         <div className="flex items-center justify-between">
           {/* Logo - Lado Izquierdo */}
-          <div className="flex items-center flex-shrink-0">
-            <Link href="/" className="flex items-center gap-1 sm:gap-2 hover:opacity-80 transition-opacity">
-              <Image
-                src="/images/logo.png"
-                alt="Servido Logo"
-                width={120}
-                height={50}
-                className="h-8 w-auto sm:h-10 lg:h-14"
-                style={{ objectFit: "contain", filter: "brightness(0) invert(1)" }}
-              />
-              <span className="text-lg sm:text-xl lg:text-2xl font-bold text-white hidden xs:block">Servido</span>
-            </Link>
-                      </div>
+                           <div className="flex items-center flex-shrink-0">
+                   <Link href="/" className="flex items-center gap-1 sm:gap-2 hover:opacity-80 transition-opacity">
+                     <Image
+                       src="/images/logo.png"
+                       alt="Servido Logo"
+                       width={120}
+                       height={50}
+                       className="h-8 w-auto sm:h-8 lg:h-12"
+                       style={{ objectFit: "contain" }}
+                     />
+                     <span className="text-lg sm:text-xl lg:text-2xl font-bold text-white hidden xs:block">Servido</span>
+                   </Link>
+                 </div>
 
             {/* Barra de búsqueda responsive (visible en móvil y tablet) */}
-            <div className="flex-1 max-w-md mx-2 lg:hidden relative">
+            <div className="flex-1 max-w-xs sm:max-w-md mx-2 lg:hidden relative">
               <form onSubmit={handleSearchSubmit} className="relative">
                 <Input
                   type="text"
                   placeholder="Buscar productos, servicios.."
                   value={searchTerm}
                   onChange={handleSearchChange}
-                  className="w-full bg-white/10 text-white placeholder:text-gray-300 border-white/20 rounded-md pr-10 pl-4 py-2 text-sm focus:bg-white/20 focus:border-white/40"
+                  className="w-full bg-white/10 text-white placeholder:text-gray-300 border-white/20 rounded-md pr-10 pl-3 sm:pl-4 py-1.5 sm:py-2 text-xs sm:text-sm focus:bg-white/20 focus:border-white/40"
                 />
                 <button
                   type="submit"
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white"
+                  className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white"
                 >
-                  <Search className="h-4 w-4" />
+                  <Search className="h-3 w-3 sm:h-4 sm:w-4" />
                 </button>
               </form>
               
