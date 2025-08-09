@@ -237,24 +237,39 @@ interface VentaProductoSeller {
 
 // Helper para normalizar la fecha de compra
 function getFechaCompra(compra: any): string {
+  console.log('DEBUG: getFechaCompra - Input compra:', {
+    createdAt: compra.createdAt,
+    createdAtType: typeof compra.createdAt,
+    fecha: compra.fecha,
+    fechaType: typeof compra.fecha
+  })
+  
   if (compra.createdAt && compra.createdAt._seconds) {
+    console.log('DEBUG: Usando createdAt._seconds:', compra.createdAt._seconds)
     return new Date(compra.createdAt._seconds * 1000).toISOString();
   }
   if (typeof compra.createdAt === 'string' && !isNaN(Date.parse(compra.createdAt))) {
+    console.log('DEBUG: Usando createdAt como string:', compra.createdAt)
     return compra.createdAt;
   }
   if (typeof compra.fecha === 'string' && !isNaN(Date.parse(compra.fecha))) {
+    console.log('DEBUG: Usando fecha como string:', compra.fecha)
     return compra.fecha;
   }
   if (typeof compra.created_at === 'string' && !isNaN(Date.parse(compra.created_at))) {
+    console.log('DEBUG: Usando created_at como string:', compra.created_at)
     return compra.created_at;
   }
   if (typeof compra.createdAt === 'number') {
+    console.log('DEBUG: Usando createdAt como number:', compra.createdAt)
     return new Date(compra.createdAt).toISOString();
   }
   if (typeof compra.fecha === 'number') {
+    console.log('DEBUG: Usando fecha como number:', compra.fecha)
     return new Date(compra.fecha).toISOString();
   }
+  
+  console.log('DEBUG: No se encontró fecha válida, retornando string vacío')
   return '';
 }
 
@@ -453,9 +468,28 @@ export default function SellerDashboardPage() {
       // También obtener ventas del sistema antiguo (purchases)
       const purchasesSnap = await getDocs(collection(db, 'purchases'))
       const purchases: any[] = purchasesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      
+      // DEBUG: Log de las compras raw que llegan de Firestore
+      console.log('DEBUG: Compras raw de Firestore:', purchases.map(compra => ({
+        id: compra.id,
+        createdAt: compra.createdAt,
+        createdAtType: typeof compra.createdAt,
+        createdAtKeys: compra.createdAt ? Object.keys(compra.createdAt) : 'null',
+        fecha: compra.fecha,
+        fechaType: typeof compra.fecha
+      })))
+      
       const ventasAntiguas: VentaProductoSeller[] = purchases.flatMap((compra: any) => {
         if (!Array.isArray(compra.products)) return []
         const fechaCompra = getFechaCompra(compra);
+        
+        // DEBUG: Log de cada compra procesada
+        console.log('DEBUG: Procesando compra:', {
+          id: compra.id,
+          createdAt: compra.createdAt,
+          fechaCompraResult: fechaCompra
+        })
+        
         return compra.products.map((item: any) => ({
           compraId: compra.id || '',
           paymentId: compra.paymentId || '',
