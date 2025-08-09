@@ -235,6 +235,29 @@ interface VentaProductoSeller {
   fechaPago?: string;
 }
 
+// Helper para normalizar la fecha de compra
+function getFechaCompra(compra: any): string {
+  if (compra.createdAt && compra.createdAt._seconds) {
+    return new Date(compra.createdAt._seconds * 1000).toISOString();
+  }
+  if (typeof compra.createdAt === 'string' && !isNaN(Date.parse(compra.createdAt))) {
+    return compra.createdAt;
+  }
+  if (typeof compra.fecha === 'string' && !isNaN(Date.parse(compra.fecha))) {
+    return compra.fecha;
+  }
+  if (typeof compra.created_at === 'string' && !isNaN(Date.parse(compra.created_at))) {
+    return compra.created_at;
+  }
+  if (typeof compra.createdAt === 'number') {
+    return new Date(compra.createdAt).toISOString();
+  }
+  if (typeof compra.fecha === 'number') {
+    return new Date(compra.fecha).toISOString();
+  }
+  return '';
+}
+
 export default function SellerDashboardPage() {
   const { currentUser, authLoading, handleLogout, refreshUserProfile } = useAuth()
   const router = useRouter()
@@ -432,25 +455,26 @@ export default function SellerDashboardPage() {
       const purchases: any[] = purchasesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
       const ventasAntiguas: VentaProductoSeller[] = purchases.flatMap((compra: any) => {
         if (!Array.isArray(compra.products)) return []
-        return compra.products
-          .filter((prod: any) => prod.vendedorId === currentUser.firebaseUser.uid)
-          .map((prod: any) => ({
-            compraId: compra.id || '',
-            paymentId: compra.paymentId || '',
-            status: compra.status || '',
-            totalAmount: compra.totalAmount || 0,
-            fechaCompra: compra.createdAt?.toDate?.() ? compra.createdAt.toDate().toISOString() : (typeof compra.createdAt === 'string' ? compra.createdAt : ''),
-            buyerId: compra.buyerId || '',
-            compradorNombre: users[compra.buyerId]?.name || '',
-            compradorEmail: users[compra.buyerId]?.email || '',
-            productId: prod?.productId || '',
-            productName: prod?.nombre || products[prod?.productId]?.name || '',
-            productPrice: prod?.precio || products[prod?.productId]?.price || 0,
-            quantity: prod?.quantity || 0,
-            vendedorId: prod?.vendedorId || '',
-            vendedorNombre: users[prod?.vendedorId]?.name || '',
-            vendedorEmail: users[prod?.vendedorId]?.email || '',
-          }))
+        const fechaCompra = getFechaCompra(compra);
+        return compra.products.map((item: any) => ({
+          compraId: compra.id || '',
+          paymentId: compra.paymentId || '',
+          status: compra.status || '',
+          totalAmount: compra.totalAmount || 0,
+          fechaCompra,
+          buyerId: compra.buyerId || '',
+          compradorNombre: users[compra.buyerId]?.displayName || users[compra.buyerId]?.name || '',
+          compradorEmail: users[compra.buyerId]?.email || '',
+          productId: item.productId || '',
+          productName: item.name || 'Producto sin nombre',
+          productPrice: item.price || 0,
+          quantity: item.quantity || 0,
+          vendedorId: item.vendedorId || '',
+          vendedorNombre: '',
+          vendedorEmail: '',
+          shippingAddress: compra.shippingAddress || null,
+          fechaPago: ''
+        }))
       })
       
       // Combinar ventas de ambos sistemas
@@ -3903,7 +3927,7 @@ export default function SellerDashboardPage() {
                         <TableHead className="min-w-[80px] text-center">Cant.</TableHead>
                         <TableHead className="min-w-[140px]">Comprador</TableHead>
                         <TableHead className="min-w-[140px]">Dirección</TableHead>
-                        <TableHead className="min-w-[100px]">Fecha</TableHead>
+                        <TableHead className="min-w-[100px] text-sm">Fecha</TableHead>
                         <TableHead className="min-w-[140px]">Estado</TableHead>
                         <TableHead className="min-w-[120px]">Acción</TableHead>
                       </TableRow>
@@ -3936,7 +3960,25 @@ export default function SellerDashboardPage() {
                             />
                           </TableCell>
                           <TableCell className="max-w-[100px] text-sm">
-                            {venta.fechaCompra ? new Date(venta.fechaCompra).toLocaleDateString() : ''}
+                            {(() => {
+                              if (!venta.fechaCompra) return '';
+                              // Si es un objeto Timestamp de Firestore
+                              if (typeof venta.fechaCompra === 'object' && venta.fechaCompra._seconds) {
+                                const date = new Date(venta.fechaCompra._seconds * 1000);
+                                return date.toLocaleDateString();
+                              }
+                              // Si es un string ISO
+                              if (typeof venta.fechaCompra === 'string') {
+                                const date = new Date(venta.fechaCompra);
+                                if (!isNaN(date.getTime())) return date.toLocaleDateString();
+                              }
+                              // Si es un número (timestamp en ms)
+                              if (typeof venta.fechaCompra === 'number') {
+                                const date = new Date(venta.fechaCompra);
+                                if (!isNaN(date.getTime())) return date.toLocaleDateString();
+                              }
+                              return '';
+                            })()}
                           </TableCell>
                           <TableCell className="max-w-[140px]">
                             <Select
