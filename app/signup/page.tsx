@@ -13,14 +13,17 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Loader2 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Loader2, Mail, Phone } from "lucide-react"
 
 export default function SignupPage() {
   const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [name, setName] = useState("")
   const [accountType, setAccountType] = useState<"buyer" | "seller">("buyer")
+  const [acceptTerms, setAcceptTerms] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -54,6 +57,18 @@ export default function SignupPage() {
       setError("Por favor, ingresa tu nombre.")
       return
     }
+    if (!email.trim()) {
+      setError("Por favor, ingresa tu correo electrónico.")
+      return
+    }
+    if (!phone.trim()) {
+      setError("Por favor, ingresa tu número de teléfono.")
+      return
+    }
+    if (!acceptTerms) {
+      setError("Debes aceptar los términos y condiciones para continuar.")
+      return
+    }
 
     setLoading(true)
     try {
@@ -65,10 +80,13 @@ export default function SignupPage() {
       const userData: { [key: string]: any } = {
         uid: user.uid,
         email: user.email,
+        phone: phone.trim(), // Campo interno para teléfono
         name: name,
         role: accountType === "seller" ? "seller" : "user",
         isActive: true,
         createdAt: serverTimestamp(),
+        termsAccepted: true,
+        termsAcceptedAt: serverTimestamp(),
       }
 
       if (accountType === "seller") {
@@ -145,8 +163,14 @@ export default function SignupPage() {
                 required
               />
             </div>
+
+            {/* Campo de email - visible solo internamente */}
             <div className="space-y-2">
-              <Label htmlFor="email">Correo Electrónico</Label>
+              <Label htmlFor="email" className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Correo Electrónico
+                <span className="text-xs text-gray-500">(solo interno)</span>
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -156,6 +180,24 @@ export default function SignupPage() {
                 required
               />
             </div>
+
+            {/* Campo de teléfono - visible solo internamente */}
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                Número de Teléfono
+                <span className="text-xs text-gray-500">(solo interno)</span>
+              </Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="+54 9 11 1234-5678"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
               <Input
@@ -167,6 +209,7 @@ export default function SignupPage() {
                 required
               />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
               <Input
@@ -178,7 +221,30 @@ export default function SignupPage() {
                 required
               />
             </div>
+
+            {/* Checkbox de términos y condiciones */}
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="terms"
+                checked={acceptTerms}
+                onCheckedChange={(checked) => setAcceptTerms(checked as boolean)}
+                required
+              />
+              <Label htmlFor="terms" className="text-sm">
+                Acepto los{" "}
+                <Link 
+                  href="/terminos-y-condiciones" 
+                  target="_blank"
+                  className="text-blue-600 hover:underline font-medium"
+                >
+                  términos y condiciones
+                </Link>{" "}
+                de Servido
+              </Label>
+            </div>
+
             {error && <p className="text-sm text-red-600">{error}</p>}
+            
             <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Crear Cuenta"}
             </Button>

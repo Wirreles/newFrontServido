@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ShoppingCart, Users, Calculator, DollarSign } from "lucide-react"
+import { ShoppingCart, Users, Calculator, DollarSign, Truck } from "lucide-react"
 import { getCartPurchaseSummary } from "@/lib/centralized-payments-api"
 import { formatPrice, formatPriceNumber } from "@/lib/utils"
 
@@ -15,12 +15,28 @@ interface PurchaseSummaryProps {
     discountedPrice: number
     quantity: number
     sellerId: string
+    freeShipping?: boolean
+    shippingCost?: number
   }>
   className?: string
 }
 
 export function PurchaseSummary({ cartItems, className = "" }: PurchaseSummaryProps) {
   const summary = getCartPurchaseSummary(cartItems)
+  
+  // Calcular envío total
+  const totalShipping = cartItems.reduce((total, item) => {
+    // Si el producto tiene envío gratis, no agregar costo
+    if (item.freeShipping) {
+      return total
+    }
+    // Si tiene costo de envío definido, agregarlo
+    if (item.shippingCost !== undefined && item.shippingCost > 0) {
+      return total + item.shippingCost
+    }
+    // Si no tiene envío gratis ni costo definido, no agregar nada
+    return total
+  }, 0)
 
   return (
     <Card className={className}>
@@ -75,7 +91,7 @@ export function PurchaseSummary({ cartItems, className = "" }: PurchaseSummaryPr
                   <span>{formatPriceNumber(vendor.subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Comisión (12%):</span>
+                  <span>Comisión (8%):</span>
                   <span>-{formatPriceNumber(vendor.commission)}</span>
                 </div>
                 <div className="flex justify-between font-medium text-green-600">
@@ -96,10 +112,20 @@ export function PurchaseSummary({ cartItems, className = "" }: PurchaseSummaryPr
             <span className="font-medium">{formatPriceNumber(summary.subtotal)}</span>
           </div>
           
+          {totalShipping > 0 && (
+            <div className="flex justify-between items-center text-blue-600">
+              <div className="flex items-center gap-1">
+                <Truck className="h-4 w-4" />
+                <span className="text-sm">Envío:</span>
+              </div>
+              <span className="font-medium">{formatPriceNumber(totalShipping)}</span>
+            </div>
+          )}
+          
           <div className="flex justify-between items-center text-purple-600">
             <div className="flex items-center gap-1">
               <Calculator className="h-4 w-4" />
-              <span className="text-sm">Comisión total (12%):</span>
+              <span className="text-sm">Comisión total (8%):</span>
             </div>
             <span className="font-medium">{formatPriceNumber(summary.commission)}</span>
           </div>
@@ -111,7 +137,7 @@ export function PurchaseSummary({ cartItems, className = "" }: PurchaseSummaryPr
               <DollarSign className="h-5 w-5" />
               <span>Total a pagar:</span>
             </div>
-            <span>{formatPriceNumber(summary.total)}</span>
+            <span>{formatPriceNumber(summary.total + totalShipping)}</span>
           </div>
         </div>
 
@@ -119,7 +145,7 @@ export function PurchaseSummary({ cartItems, className = "" }: PurchaseSummaryPr
         <div className="bg-blue-50 p-3 rounded-lg">
           <p className="text-xs text-blue-800">
             <strong>Sistema centralizado:</strong> Los pagos se procesan a través de nuestra cuenta oficial de MercadoPago. 
-            Los vendedores recibirán sus pagos según la configuración establecida, descontando la comisión del 12%.
+            Los vendedores recibirán sus pagos según la configuración establecida, descontando la comisión del 8%.
           </p>
         </div>
       </CardContent>

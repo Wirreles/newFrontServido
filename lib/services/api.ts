@@ -64,9 +64,11 @@ export class ApiService {
     }[]
     buyerId: string
     buyerEmail: string
+    shippingCost?: number // 🆕 Agregado: costo de envío
     shippingAddress?: {
       fullName: string
       phone: string
+      dni: string
       address: string
       city: string
       state: string
@@ -131,9 +133,11 @@ export class ApiService {
     quantity: number
     buyerId: string
     buyerEmail: string
+    shippingCost?: number // 🆕 Agregado: costo de envío
     shippingAddress?: {
       fullName: string
       phone: string
+      dni: string
       address: string
       city: string
       state: string
@@ -145,6 +149,7 @@ export class ApiService {
       products: [{ productId: data.productId, quantity: data.quantity }],
       buyerId: data.buyerId,
       buyerEmail: data.buyerEmail,
+      shippingCost: data.shippingCost, // 🆕 Agregado: costo de envío
       shippingAddress: data.shippingAddress
     })
   }
@@ -157,9 +162,11 @@ export class ApiService {
     }[]
     buyerId: string
     buyerEmail: string
+    shippingCost?: number // 🆕 Agregado: costo de envío
     shippingAddress?: {
       fullName: string
       phone: string
+      dni: string
       address: string
       city: string
       state: string

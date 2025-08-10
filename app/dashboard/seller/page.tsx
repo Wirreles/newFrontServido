@@ -77,6 +77,9 @@ import { hasWhiteBackground, isValidVideoFile, getVideoDuration } from "@/lib/im
 import { useToast } from "@/components/ui/use-toast"
 import { ApiService } from "@/lib/services/api"
 import { BankConfigForm } from "@/components/seller/bank-config-form"
+import { PaymentDateButton } from "@/components/ui/payment-date-button"
+import { ShippingAddressButton } from "@/components/ui/shipping-address-button"
+import { PriceFormatToggle } from "@/components/ui/price-format-toggle"
 import { 
   getSellerSales, 
   calculateCommissionDistribution, 
@@ -219,6 +222,63 @@ interface VentaProductoSeller {
   vendedorId: string;
   vendedorNombre: string;
   vendedorEmail: string;
+  shippingAddress?: {
+    fullName: string;
+    phone: string;
+    address: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    dni?: string;
+    additionalInfo?: string;
+  };
+  fechaPago?: string;
+}
+
+// Helper para normalizar la fecha de compra
+function getFechaCompra(compra: any): string {
+  console.log('DEBUG: getFechaCompra - Input compra:', {
+    createdAt: compra.createdAt,
+    createdAtType: typeof compra.createdAt,
+    fecha: compra.fecha,
+    fechaType: typeof compra.fecha
+  })
+  
+  // Firestore Timestamp object (nuevo formato)
+  if (compra.createdAt && compra.createdAt.seconds) {
+    console.log('DEBUG: Usando createdAt.seconds (Firestore):', compra.createdAt.seconds)
+    return new Date(compra.createdAt.seconds * 1000).toISOString();
+  }
+  
+  // Firestore Timestamp object (formato antiguo con _seconds)
+  if (compra.createdAt && compra.createdAt._seconds) {
+    console.log('DEBUG: Usando createdAt._seconds (formato antiguo):', compra.createdAt._seconds)
+    return new Date(compra.createdAt._seconds * 1000).toISOString();
+  }
+  
+  if (typeof compra.createdAt === 'string' && !isNaN(Date.parse(compra.createdAt))) {
+    console.log('DEBUG: Usando createdAt como string:', compra.createdAt)
+    return compra.createdAt;
+  }
+  if (typeof compra.fecha === 'string' && !isNaN(Date.parse(compra.fecha))) {
+    console.log('DEBUG: Usando fecha como string:', compra.fecha)
+    return compra.fecha;
+  }
+  if (typeof compra.created_at === 'string' && !isNaN(Date.parse(compra.created_at))) {
+    console.log('DEBUG: Usando created_at como string:', compra.created_at)
+    return compra.created_at;
+  }
+  if (typeof compra.createdAt === 'number') {
+    console.log('DEBUG: Usando createdAt como number:', compra.createdAt)
+    return new Date(compra.createdAt).toISOString();
+  }
+  if (typeof compra.fecha === 'number') {
+    console.log('DEBUG: Usando fecha como number:', compra.fecha)
+    return new Date(compra.fecha).toISOString();
+  }
+  
+  console.log('DEBUG: No se encontró fecha válida, retornando string vacío')
+  return '';
 }
 
 export default function SellerDashboardPage() {
@@ -386,34 +446,91 @@ export default function SellerDashboardPage() {
       productsSnap.forEach(doc => { products[doc.id] = doc.data() })
       setProductsMap(products)
       console.log('PRODUCTS:', products)
-      // Fetch purchases
+      
+      // Fetch centralized purchases (sistema nuevo)
+      const centralizedPurchasesSnap = await getDocs(collection(db, 'centralizedPurchases'))
+      const centralizedPurchases: any[] = centralizedPurchasesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      
+      // Desglosar productos vendidos por el vendedor actual desde compras centralizadas
+      const ventasCentralizadas: VentaProductoSeller[] = centralizedPurchases.flatMap((compra: any) => {
+        if (!Array.isArray(compra.items)) return []
+        return compra.items
+          .filter((item: any) => item.vendedorId === currentUser.firebaseUser.uid)
+          .map((item: any) => ({
+            compraId: compra.id || '',
+            paymentId: compra.mercadoPagoPaymentId || '',
+            status: compra.estadoPago || '',
+            totalAmount: compra.total || 0,
+            fechaCompra: compra.fecha || '',
+            buyerId: compra.compradorId || '',
+            compradorNombre: users[compra.compradorId]?.displayName || users[compra.compradorId]?.name || '',
+            compradorEmail: users[compra.compradorId]?.email || '',
+            productId: item?.productoId || '',
+            productName: item?.productoNombre || products[item?.productoId]?.name || 'Producto sin nombre',
+            productPrice: item?.precioUnitario || 0,
+            quantity: item?.cantidad || 0,
+            vendedorId: item?.vendedorId || '',
+            vendedorNombre: item?.vendedorNombre || '',
+            vendedorEmail: item?.vendedorEmail || '',
+            shippingAddress: compra.shippingAddress,
+            fechaPago: item?.fechaPagoVendedor || ''
+          }))
+      })
+      
+      // También obtener ventas del sistema antiguo (purchases)
       const purchasesSnap = await getDocs(collection(db, 'purchases'))
       const purchases: any[] = purchasesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      // Desglosar productos vendidos por el vendedor actual
-      const ventasPorProducto: VentaProductoSeller[] = purchases.flatMap((compra: any) => {
+      
+      // DEBUG: Log de las compras raw que llegan de Firestore
+      console.log('DEBUG: Compras raw de Firestore:', purchases.map(compra => ({
+        id: compra.id,
+        createdAt: compra.createdAt,
+        createdAtType: typeof compra.createdAt,
+        createdAtKeys: compra.createdAt ? Object.keys(compra.createdAt) : 'null',
+        fecha: compra.fecha,
+        fechaType: typeof compra.fecha
+      })))
+      
+      const ventasAntiguas: VentaProductoSeller[] = purchases.flatMap((compra: any) => {
         if (!Array.isArray(compra.products)) return []
+        const fechaCompra = getFechaCompra(compra);
+        
+        // DEBUG: Log de cada compra procesada
+        console.log('DEBUG: Procesando compra:', {
+          id: compra.id,
+          createdAt: compra.createdAt,
+          fechaCompraResult: fechaCompra
+        })
+        
         return compra.products
-          .filter((prod: any) => prod.vendedorId === currentUser.firebaseUser.uid)
-          .map((prod: any) => ({
+          .filter((item: any) => item.vendedorId === currentUser.firebaseUser.uid) // Solo productos del vendedor actual
+          .map((item: any) => ({
             compraId: compra.id || '',
             paymentId: compra.paymentId || '',
             status: compra.status || '',
             totalAmount: compra.totalAmount || 0,
-            fechaCompra: compra.createdAt?.toDate?.() ? compra.createdAt.toDate().toISOString() : (typeof compra.createdAt === 'string' ? compra.createdAt : ''),
+            fechaCompra,
             buyerId: compra.buyerId || '',
-            compradorNombre: users[compra.buyerId]?.name || '',
-            compradorEmail: users[compra.buyerId]?.email || '',
-            productId: prod?.productId || '',
-            productName: prod?.nombre || products[prod?.productId]?.name || '',
-            productPrice: prod?.precio || products[prod?.productId]?.price || 0,
-            quantity: prod?.quantity || 0,
-            vendedorId: prod?.vendedorId || '',
-            vendedorNombre: users[prod?.vendedorId]?.name || '',
-            vendedorEmail: users[prod?.vendedorId]?.email || '',
+            compradorNombre: users[compra.buyerId]?.displayName || users[compra.buyerId]?.name || '',
+            compradorEmail: compra.buyerId || '',
+            productId: item.productId || '',
+            productName: item.name || 'Producto sin nombre',
+            productPrice: item.price || 0,
+            quantity: item.quantity || 0,
+            vendedorId: item.vendedorId || '',
+            vendedorNombre: '',
+            vendedorEmail: '',
+            shippingAddress: compra.shippingAddress || null,
+            fechaPago: ''
           }))
       })
-      console.log('VENTAS POR PRODUCTO DEL VENDEDOR:', ventasPorProducto)
-      setSales(ventasPorProducto)
+      
+      // Combinar ventas de ambos sistemas
+      const todasLasVentas = [...ventasCentralizadas, ...ventasAntiguas]
+      console.log('VENTAS CENTRALIZADAS:', ventasCentralizadas)
+      console.log('VENTAS ANTIGUAS:', ventasAntiguas)
+      console.log('TODAS LAS VENTAS:', todasLasVentas)
+      setSales(todasLasVentas)
       setLoadingSales(false)
       // Debug filteredSales
       setTimeout(() => {
@@ -2086,14 +2203,14 @@ export default function SellerDashboardPage() {
                 <MessageSquare className="h-4 w-4" />
                 Chats
               </Button> */}
-              <Button
+              {/* <Button
                 variant={activeTab === "coupons" ? "secondary" : "ghost"}
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
                 onClick={() => setActiveTab("coupons")}
               >
                 <Tag className="h-4 w-4" />
                 Cupones
-              </Button>
+              </Button> */}
               <Button
                 variant={activeTab === "create-coupons" ? "secondary" : "ghost"}
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-700 hover:text-orange-600 justify-start"
@@ -2222,7 +2339,7 @@ export default function SellerDashboardPage() {
                   <MessageSquare className="mr-2 h-5 w-5" />
                   Mis Chats
                 </Button> */}
-                <Button
+                {/* <Button
                   variant={activeTab === "coupons" ? "secondary" : "ghost"}
                   onClick={() => {
                     setActiveTab("coupons")
@@ -2232,7 +2349,7 @@ export default function SellerDashboardPage() {
                 >
                   <Tag className="mr-2 h-5 w-5" />
                   Cupones
-                </Button>
+                </Button> */}
                 <Button
                   variant={activeTab === "create-coupons" ? "secondary" : "ghost"}
                   onClick={() => {
@@ -3114,6 +3231,7 @@ export default function SellerDashboardPage() {
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="profile">Mi Perfil</TabsTrigger>
                     <TabsTrigger value="subscription">Suscripción</TabsTrigger>
+                    <TabsTrigger value="settings">Configuración General</TabsTrigger>
                     {/* <TabsTrigger value="mercadopago">MercadoPago</TabsTrigger>  */}
                   </TabsList>
                   
@@ -3277,21 +3395,34 @@ export default function SellerDashboardPage() {
                     </div>
                   </TabsContent>
                   
-                  {/* <TabsContent value="mercadopago" className="space-y-6 mt-6">
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">Configuración de Pagos</h3>
-                      <div className="bg-blue-100 text-blue-800 p-3 rounded flex items-center gap-2">
-                        <span className="font-semibold">ℹ️ Sistema de pagos centralizado activo.</span>
-                        <span className="text-xs">Los pagos se procesan de forma centralizada. Configura tus datos bancarios para recibir pagos.</span>
-                      </div>
-                      <div className="mt-4">
-                        <p className="text-sm text-gray-600">
-                          El nuevo sistema de pagos centralizado permite una mejor gestión de comisiones y distribución de fondos.
-                          Los pagos se procesan a través de nuestra cuenta oficial de MercadoPago.
-                        </p>
-                      </div>
+                  <TabsContent value="settings" className="space-y-6 mt-6">
+                    <div className="space-y-6">
+                      <h3 className="text-lg font-semibold">Configuración General</h3>
+                      
+                      {/* Configuración de formato de precios */}
+                      <PriceFormatToggle 
+                        onFormatChange={(useReducedDecimals) => {
+                          // Aquí se puede agregar lógica adicional si es necesario
+                          console.log('Formato de precios actualizado:', useReducedDecimals)
+                        }}
+                      />
+                      
+                      {/* Otras configuraciones pueden ir aquí */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Otras Configuraciones</CardTitle>
+                          <CardDescription>
+                            Configuraciones adicionales de la aplicación
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-gray-600">
+                            Más configuraciones estarán disponibles próximamente.
+                          </p>
+                        </CardContent>
+                      </Card>
                     </div>
-                  </TabsContent> */}
+                  </TabsContent>
                 </Tabs>
                   </CardContent>
                 </Card>
@@ -3448,7 +3579,7 @@ export default function SellerDashboardPage() {
             </div>
           )}
 
-          {activeTab === "coupons" && (
+          {/* {activeTab === "coupons" && (
             <Card>
               <CardHeader>
                 <CardTitle>Gestionar Cupones de Descuento</CardTitle>
@@ -3626,7 +3757,7 @@ export default function SellerDashboardPage() {
                 )}
               </CardContent>
             </Card>
-          )}
+          )} */}
 
           {/* Create Coupons Tab */}
           {activeTab === "create-coupons" && (
@@ -3881,58 +4012,112 @@ export default function SellerDashboardPage() {
                 <CardDescription>Administra el estado de envío de tus productos vendidos</CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Producto</TableHead>
-                      <TableHead>Cantidad</TableHead>
-                      <TableHead>Comprador</TableHead>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Estado de Envío</TableHead>
-                      <TableHead>Acción</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredSales.map((venta) => (
-                      <TableRow key={venta.compraId + '-' + venta.productId}>
-                        <TableCell>{venta.productName}</TableCell>
-                        <TableCell>{venta.quantity}</TableCell>
-                        <TableCell>{venta.compradorNombre} ({venta.compradorEmail})</TableCell>
-                        <TableCell>{venta.fechaCompra ? new Date(venta.fechaCompra).toLocaleDateString() : ''}</TableCell>
-                        <TableCell>
-                          <Select
-                            value={shippingStates[venta.compraId + '-' + venta.productId] || 'pendiente'}
-                            onValueChange={(value) => handleShippingStateChange(venta.compraId + '-' + venta.productId, value)}
-                          >
-                            <SelectTrigger className="w-[140px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pendiente">Pendiente</SelectItem>
-                              <SelectItem value="preparacion">En preparación</SelectItem>
-                              <SelectItem value="enviado">Enviado</SelectItem>
-                              <SelectItem value="entregado">Entregado</SelectItem>
-                              <SelectItem value="cancelado">Cancelado</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => {
-                              console.log('🔘 BOTÓN CLICKEADO - Guardar Estado');
-                              console.log('Venta a guardar:', venta);
-                              handleSaveShippingState(venta);
-                            }}
-                          >
-                            Guardar Estado
-                          </Button>
-                        </TableCell>
+                {/* Tabla responsive con scroll horizontal */}
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="min-w-[150px]">Producto</TableHead>
+                        <TableHead className="min-w-[80px] text-center">Cant.</TableHead>
+                        <TableHead className="min-w-[140px]">Comprador</TableHead>
+                        <TableHead className="min-w-[140px]">Dirección</TableHead>
+                        <TableHead className="min-w-[100px] text-sm">Fecha</TableHead>
+                        <TableHead className="min-w-[140px]">Estado</TableHead>
+                        <TableHead className="min-w-[120px]">Acción</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredSales.map((venta) => {
+                        console.log('Venta en tabla:', venta)
+                        return (
+                          <TableRow key={venta.compraId + '-' + venta.productId}>
+                          <TableCell className="max-w-[150px]">
+                            <div className="truncate font-medium" title={venta.productName}>
+                              {venta.productName || 'Producto sin nombre'}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">{venta.quantity}</TableCell>
+                          <TableCell className="max-w-[140px]">
+                            <div>
+                              <div className="font-medium truncate" title={venta.compradorNombre}>
+                                {venta.compradorNombre}
+                              </div>
+                              <div className="text-sm text-gray-500 truncate" title={venta.compradorEmail}>
+                                {venta.compradorEmail}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-[140px]">
+                            <ShippingAddressButton
+                              shippingAddress={venta.shippingAddress}
+                              productName={venta.productName}
+                            />
+                          </TableCell>
+                          <TableCell className="max-w-[100px] text-sm">
+                            {(() => {
+                              if (!venta.fechaCompra) return '';
+                              // Si es un objeto Timestamp de Firestore
+                              if (typeof venta.fechaCompra === 'object' && venta.fechaCompra._seconds) {
+                                const date = new Date(venta.fechaCompra._seconds * 1000);
+                                return date.toLocaleDateString();
+                              }
+                              // Si es un string ISO
+                              if (typeof venta.fechaCompra === 'string') {
+                                const date = new Date(venta.fechaCompra);
+                                if (!isNaN(date.getTime())) return date.toLocaleDateString();
+                              }
+                              // Si es un número (timestamp en ms)
+                              if (typeof venta.fechaCompra === 'number') {
+                                const date = new Date(venta.fechaCompra);
+                                if (!isNaN(date.getTime())) return date.toLocaleDateString();
+                              }
+                              return '';
+                            })()}
+                          </TableCell>
+                          <TableCell className="max-w-[140px]">
+                            <Select
+                              value={shippingStates[venta.compraId + '-' + venta.productId] || 'pendiente'}
+                              onValueChange={(value) => handleShippingStateChange(venta.compraId + '-' + venta.productId, value)}
+                            >
+                              <SelectTrigger className="w-full min-w-[120px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pendiente">Pendiente</SelectItem>
+                                <SelectItem value="preparacion">En preparación</SelectItem>
+                                <SelectItem value="enviado">Enviado</SelectItem>
+                                <SelectItem value="entregado">Entregado</SelectItem>
+                                <SelectItem value="cancelado">Cancelado</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="max-w-[120px]">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="w-full"
+                              onClick={() => {
+                                console.log('🔘 BOTÓN CLICKEADO - Guardar Estado');
+                                console.log('Venta a guardar:', venta);
+                                handleSaveShippingState(venta);
+                              }}
+                            >
+                              Guardar
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+                
+                {/* Mensaje cuando no hay ventas */}
+                {filteredSales.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    No hay ventas para mostrar en este momento.
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

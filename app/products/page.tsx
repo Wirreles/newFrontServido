@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import Image from "next/image"
+import { SimpleImage } from '@/components/ui/simple-image'
 import { collection, query, getDocs, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
@@ -385,11 +385,7 @@ export default function ProductsPage() {
                     <Link key={product.id} href={`/product/${product.id}`} className="block">
                       <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-200 h-full">
                         <div className="aspect-square relative bg-gray-100">
-                          <Image
-                            src={getProductThumbnail(product.media, product.imageUrl, product.name)}
-                            alt={product.name}
-                            fill
-                            className="object-cover"
+                          <SimpleImage src={getProductThumbnail(product.media, product.imageUrl, product.name)} alt={product.name} className="w-full h-full object-cover" className="object-cover"
                             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
                           />
                         </div>

@@ -1,5 +1,5 @@
 import React, { useState } from "react"
-import Image from "next/image"
+import { SimpleImage } from '@/components/ui/simple-image'
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { MessageSquare, Tag, Layers, Heart, Share2, Star, User, AlertCircle, Loader2 } from "lucide-react"
@@ -147,11 +147,7 @@ const ServiceDetail: React.FC<ServiceDetailProps> = ({
 
       {/* Imagen principal con overlay de botones */}
       <div className="w-full aspect-square relative rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
-        <Image
-          src={mainImage}
-          alt={service.name}
-          fill
-          className="object-cover"
+        <SimpleImage src={mainImage} alt={service.name} className="w-full h-full object-cover" className="object-cover"
         />
         {/* Overlay botones */}
         <div className="absolute top-4 right-4 flex gap-2 z-10">

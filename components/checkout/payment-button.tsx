@@ -48,11 +48,21 @@ export function PaymentButton({ items, sellerId, className = "" }: PaymentButton
         quantity: item.quantity
       }))
 
+      // Calcular costo total de envío para estos items
+      const totalShippingCost = items.reduce((total, item) => {
+        if (item.freeShipping) return total
+        if (item.shippingCost !== undefined && item.shippingCost > 0) {
+          return total + item.shippingCost
+        }
+        return total
+      }, 0)
+
       // Usar el nuevo sistema centralizado con múltiples productos
       const response = await ApiService.createProductPreference({
         products,
         buyerId: currentUser.firebaseUser.uid,
-        buyerEmail: currentUser.firebaseUser.email || ''
+        buyerEmail: currentUser.firebaseUser.email || '',
+        shippingCost: totalShippingCost // 🆕 Agregado: costo total de envío
       })
 
       if (response.error) {

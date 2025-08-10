@@ -372,7 +372,7 @@ export function BankConfigForm({ sellerId, onConfigSaved }: BankConfigFormProps)
           <AlertDescription>
             <ul className="list-disc list-inside space-y-1 mt-2">
               <li>Los pagos se procesan manualmente desde el panel de administración</li>
-              <li>Se aplica una comisión del 12% sobre cada venta</li>
+              <li>Se aplica una comisión del 8% sobre cada venta</li>
               <li>Las comisiones varían según la preferencia de retiro seleccionada</li>
               <li>Asegúrate de que los datos bancarios sean correctos para evitar demoras</li>
             </ul>

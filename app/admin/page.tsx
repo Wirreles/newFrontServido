@@ -639,7 +639,7 @@ export default function AdminDashboard() {
       setPurchases(purchases)
 
       // Calcular métricas de ventas
-      const COMMISSION_RATE = 0.12;
+      const COMMISSION_RATE = 0.08;
       const approvedPurchases = purchases.filter(p => p.status === 'approved');
       const totalVentas = approvedPurchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
       const totalComisiones = totalVentas * COMMISSION_RATE;
@@ -2976,7 +2976,7 @@ export default function AdminDashboard() {
                     </CardHeader>
                     <CardContent className="p-2 sm:p-4 md:p-6">
                       <div className="text-xl xs:text-2xl font-bold">{formatPriceNumber(salesSummary.totalComisiones)}</div>
-                      <p className="text-xs text-muted-foreground">12% de comisión total</p>
+                      <p className="text-xs text-muted-foreground">8% de comisión total</p>
                     </CardContent>
                   </Card>
                   <Card className="w-full">
@@ -3791,7 +3791,7 @@ export default function AdminDashboard() {
                 </TableHeader>
                 <TableBody>
                   {selectedPurchase?.products?.map((p: any, idx: number) => {
-                    const amountToPay = (p.precio || p.price || 0) * (p.quantity || p.cantidad || 1) * 0.88; // 12% comisión
+                    const amountToPay = (p.precio || p.price || 0) * (p.quantity || p.cantidad || 1) * 0.92; // 8% comisión
                     const isPaid = p.paidToSeller === true;
                     return (
                       <TableRow key={idx} className="align-middle">

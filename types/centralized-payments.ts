@@ -11,11 +11,21 @@ export interface CentralizedPurchase {
   fecha: string
   items: PurchaseItem[]
   total: number
-  comisionTotal: number // 12% del total
+  comisionTotal: number // 8% del total
   estadoPago: 'pendiente' | 'pagado' | 'cancelado'
   estadoEnvio: 'pendiente' | 'en_preparacion' | 'enviado' | 'entregado' | 'cancelado'
   mediosPago: string
   mercadoPagoPaymentId: string // ID del pago en la cuenta centralizada
+  shippingAddress?: {
+    fullName: string
+    phone: string
+    dni: string
+    address: string
+    city: string
+    state: string
+    zipCode: string
+    additionalInfo?: string
+  }
   createdAt: any
   updatedAt: any
 }
@@ -26,7 +36,7 @@ export interface PurchaseItem {
   cantidad: number
   precioUnitario: number
   subtotal: number
-  comisionApp: number // 12% del subtotal
+  comisionApp: number // 8% del subtotal
   montoVendedor: number // subtotal - comision
   estadoPagoVendedor: 'pendiente' | 'pagado' | 'cancelado'
   fechaPagoVendedor?: string
@@ -187,7 +197,7 @@ export interface MigrationStats {
 // CONSTANTES
 // ============================================================================
 
-export const COMMISSION_RATE = 0.12 // 12%
+export const COMMISSION_RATE = 0.08 // 8%
 
 export const TAX_RATES = {
   a_7_dias: 0.105, // 10.5% para retiro a 7 días
