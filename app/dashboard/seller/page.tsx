@@ -318,6 +318,10 @@ export default function SellerDashboardPage() {
   const [couponApplyEndDate, setCouponApplyEndDate] = useState<Date | undefined>(undefined)
   const [associatingCoupon, setAssociatingCoupon] = useState(false)
   const [isCouponModalOpen, setIsCouponModalOpen] = useState(false)
+  
+  // Estado para precio de suscripción
+  const [subscriptionPrice, setSubscriptionPrice] = useState<number | null>(null)
+  const [loadingSubscriptionPrice, setLoadingSubscriptionPrice] = useState(false)
 
   // Estados para creación de cupones propios
   const [myCoupons, setMyCoupons] = useState<Coupon[]>([])
@@ -820,6 +824,30 @@ export default function SellerDashboardPage() {
       refreshUserProfile();
     }
   }, [activeTab, refreshUserProfile]);
+  
+  // Función para obtener el precio de suscripción
+  const fetchSubscriptionPrice = async () => {
+    setLoadingSubscriptionPrice(true);
+    try {
+      const response = await fetch('/api/subscription/active-price');
+      const data = await response.json();
+      
+      if (data.price) {
+        setSubscriptionPrice(data.price);
+      }
+    } catch (error) {
+      console.error('Error al obtener precio de suscripción:', error);
+    } finally {
+      setLoadingSubscriptionPrice(false);
+    }
+  };
+  
+  // Cargar precio de suscripción cuando se active la pestaña de perfil
+  useEffect(() => {
+    if (activeTab === 'profile') {
+      fetchSubscriptionPrice();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && localStorage.getItem("mp_connecting")) {
@@ -2605,7 +2633,7 @@ export default function SellerDashboardPage() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <Label htmlFor="productPrice" className="text-base">Precio ($)</Label>
+                        <Label htmlFor="productPrice" className="text-base">Precio (ARS)</Label>
                       <Input
                         id="productPrice"
                         type="number"
@@ -2705,7 +2733,7 @@ export default function SellerDashboardPage() {
                           step="0.01"
                           value={shippingCost}
                           onChange={e => setShippingCost(e.target.value)}
-                          placeholder="Costo de envío ($)"
+                          placeholder="Costo de envío (ARS)"
                           className={productFormTouched && productFormErrors.shippingCost ? 'border-red-500' : ''}
                         />
                         {productFormTouched && productFormErrors.shippingCost && (
@@ -3213,6 +3241,28 @@ export default function SellerDashboardPage() {
                                    <strong>Nota:</strong> Los productos físicos no requieren suscripción, solo los servicios.
                                  </p>
                                </div>
+                      {/* Mostrar precio de suscripción */}
+                      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-700">Precio de suscripción:</span>
+                          <span className="text-lg font-bold text-purple-700">
+                            {loadingSubscriptionPrice ? (
+                              <span className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Cargando...
+                              </span>
+                            ) : subscriptionPrice ? (
+                              `ARS ${subscriptionPrice.toFixed(2)}`
+                            ) : (
+                              'No disponible'
+                            )}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Este precio puede variar según la configuración del administrador
+                        </p>
+                      </div>
+                      
                       <Button
                         onClick={handleSubscribe}
                         disabled={subscribing}
@@ -3633,7 +3683,7 @@ export default function SellerDashboardPage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="percentage">Porcentaje (%)</SelectItem>
-                            <SelectItem value="fixed">Monto Fijo ($)</SelectItem>
+                            <SelectItem value="fixed">Monto Fijo (ARS)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

@@ -94,6 +94,7 @@ import * as XLSX from "xlsx"
 import { useToast } from "@/components/ui/use-toast"
 import { getDashboardProductImage } from "@/lib/image-utils"
 import { formatPrice, formatPriceNumber } from "@/lib/utils"
+import SubscriptionPricingManager from "@/components/admin/subscription-pricing-manager"
 
 interface UserData {
   id: string
@@ -1923,6 +1924,7 @@ export default function AdminDashboard() {
                 { tab: "banners", label: "Banners", icon: ImageIcon },
                 { tab: "alerts", label: "Alertas", icon: Megaphone },
                 { tab: "coupons", label: "Cupones", icon: Percent },
+                { tab: "subscriptionPricing", label: "Precios Suscripción", icon: Percent },
               ].map((item) => (
                 <Button
                   key={item.tab}
@@ -2012,6 +2014,7 @@ export default function AdminDashboard() {
               <TabsTrigger value="banners">Banners</TabsTrigger>
               <TabsTrigger value="alerts">Alertas</TabsTrigger>
               <TabsTrigger value="coupons">Cupones</TabsTrigger>
+              <TabsTrigger value="subscriptionPricing">Precios Suscripción</TabsTrigger>
             </TabsList>
 
             {/* Overview Tab */}
@@ -3640,6 +3643,28 @@ export default function AdminDashboard() {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Precios de Suscripción Tab */}
+            <TabsContent value="subscriptionPricing" className="mt-4">
+              {currentUser ? (
+                <SubscriptionPricingManager currentUserId={currentUser.firebaseUser.uid} />
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Acceso Restringido</CardTitle>
+                    <CardDescription>
+                      Debes estar autenticado para acceder a esta funcionalidad
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                      <span className="ml-2">Verificando autenticación...</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
           </Tabs>
         </main>
