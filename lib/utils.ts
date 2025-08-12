@@ -12,64 +12,59 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// Función para formatear precios con decimales en formato argentino
+// Función para formatear precios con símbolo de moneda (sin decimales)
 export function formatPrice(price: number): string {
   return new Intl.NumberFormat('es-AR', {
     style: 'currency',
     currency: 'ARS',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(price)
 }
 
-// Función para formatear precios sin símbolo de moneda
+// Función para formatear precios sin símbolo de moneda (sin decimales)
 export function formatPriceNumber(price: number): string {
   return new Intl.NumberFormat('es-AR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(price)
 }
 
-// Función para formatear precios con decimales reducidos (estilo MercadoLibre)
+// Función para formatear precios reducidos (sin decimales)
 export function formatPriceReduced(price: number): string {
-  const formatted = new Intl.NumberFormat('es-AR', {
+  return new Intl.NumberFormat('es-AR', {
     style: 'currency',
     currency: 'ARS',
     minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 0,
   }).format(price)
-  
-  // Si termina en ,00, remover los decimales
-  if (formatted.endsWith(',00')) {
-    return formatted.replace(',00', '')
-  }
-  
-  // Si termina en ,0, remover el 0
-  if (formatted.endsWith(',0')) {
-    return formatted.replace(',0', '')
-  }
-  
-  return formatted
 }
 
-// Función para formatear precios con decimales reducidos sin símbolo de moneda
+// Función para formatear precios reducidos sin símbolo de moneda (sin decimales)
 export function formatPriceNumberReduced(price: number): string {
-  const formatted = new Intl.NumberFormat('es-AR', {
+  return new Intl.NumberFormat('es-AR', {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 0,
   }).format(price)
-  
-  // Si termina en ,00, remover los decimales
-  if (formatted.endsWith(',00')) {
-    return formatted.replace(',00', '')
+}
+
+// Limpiar y formatear precio (sin decimales)
+export function cleanAndFormatPrice(price: string | number): string {
+  const priceStr = typeof price === 'number' ? price.toString() : price
+  const cleaned = priceStr.replace(/[^\d.,]/g, '')
+  const numPrice = parseFloat(cleaned.replace(',', '.'))
+  if (isNaN(numPrice)) {
+    return formatPriceNumber(0)
   }
-  
-  // Si termina en ,0, remover el 0
-  if (formatted.endsWith(',0')) {
-    return formatted.replace(',0', '')
-  }
-  
-  return formatted
+  return formatPriceNumber(Math.round(numPrice))
+}
+
+// Formatear números grandes (sin decimales)
+export function formatLargeNumber(num: number): string {
+  return new Intl.NumberFormat('es-AR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(num)
 }
 
 export function encrypt(text: string): string {

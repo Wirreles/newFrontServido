@@ -4,6 +4,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { CartProvider } from "@/contexts/cart-context"
 import { AuthProvider } from "@/contexts/auth-context"
+import { CacheProvider } from "@/contexts/cache-context"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { TabBar } from "@/components/layout/tab-bar"
@@ -22,14 +23,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es">
       <body className={`${inter.className} flex flex-col min-h-screen`}>
         <NProgressProvider>
-          <AuthProvider>
-            <CartProvider>
-              <Header /> {/* Global Header */}
-              <main className="flex-1 pb-16 md:pb-16">{children}</main> {/* Adjusted padding for mobile header */}
-              <Footer /> {/* Global Footer */}
-              <TabBar /> {/* Global Tab Bar */}
-            </CartProvider>
-          </AuthProvider>
+          <CacheProvider>
+            <AuthProvider>
+              <CartProvider>
+                <Header /> {/* Global Header */}
+                <main className="flex-1 pb-16 md:16">{children}</main> {/* Adjusted padding for mobile header */}
+                <Footer /> {/* Global Footer */}
+                <TabBar /> {/* Global Tab Bar */}
+              </CartProvider>
+            </AuthProvider>
+          </CacheProvider>
         </NProgressProvider>
       </body>
     </html>

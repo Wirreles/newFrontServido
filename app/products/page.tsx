@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
+import { useDebounce } from "@/hooks/use-debounce"
 import Link from "next/link"
 import { SimpleImage } from '@/components/ui/simple-image'
-import { collection, query, getDocs, orderBy } from "firebase/firestore"
+import { collection, query, getDocs, orderBy, limit, startAfter } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -16,6 +17,7 @@ import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { getProductThumbnail } from "@/lib/image-utils"
 import { formatPrice } from "@/lib/utils"
+import { Pagination } from "@/components/ui/pagination"
 
 interface Product {
   id: string
@@ -46,6 +48,10 @@ interface Brand {
   name: string
 }
 
+// Cache para productos
+const productCache = new Map<string, { data: Product[], timestamp: number, lastDoc: any }>()
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutos
+
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
@@ -65,11 +71,37 @@ export default function ProductsPage() {
     "createdAt_desc",
   )
 
-  // Fetch initial data
+  // Debounced search term for better performance
+  const debouncedSearchTerm = useDebounce(searchTerm, 300)
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const [productsPerPage] = useState(20)
+  const [hasMore, setHasMore] = useState(true)
+  const [lastVisibleDoc, setLastVisibleDoc] = useState<any>(null)
+
+  // Cache key based on filters and sort
+  const cacheKey = useMemo(() => {
+    return `${selectedCategory}-${selectedBrand}-${isServiceFilter}-${sortBy}-${debouncedSearchTerm}`
+  }, [selectedCategory, selectedBrand, isServiceFilter, sortBy, debouncedSearchTerm])
+
+  // Fetch initial data with cache
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
       try {
+        // Check cache first
+        const cached = productCache.get(cacheKey)
+        const now = Date.now()
+        
+        if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+          setProducts(cached.data)
+          setFilteredProducts(cached.data)
+          setLastVisibleDoc(cached.lastDoc)
+          setLoading(false)
+          return
+        }
+
         // Fetch categories
         const categoriesQuery = query(collection(db, "categories"), orderBy("name"))
         const categorySnapshot = await getDocs(categoriesQuery)
@@ -80,13 +112,8 @@ export default function ProductsPage() {
         const brandSnapshot = await getDocs(brandsQuery)
         setBrands(brandSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Brand))
 
-        // Fetch all products
-        const productsQuery = query(collection(db, "products"), orderBy("createdAt", "desc"))
-        const productSnapshot = await getDocs(productsQuery)
-        const fetchedProducts = productSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Product)
-
-        setProducts(fetchedProducts)
-        setFilteredProducts(fetchedProducts)
+        // Fetch products with pagination
+        await fetchProducts()
       } catch (err) {
         console.error("Error fetching data:", err)
         setError("Error al cargar los datos. Intenta de nuevo más tarde.")
@@ -95,15 +122,80 @@ export default function ProductsPage() {
       }
     }
     fetchData()
-  }, [])
+  }, [cacheKey])
+
+  // Fetch products function
+  const fetchProducts = useCallback(async (isLoadMore = false) => {
+    try {
+      let productsQuery = query(collection(db, "products"))
+      
+      // Apply sorting
+      switch (sortBy) {
+        case "price_asc":
+          productsQuery = query(productsQuery, orderBy("price", "asc"))
+          break
+        case "price_desc":
+          productsQuery = query(productsQuery, orderBy("price", "desc"))
+          break
+        case "name_asc":
+          productsQuery = query(productsQuery, orderBy("name", "asc"))
+          break
+        case "name_desc":
+          productsQuery = query(productsQuery, orderBy("name", "desc"))
+          break
+        case "createdAt_desc":
+        default:
+          productsQuery = query(productsQuery, orderBy("createdAt", "desc"))
+          break
+      }
+
+      // Apply pagination
+      if (isLoadMore && lastVisibleDoc) {
+        productsQuery = query(productsQuery, startAfter(lastVisibleDoc), limit(productsPerPage))
+      } else {
+        productsQuery = query(productsQuery, limit(productsPerPage))
+      }
+
+      const productSnapshot = await getDocs(productsQuery)
+      const fetchedProducts = productSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Product)
+
+      if (isLoadMore) {
+        setProducts(prev => [...prev, ...fetchedProducts])
+      } else {
+        setProducts(fetchedProducts)
+        setCurrentPage(1)
+      }
+
+      setLastVisibleDoc(productSnapshot.docs[productSnapshot.docs.length - 1])
+      setHasMore(fetchedProducts.length === productsPerPage)
+
+      // Update cache
+      productCache.set(cacheKey, {
+        data: isLoadMore ? [...products, ...fetchedProducts] : fetchedProducts,
+        timestamp: Date.now(),
+        lastDoc: productSnapshot.docs[productSnapshot.docs.length - 1]
+      })
+
+    } catch (err) {
+      console.error("Error fetching products:", err)
+      setError("Error al cargar los productos. Intenta de nuevo más tarde.")
+    }
+  }, [sortBy, lastVisibleDoc, productsPerPage, cacheKey, products])
+
+  // Load more products
+  const loadMoreProducts = useCallback(() => {
+    if (hasMore && !loading) {
+      fetchProducts(true)
+    }
+  }, [hasMore, loading, fetchProducts])
 
   // Apply filters whenever filter states change
   useEffect(() => {
     let filtered = [...products]
 
     // Search filter
-    if (searchTerm) {
-      const lowerCaseSearchTerm = searchTerm.toLowerCase()
+    if (debouncedSearchTerm) {
+      const lowerCaseSearchTerm = debouncedSearchTerm.toLowerCase()
       filtered = filtered.filter(
         (product) =>
           product.name.toLowerCase().includes(lowerCaseSearchTerm) ||
@@ -136,25 +228,16 @@ export default function ProductsPage() {
       filtered = filtered.filter((product) => product.isService === isServiceFilter)
     }
 
-    // Sort
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case "price_asc":
-          return a.price - b.price
-        case "price_desc":
-          return b.price - a.price
-        case "name_asc":
-          return a.name.localeCompare(b.name)
-        case "name_desc":
-          return b.name.localeCompare(a.name)
-        case "createdAt_desc":
-        default:
-          return b.createdAt?.toMillis() - a.createdAt?.toMillis()
-      }
-    })
-
     setFilteredProducts(filtered)
-  }, [products, searchTerm, selectedCategory, selectedBrand, minPrice, maxPrice, isServiceFilter, sortBy])
+    setCurrentPage(1) // Reset to first page when filters change
+  }, [products, debouncedSearchTerm, selectedCategory, selectedBrand, minPrice, maxPrice, isServiceFilter])
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+    setLastVisibleDoc(null)
+    setHasMore(true)
+  }, [cacheKey])
 
   const handleClearFilters = () => {
     setSearchTerm("")
@@ -164,6 +247,17 @@ export default function ProductsPage() {
     setMaxPrice("")
     setIsServiceFilter("all")
     setSortBy("createdAt_desc")
+  }
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredProducts.length / productsPerPage)
+  const startIndex = (currentPage - 1) * productsPerPage
+  const endIndex = startIndex + productsPerPage
+  const currentProducts = filteredProducts.slice(startIndex, endIndex)
+
+  const goToPage = (page: number) => {
+    setCurrentPage(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const FilterContent = () => (
@@ -192,6 +286,11 @@ export default function ProductsPage() {
             >
               <XCircle className="h-4 w-4" />
             </Button>
+          )}
+          {searchTerm !== debouncedSearchTerm && (
+            <div className="absolute right-10 top-1/2 -translate-y-1/2">
+              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+            </div>
           )}
         </div>
       </div>
@@ -376,39 +475,98 @@ export default function ProductsPage() {
               </div>
             ) : (
               <>
-                <div className="mb-4 text-sm text-gray-600">
-                  {filteredProducts.length} producto{filteredProducts.length !== 1 ? "s" : ""} encontrado
-                  {filteredProducts.length !== 1 ? "s" : ""}
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    {filteredProducts.length} producto{filteredProducts.length !== 1 ? "s" : ""} encontrado
+                    {filteredProducts.length !== 1 ? "s" : ""}
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    Los datos se actualizan automáticamente cada 5 minutos
+                  </div>
                 </div>
+                
+                {/* Product Grid with Uniform Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
-                  {filteredProducts.map((product) => (
+                  {currentProducts.map((product) => (
                     <Link key={product.id} href={`/product/${product.id}`} className="block">
-                      <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-200 h-full">
-                        <div className="aspect-square relative bg-gray-100">
-                          <SimpleImage src={getProductThumbnail(product.media, product.imageUrl, product.name)} alt={product.name} className="w-full h-full object-cover" className="object-cover"
+                      <Card className="overflow-hidden hover:shadow-xl transition-shadow product-card-fixed">
+                        <div className="product-image-container relative">
+                          <SimpleImage 
+                            src={getProductThumbnail(product.media, product.imageUrl, product.name)} 
+                            alt={product.name} 
+                            className="product-image"
                             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
                           />
+                          {/* Badges superpuestos */}
+                          <div className="absolute top-2 right-2 flex flex-col gap-1">
+                            {/* Estado del producto */}
+                            {product.condition && (
+                              <span className={`px-2 py-1 text-xs font-bold rounded-full product-badge ${
+                                product.condition === 'nuevo' 
+                                  ? 'product-badge-new' 
+                                  : 'product-badge-used'
+                              }`}>
+                                {product.condition === 'nuevo' ? 'NUEVO' : 'USADO'}
+                              </span>
+                            )}
+                            {/* Envío */}
+                            {product.freeShipping ? (
+                              <span className="px-2 py-1 text-xs font-bold rounded-full product-badge product-badge-shipping">
+                                ENVÍO GRATIS
+                              </span>
+                            ) : product.shippingCost !== undefined ? (
+                              <span className="px-2 py-1 text-xs font-bold rounded-full product-badge product-badge-cost">
+                                ENVÍO {formatPrice(product.shippingCost)}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
-                        <CardContent className="p-3">
-                          <h3 className="text-sm font-medium mb-2 line-clamp-2 min-h-[2.5rem]">{product.name}</h3>
-                          <p className="text-lg font-bold text-blue-600 mb-1">{formatPrice(product.price)}</p>
-                          {/* Condición */}
-                          {product.condition && (
-                            <span className="text-xs font-medium text-gray-700 mb-1">
-                              {product.condition === 'nuevo' ? 'Nuevo' : 'Usado'}
-                            </span>
-                          )}
-                          {/* Envío */}
-                          {product.freeShipping ? (
-                            <span className="text-xs text-green-600">Envío gratis</span>
-                          ) : (
-                            <span className="text-xs text-gray-600">Envío: {product.shippingCost !== undefined ? formatPrice(product.shippingCost) : '-'}</span>
-                          )}
+                        <CardContent className="p-3 flex flex-col flex-grow justify-between h-[120px]">
+                          <div className="flex-grow">
+                            <h3 className="text-sm font-medium mb-1 line-clamp-2 leading-tight min-h-[2.5rem]">{product.name}</h3>
+                            <p className="text-lg font-semibold text-blue-600 mb-2">{formatPrice(product.price)}</p>
+                          </div>
+                          <div className="space-y-1 mt-auto">
+                            {/* Aquí puedes agregar información adicional si es necesario */}
+                          </div>
                         </CardContent>
                       </Card>
                     </Link>
                   ))}
                 </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="mt-8">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={goToPage}
+                      maxVisiblePages={7}
+                      showPageInfo={true}
+                    />
+                  </div>
+                )}
+
+                {/* Load More Button for Infinite Scroll Alternative */}
+                {hasMore && (
+                  <div className="mt-6 text-center">
+                    <Button 
+                      onClick={loadMoreProducts} 
+                      disabled={loading}
+                      variant="outline"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Cargando...
+                        </>
+                      ) : (
+                        'Cargar más productos'
+                      )}
+                    </Button>
+                  </div>
+                )}
               </>
             )}
           </div>
