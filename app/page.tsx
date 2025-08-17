@@ -9,6 +9,7 @@ import { formatPrice } from '@/lib/utils'
 import { SimpleImage } from '@/components/ui/simple-image'
 import { collection, getDocs, query, orderBy, limit, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 
 interface Product {
   id: string
@@ -587,6 +588,11 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {/* PWA Install Prompt */}
+      <div className="fixed bottom-20 right-4 z-40">
+        <PWAInstallPrompt />
+      </div>
     </div>
   )
 }
