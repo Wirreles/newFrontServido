@@ -49,6 +49,10 @@
 - [x] Modo standalone detectado
 - [x] Botones de instalación
 - [x] Página offline creada
+- [x] **Modal simplificado y amigable** ✅
+- [x] **Notificación post-instalación removible** ✅
+- [x] **Opción "Más tarde" en sidebar** ✅
+- [x] **Lenguaje simple y comprensible** ✅
 
 ---
 
@@ -62,6 +66,7 @@
 - [x] `public/images/logo-512.png`
 - [x] `app/offline/page.tsx`
 - [x] `components/pwa-install-prompt.tsx`
+- [x] `components/pwa-sidebar-option.tsx`
 - [x] `scripts/generate-pwa-icons.js`
 - [x] `public/PWA-ICONS-INSTRUCTIONS.md`
 - [x] `docs/pwa-verification-checklist.md`
