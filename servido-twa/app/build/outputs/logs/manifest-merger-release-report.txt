@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:22:1-194:12
-INJECTED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:22:1-194:12
-INJECTED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:22:1-194:12
-INJECTED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:22:1-194:12
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:22:1-164:12
+INJECTED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:22:1-164:12
+INJECTED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:22:1-164:12
+INJECTED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:22:1-164:12
 MERGED from [com.google.androidbrowserhelper:locationdelegation:1.1.2] C:\Users\chino\.gradle\caches\8.11.1\transforms\6215e13210b05cc5715af15b5940fb9f\transformed\locationdelegation-1.1.2\AndroidManifest.xml:2:1-14:12
 MERGED from [com.google.androidbrowserhelper:androidbrowserhelper:2.6.2] C:\Users\chino\.gradle\caches\8.11.1\transforms\5053e02be90783e54992393be394bb70\transformed\androidbrowserhelper-2.6.2\AndroidManifest.xml:17:1-32:12
 MERGED from [com.google.android.gms:play-services-location:21.0.1] C:\Users\chino\.gradle\caches\8.11.1\transforms\fc152f6c05f0a8e42a641aef39f03e09\transformed\play-services-location-21.0.1\AndroidManifest.xml:2:1-9:12
@@ -50,12 +50,12 @@ MERGED from [androidx.annotation:annotation-experimental:1.4.1] C:\Users\chino\.
 	xmlns:android
 		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:22:11-69
 uses-permission#android.permission.POST_NOTIFICATIONS
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:26:9-80
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:26:5-76
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:26:26-78
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:26:22-74
 application
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:35:5-193:19
-INJECTED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:35:5-193:19
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:28:5-163:19
+INJECTED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:28:5-163:19
 MERGED from [com.google.androidbrowserhelper:locationdelegation:1.1.2] C:\Users\chino\.gradle\caches\8.11.1\transforms\6215e13210b05cc5715af15b5940fb9f\transformed\locationdelegation-1.1.2\AndroidManifest.xml:10:5-12:19
 MERGED from [com.google.androidbrowserhelper:locationdelegation:1.1.2] C:\Users\chino\.gradle\caches\8.11.1\transforms\6215e13210b05cc5715af15b5940fb9f\transformed\locationdelegation-1.1.2\AndroidManifest.xml:10:5-12:19
 MERGED from [com.google.android.gms:play-services-location:21.0.1] C:\Users\chino\.gradle\caches\8.11.1\transforms\fc152f6c05f0a8e42a641aef39f03e09\transformed\play-services-location-21.0.1\AndroidManifest.xml:7:5-20
@@ -83,229 +83,229 @@ MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] C:\Users\ch
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.13.0] C:\Users\chino\.gradle\caches\8.11.1\transforms\a5429f7b20c607b890f08b5283ad4ec0\transformed\core-1.13.0\AndroidManifest.xml:28:18-86
 	android:supportsRtl
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:43:9-35
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:34:9-35
 	android:label
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:39:9-40
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:32:9-40
 	android:manageSpaceActivity
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:41:9-105
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:33:9-105
 	android:icon
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:38:9-43
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:31:9-43
 	android:allowBackup
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:37:9-35
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:30:9-35
 	android:theme
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:44:9-68
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:35:9-68
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:36:9-35
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:29:9-35
 meta-data#asset_statements
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:46:9-48:58
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:38:9-40:58
 	android:resource
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:48:13-55
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:40:13-55
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:47:13-44
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:39:13-44
 meta-data#web_manifest_url
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:51:13-53:58
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:43:9-45:54
 	android:value
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:53:17-55
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:45:13-51
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:52:17-48
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:44:13-44
 meta-data#twa_generator
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:56:9-58:52
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:48:9-50:52
 	android:value
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:58:13-49
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:50:13-49
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:57:13-41
-activity#com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:65:13-69:24
-	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:65:23-104
-meta-data#android.support.customtabs.trusted.MANAGE_SPACE_URL
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:66:13-68:53
-	android:value
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:68:17-50
-	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:67:17-83
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:49:13-41
 activity#ar.com.servido.app.LauncherActivity
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:72:9-151:20
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:53:9-128:20
 	android:label
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:74:13-49
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:55:13-49
 	android:exported
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:75:13-36
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:56:13-36
 	android:alwaysRetainTaskState
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:73:13-49
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:54:13-49
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:72:19-50
-meta-data#android.support.customtabs.trusted.DEFAULT_URL
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:76:13-77:53
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:53:19-50
+meta-data#androidx.browser.trusted.DEFAULT_URL
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:59:13-60:53
 	android:value
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:77:17-50
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:60:17-50
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:76:24-85
-meta-data#android.support.customtabs.trusted.STATUS_BAR_COLOR
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:79:13-81:58
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:59:24-75
+meta-data#androidx.browser.trusted.STATUS_BAR_COLOR
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:63:13-65:58
 	android:resource
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:81:17-55
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:65:17-55
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:80:17-83
-meta-data#android.support.customtabs.trusted.STATUS_BAR_COLOR_DARK
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:85:13-87:62
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:64:17-73
+meta-data#androidx.browser.trusted.STATUS_BAR_COLOR_DARK
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:67:13-69:62
 	android:resource
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:87:17-59
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:69:17-59
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:86:17-88
-meta-data#android.support.customtabs.trusted.NAVIGATION_BAR_COLOR
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:89:13-91:61
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:68:17-78
+meta-data#androidx.browser.trusted.NAVIGATION_BAR_COLOR
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:71:13-73:61
 	android:resource
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:91:17-58
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:73:17-58
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:90:17-87
-meta-data#android.support.customtabs.trusted.NAVIGATION_BAR_COLOR_DARK
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:93:13-95:65
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:72:17-77
+meta-data#androidx.browser.trusted.NAVIGATION_BAR_COLOR_DARK
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:75:13-77:65
 	android:resource
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:95:17-62
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:77:17-62
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:94:17-92
-meta-data#androix.browser.trusted.NAVIGATION_BAR_DIVIDER_COLOR
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:97:13-99:68
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:76:17-82
+meta-data#androidx.browser.trusted.NAVIGATION_BAR_DIVIDER_COLOR
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:79:13-81:68
 	android:resource
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:99:17-65
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:81:17-65
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:98:17-84
-meta-data#androix.browser.trusted.NAVIGATION_BAR_DIVIDER_COLOR_DARK
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:101:13-103:72
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:80:17-85
+meta-data#androidx.browser.trusted.NAVIGATION_BAR_DIVIDER_COLOR_DARK
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:83:13-85:72
 	android:resource
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:103:17-69
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:85:17-69
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:102:17-89
-meta-data#android.support.customtabs.trusted.SPLASH_IMAGE_DRAWABLE
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:105:13-106:54
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:84:17-90
+meta-data#androidx.browser.trusted.SPLASH_IMAGE_DRAWABLE
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:88:13-89:54
 	android:resource
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:106:17-52
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:89:17-52
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:105:24-95
-meta-data#android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:108:13-109:60
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:88:24-85
+meta-data#androidx.browser.trusted.SPLASH_SCREEN_BACKGROUND_COLOR
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:91:13-92:60
 	android:resource
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:109:17-58
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:92:17-58
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:108:24-104
-meta-data#android.support.customtabs.trusted.SPLASH_SCREEN_FADE_OUT_DURATION
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:111:13-112:71
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:91:24-94
+meta-data#androidx.browser.trusted.SPLASH_SCREEN_FADE_OUT_DURATION
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:94:13-95:71
 	android:value
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:112:17-69
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:95:17-69
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:111:24-105
-meta-data#android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:114:13-115:60
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:94:24-95
+meta-data#androidx.browser.trusted.FILE_PROVIDER_AUTHORITY
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:97:13-98:60
 	android:value
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:115:17-58
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:98:17-58
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:114:24-97
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:97:24-87
 meta-data#android.app.shortcuts
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:117:13-97
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:101:13-97
 	android:resource
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:117:61-94
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:101:61-94
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:117:24-60
-meta-data#android.support.customtabs.trusted.FALLBACK_STRATEGY
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:119:13-120:56
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:101:24-60
+meta-data#androidx.browser.trusted.FALLBACK_STRATEGY
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:104:13-105:56
 	android:value
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:120:17-53
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:105:17-53
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:119:24-91
-meta-data#android.support.customtabs.trusted.SCREEN_ORIENTATION
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:126:13-127:54
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:104:24-81
+meta-data#androidx.browser.trusted.SCREEN_ORIENTATION
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:108:13-109:54
 	android:value
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:127:17-52
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:109:17-52
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:126:24-92
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:108:24-82
+meta-data#androidx.browser.trusted.IMMERSIVE_MODE_ENABLED
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:112:13-114:40
+	android:value
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:114:17-37
+	android:name
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:113:17-79
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:133:13-136:29
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:116:13-119:29
 action#android.intent.action.MAIN
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:134:17-69
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:117:17-69
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:134:25-66
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:117:25-66
 category#android.intent.category.LAUNCHER
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:135:17-77
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:118:17-77
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:135:27-74
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:118:27-74
 intent-filter#action:name:android.intent.action.VIEW+category:name:android.intent.category.BROWSABLE+category:name:android.intent.category.DEFAULT+data:host:@string/hostName+data:scheme:https
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:138:13-146:29
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:121:13-127:29
 	android:autoVerify
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:138:28-53
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:121:28-53
 action#android.intent.action.VIEW
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:139:17-68
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:122:17-68
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:139:25-66
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:122:25-66
 category#android.intent.category.DEFAULT
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:140:17-76
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:123:17-76
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:140:27-73
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:123:27-73
 category#android.intent.category.BROWSABLE
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:141:17-77
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:124:17-77
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:141:27-75
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:124:27-75
 data
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:142:17-145:19
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:125:17-126:55
 	android:host
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:143:21-52
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:126:21-52
 	android:scheme
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:142:23-45
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:125:23-45
+activity#com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:131:9-102
+	android:name
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:131:19-100
 activity#com.google.androidbrowserhelper.trusted.FocusActivity
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:153:9-90
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:132:9-90
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:153:19-87
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:132:19-87
 activity#com.google.androidbrowserhelper.trusted.WebViewFallbackActivity
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:155:9-156:62
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:133:9-134:62
 	android:configChanges
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:156:13-59
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:134:13-59
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:155:19-97
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:133:19-97
 provider#androidx.core.content.FileProvider
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:158:9-166:20
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:136:9-144:20
 	android:grantUriPermissions
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:161:13-47
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:139:13-47
 	android:authorities
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:160:13-60
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:138:13-60
 	android:exported
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:162:13-37
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:140:13-37
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:159:13-62
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:137:13-62
 meta-data#android.support.FILE_PROVIDER_PATHS
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:163:13-165:53
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:141:13-143:53
 	android:resource
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:165:17-50
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:143:17-50
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:164:17-67
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:142:17-67
 service#ar.com.servido.app.DelegationService
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:168:9-183:19
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:146:9-159:19
 	android:enabled
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:170:13-55
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:148:13-55
 	android:exported
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:171:13-56
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:149:13-56
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:169:13-46
-meta-data#android.support.customtabs.trusted.SMALL_ICON
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:174:17-176:73
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:147:13-46
+meta-data#androidx.browser.trusted.SMALL_ICON
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:151:13-153:69
 	android:resource
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:176:21-70
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:153:17-66
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:175:21-81
-intent-filter#action:name:android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE+category:name:android.intent.category.DEFAULT
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:179:13-182:29
-action#android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:180:17-105
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:152:17-67
+intent-filter#action:name:androidx.browser.trusted.TRUSTED_WEB_ACTIVITY_SERVICE+category:name:android.intent.category.DEFAULT
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:155:13-158:29
+action#androidx.browser.trusted.TRUSTED_WEB_ACTIVITY_SERVICE
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:156:17-95
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:180:25-103
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:156:25-93
 activity#com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:186:13-118
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:161:9-114
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:186:23-115
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:161:19-111
 activity#com.google.androidbrowserhelper.locationdelegation.PermissionRequestActivity
-ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:190:13-191:89
+ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:162:9-112
 MERGED from [com.google.androidbrowserhelper:locationdelegation:1.1.2] C:\Users\chino\.gradle\caches\8.11.1\transforms\6215e13210b05cc5715af15b5940fb9f\transformed\locationdelegation-1.1.2\AndroidManifest.xml:11:9-113
 MERGED from [com.google.androidbrowserhelper:locationdelegation:1.1.2] C:\Users\chino\.gradle\caches\8.11.1\transforms\6215e13210b05cc5715af15b5940fb9f\transformed\locationdelegation-1.1.2\AndroidManifest.xml:11:9-113
 	android:name
-		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:190:23-123
+		ADDED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml:162:19-110
 uses-sdk
 INJECTED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from G:\proyectos\servido\newFrontServido\servido-twa\app\src\main\AndroidManifest.xml

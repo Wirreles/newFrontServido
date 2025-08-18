@@ -26,7 +26,7 @@
     <!-- Value from default config. -->
     <string name="appName" translatable="false">Servido - Marketplace de Productos y Servicios</string>
     <!-- Value from default config. -->
-    <string name="fallbackType" translatable="false">customtabs</string>
+    <string name="fallbackType" translatable="false">webview</string>
     <!-- Value from default config. -->
     <string name="fullScopeUrl" translatable="false">https://www.servido.com.ar/</string>
     <!-- Value from default config. -->

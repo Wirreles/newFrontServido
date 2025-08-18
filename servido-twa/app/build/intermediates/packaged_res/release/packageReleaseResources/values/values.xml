@@ -22,7 +22,7 @@
     }]
     
   </string>
-    <string name="fallbackType" translatable="false">customtabs</string>
+    <string name="fallbackType" translatable="false">webview</string>
     <string name="fullScopeUrl" translatable="false">https://www.servido.com.ar/</string>
     <string name="generatorApp" translatable="false">bubblewrap-cli</string>
     <string name="hostName" translatable="false">www.servido.com.ar</string>

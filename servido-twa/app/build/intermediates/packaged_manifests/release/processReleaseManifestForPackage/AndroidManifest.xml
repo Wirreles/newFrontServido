@@ -30,6 +30,7 @@
         android:minSdkVersion="21"
         android:targetSdkVersion="35" />
 
+    <!-- Permisos necesarios -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -60,68 +61,87 @@
         android:manageSpaceActivity="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Translucent.NoTitleBar" >
+
+        <!-- Asset Links -->
         <meta-data
             android:name="asset_statements"
             android:resource="@string/assetStatements" />
+
+        <!-- Web manifest -->
         <meta-data
             android:name="web_manifest_url"
             android:value="@string/webManifestUrl" />
+
+        <!-- Generator info -->
         <meta-data
             android:name="twa_generator"
             android:value="@string/generatorApp" />
 
-        <activity android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity" >
-            <meta-data
-                android:name="android.support.customtabs.trusted.MANAGE_SPACE_URL"
-                android:value="@string/launchUrl" />
-        </activity>
+        <!-- Launcher Activity -->
         <activity
             android:name="ar.com.servido.app.LauncherActivity"
             android:alwaysRetainTaskState="true"
             android:exported="true"
             android:label="@string/launcherName" >
+
+            <!-- URL principal -->
             <meta-data
-                android:name="android.support.customtabs.trusted.DEFAULT_URL"
+                android:name="androidx.browser.trusted.DEFAULT_URL"
                 android:value="@string/launchUrl" />
+
+            <!-- Colores de UI -->
             <meta-data
-                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
+                android:name="androidx.browser.trusted.STATUS_BAR_COLOR"
                 android:resource="@color/colorPrimary" />
             <meta-data
-                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR_DARK"
+                android:name="androidx.browser.trusted.STATUS_BAR_COLOR_DARK"
                 android:resource="@color/colorPrimaryDark" />
             <meta-data
-                android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
+                android:name="androidx.browser.trusted.NAVIGATION_BAR_COLOR"
                 android:resource="@color/navigationColor" />
             <meta-data
-                android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR_DARK"
+                android:name="androidx.browser.trusted.NAVIGATION_BAR_COLOR_DARK"
                 android:resource="@color/navigationColorDark" />
             <meta-data
-                android:name="androix.browser.trusted.NAVIGATION_BAR_DIVIDER_COLOR"
+                android:name="androidx.browser.trusted.NAVIGATION_BAR_DIVIDER_COLOR"
                 android:resource="@color/navigationDividerColor" />
             <meta-data
-                android:name="androix.browser.trusted.NAVIGATION_BAR_DIVIDER_COLOR_DARK"
+                android:name="androidx.browser.trusted.NAVIGATION_BAR_DIVIDER_COLOR_DARK"
                 android:resource="@color/navigationDividerColorDark" />
+
+            <!-- Splash -->
             <meta-data
-                android:name="android.support.customtabs.trusted.SPLASH_IMAGE_DRAWABLE"
+                android:name="androidx.browser.trusted.SPLASH_IMAGE_DRAWABLE"
                 android:resource="@drawable/splash" />
             <meta-data
-                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
+                android:name="androidx.browser.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
                 android:resource="@color/backgroundColor" />
             <meta-data
-                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_FADE_OUT_DURATION"
+                android:name="androidx.browser.trusted.SPLASH_SCREEN_FADE_OUT_DURATION"
                 android:value="@integer/splashScreenFadeOutDuration" />
             <meta-data
-                android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
+                android:name="androidx.browser.trusted.FILE_PROVIDER_AUTHORITY"
                 android:value="@string/providerAuthority" />
+
+            <!-- Atajos -->
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
+
+            <!-- Estrategia fallback -->
             <meta-data
-                android:name="android.support.customtabs.trusted.FALLBACK_STRATEGY"
+                android:name="androidx.browser.trusted.FALLBACK_STRATEGY"
                 android:value="@string/fallbackType" />
+
+            <!-- Orientación -->
             <meta-data
-                android:name="android.support.customtabs.trusted.SCREEN_ORIENTATION"
+                android:name="androidx.browser.trusted.SCREEN_ORIENTATION"
                 android:value="@string/orientation" />
+
+            <!-- 🚀 Activar immersive mode -->
+            <meta-data
+                android:name="androidx.browser.trusted.IMMERSIVE_MODE_ENABLED"
+                android:value="true" />
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -139,6 +159,9 @@
                     android:scheme="https" />
             </intent-filter>
         </activity>
+
+        <!-- Otras activities y services de Bubblewrap -->
+        <activity android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity" />
         <activity android:name="com.google.androidbrowserhelper.trusted.FocusActivity" />
         <activity
             android:name="com.google.androidbrowserhelper.trusted.WebViewFallbackActivity"
@@ -159,11 +182,11 @@
             android:enabled="@bool/enableNotification"
             android:exported="@bool/enableNotification" >
             <meta-data
-                android:name="android.support.customtabs.trusted.SMALL_ICON"
+                android:name="androidx.browser.trusted.SMALL_ICON"
                 android:resource="@drawable/ic_notification_icon" />
 
             <intent-filter>
-                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
+                <action android:name="androidx.browser.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
 
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
