@@ -10,6 +10,7 @@ const urlsToCache = [
   '/manifest.json',
   '/images/logo-128.png',
   '/images/logo-192.png',
+  '/images/logo-320.png',
   '/images/logo-512.png',
   '/images/banner-1.png',
   '/images/banner-2.png'
