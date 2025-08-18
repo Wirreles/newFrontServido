@@ -1,0 +1,50 @@
+{
+  "packageId": "ar.com.servido.app",
+  "host": "www.servido.com.ar",
+  "name": "Servido - Marketplace de Productos y Servicios",
+  "launcherName": "Servido",
+  "display": "standalone",
+  "themeColor": "#8B5CF6",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#FFFFFF",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://www.servido.com.ar/images/logo-512.png",
+  "maskableIconUrl": "https://www.servido.com.ar/images/logo-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "G:\\proyectos\\servido\\newFrontServido\\servido-twa\\android.keystore",
+    "alias": "android"
+  },
+  "appVersionName": "1",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://www.servido.com.ar/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": true
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://www.servido.com.ar/",
+  "minSdkVersion": 21,
+  "orientation": "portrait-primary",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "fileHandlers": [],
+  "launchHandlerClientMode": "",
+  "appVersion": "1"
+}

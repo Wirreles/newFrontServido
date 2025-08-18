@@ -1,0 +1,8 @@
+[{
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "ar.com.servido.app",
+      "sha256_cert_fingerprints": ["FC:D2:F4:A7:F0:31:CE:0A:22:49:67:48:FA:CC:BA:4B:E7:7A:6D:52:2E:E3:16:5D:2F:84:6D:5F:92:2D:50:F0"]
+    }
+  }]

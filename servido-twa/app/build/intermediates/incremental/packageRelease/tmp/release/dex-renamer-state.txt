@@ -1,0 +1,4 @@
+#Mon Aug 18 14:52:17 ART 2025
+base.0=G\:\\proyectos\\servido\\newFrontServido\\servido-twa\\app\\build\\intermediates\\dex\\release\\minifyReleaseWithR8\\classes.dex
+renamed.0=classes.dex
+path.0=classes.dex
