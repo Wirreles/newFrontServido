@@ -42,7 +42,7 @@ const cacheFirst = async (request) => {
 const networkFirst = async (request) => {
   try {
     const networkResponse = await fetch(request);
-    if (networkResponse.ok && request.method === 'GET') {
+    if (networkResponse.ok) {
       const cache = await caches.open(DYNAMIC_CACHE);
       cache.put(request, networkResponse.clone());
     }
@@ -97,6 +97,12 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // NO cachear requests POST, PUT, DELETE
+  if (request.method !== 'GET') {
+    event.respondWith(fetch(request));
+    return;
+  }
+
   // Cache First para recursos estáticos
   if (request.destination === 'image' || 
       request.destination === 'font' || 
@@ -106,7 +112,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network First para API calls
+  // Network First para API calls (solo GET)
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(networkFirst(request));
     return;
@@ -118,7 +124,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Para otros recursos, usar Network First
+  // Para otros recursos GET, usar Network First
   event.respondWith(networkFirst(request));
 });
 
