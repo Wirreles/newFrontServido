@@ -99,12 +99,14 @@ export function PWAInstallPrompt() {
   // Mensaje de éxito temporal (se auto-oculta)
   if (showSuccessMessage) {
     return (
-      <div className="fixed bottom-4 right-4 bg-green-500 text-white p-4 rounded-lg shadow-lg max-w-sm z-50 animate-in slide-in-from-bottom-2 duration-300">
-        <div className="flex items-center space-x-3">
-          <CheckCircle className="w-6 h-6 text-green-100" />
-          <div className="flex-1">
-            <h3 className="font-semibold">¡Aplicación Instalada!</h3>
-            <p className="text-sm opacity-90">La app de Servido está disponible en tu pantalla de inicio</p>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
+        <div className="bg-green-500 text-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4 animate-in slide-in-from-bottom-2 duration-300">
+          <div className="flex items-center space-x-3">
+            <CheckCircle className="w-6 h-6 text-green-100" />
+            <div className="flex-1">
+              <h3 className="font-semibold">¡Aplicación Instalada!</h3>
+              <p className="text-sm opacity-90">La app de Servido está disponible en tu pantalla de inicio</p>
+            </div>
           </div>
         </div>
       </div>
@@ -122,8 +124,9 @@ export function PWAInstallPrompt() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 bg-white border border-gray-200 rounded-lg shadow-lg max-w-sm z-50 animate-in slide-in-from-bottom-2 duration-300">
-      <div className="p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
+      <div className="bg-white border border-gray-200 rounded-lg shadow-xl max-w-sm w-full mx-4 animate-in slide-in-from-bottom-2 duration-300">
+        <div className="p-4">
         <div className="flex items-center space-x-3 mb-3">
           <div className="flex-shrink-0">
             <Download className="w-6 h-6 text-purple-600" />
@@ -169,7 +172,7 @@ export function PWAInstallPrompt() {
 
         <button
           onClick={() => setShowPrompt(false)}
-          className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition-colors"
+          className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
         >
           <XCircle className="w-4 h-4" />
         </button>
