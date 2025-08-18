@@ -69,18 +69,5 @@
       ]
     }
   ],
-  "screenshots": [
-    {
-      "src": "/images/screenshot-mobile-1.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow"
-    },
-    {
-      "src": "/images/screenshot-tablet-1.png", 
-      "sizes": "768x1024",
-      "type": "image/png",
-      "form_factor": "wide"
-    }
-  ]
+  "screenshots": []
 }
