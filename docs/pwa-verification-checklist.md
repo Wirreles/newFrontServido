@@ -32,6 +32,7 @@
 - [x] Service worker registrado
 
 ### ✅ **Tarea 1.4: Iconos creados**
+- [x] `logo-128.png` creado (128x128)
 - [x] `logo-192.png` creado (192x192)
 - [x] `logo-512.png` creado (512x512)
 - [x] Iconos maskable configurados
@@ -56,6 +57,7 @@
 ### **Archivos Creados:**
 - [x] `public/manifest.json`
 - [x] `public/sw.js`
+- [x] `public/images/logo-128.png`
 - [x] `public/images/logo-192.png`
 - [x] `public/images/logo-512.png`
 - [x] `app/offline/page.tsx`

@@ -46,12 +46,12 @@ export const metadata: Metadata = {
     description: 'Tu marketplace confiable para comprar y vender productos y servicios en Argentina',
     images: ['/images/logo-512.png']
   },
-  icons: {
-    icon: [
-      { url: '/images/logo.png', sizes: '128x128', type: 'image/png' },
-      { url: '/images/logo-192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/images/logo-512.png', sizes: '512x512', type: 'image/png' }
-    ],
+                    icons: {
+                    icon: [
+                      { url: '/images/logo-128.png', sizes: '128x128', type: 'image/png' },
+                      { url: '/images/logo-192.png', sizes: '192x192', type: 'image/png' },
+                      { url: '/images/logo-512.png', sizes: '512x512', type: 'image/png' }
+                    ],
     apple: [
       { url: '/images/logo-192.png', sizes: '192x192', type: 'image/png' }
     ]
@@ -67,7 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Servido" />
-        <link rel="apple-touch-icon" href="/images/logo-192.png" />
+                          <link rel="apple-touch-icon" href="/images/logo-128.png" />
         <script
           dangerouslySetInnerHTML={{
             __html: `

@@ -8,7 +8,7 @@ const urlsToCache = [
   '/',
   '/offline',
   '/manifest.json',
-  '/images/logo.png',
+  '/images/logo-128.png',
   '/images/logo-192.png',
   '/images/logo-512.png',
   '/images/banner-1.png',
@@ -42,7 +42,7 @@ const cacheFirst = async (request) => {
 const networkFirst = async (request) => {
   try {
     const networkResponse = await fetch(request);
-    if (networkResponse.ok) {
+    if (networkResponse.ok && request.method === 'GET') {
       const cache = await caches.open(DYNAMIC_CACHE);
       cache.put(request, networkResponse.clone());
     }
