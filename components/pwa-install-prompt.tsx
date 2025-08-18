@@ -103,8 +103,8 @@ export function PWAInstallPrompt() {
         <div className="flex items-center space-x-3">
           <CheckCircle className="w-6 h-6 text-green-100" />
           <div className="flex-1">
-            <h3 className="font-semibold">¡Listo!</h3>
-            <p className="text-sm opacity-90">Servido está instalado en tu dispositivo</p>
+            <h3 className="font-semibold">¡Aplicación Instalada!</h3>
+            <p className="text-sm opacity-90">La app de Servido está disponible en tu pantalla de inicio</p>
           </div>
         </div>
       </div>
@@ -129,23 +129,23 @@ export function PWAInstallPrompt() {
             <Download className="w-6 h-6 text-purple-600" />
           </div>
           <div className="flex-1">
-            <h3 className="font-semibold text-gray-900">Instalar Servido</h3>
-            <p className="text-sm text-gray-600">Accede más rápido desde tu pantalla de inicio</p>
+            <h3 className="font-semibold text-gray-900">Instalar Aplicación Servido</h3>
+            <p className="text-sm text-gray-600">Descarga la app de Servido en tu dispositivo</p>
           </div>
         </div>
 
         <div className="space-y-2 mb-4">
           <div className="flex items-center space-x-2 text-sm text-gray-600">
             <Zap className="w-4 h-4 text-yellow-500" />
-            <span>Acceso rápido</span>
+            <span>Acceso rápido desde el escritorio</span>
           </div>
           <div className="flex items-center space-x-2 text-sm text-gray-600">
             <Smartphone className="w-4 h-4 text-blue-500" />
-            <span>Como una app</span>
+            <span>Experiencia de aplicación nativa</span>
           </div>
           <div className="flex items-center space-x-2 text-sm text-gray-600">
             <Shield className="w-4 h-4 text-green-500" />
-            <span>Funciona offline</span>
+            <span>Funciona sin internet</span>
           </div>
         </div>
 
@@ -155,7 +155,7 @@ export function PWAInstallPrompt() {
             className="flex-1 bg-purple-600 hover:bg-purple-700"
           >
             <Download className="w-4 h-4 mr-2" />
-            Instalar
+            Instalar App
           </Button>
           
           <Button 

@@ -8,7 +8,8 @@ import { CacheProvider } from "@/contexts/cache-context"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { TabBar } from "@/components/layout/tab-bar"
-import { NProgressProvider } from "@/components/providers/nprogress-provider";
+import { NProgressProvider } from "@/components/providers/nprogress-provider"
+import { SafeArea } from "@/components/ui/safe-area"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
   generator: 'Next.js',
   manifest: '/manifest.json',
   themeColor: '#8b5cf6',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
+  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -65,8 +66,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#8b5cf6" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Servido" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="format-detection" content="telephone=no" />
                           <link rel="apple-touch-icon" href="/images/logo-128.png" />
         <script
           dangerouslySetInnerHTML={{
@@ -91,10 +94,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <CacheProvider>
             <AuthProvider>
               <CartProvider>
-                <Header /> {/* Global Header */}
-                <main className="flex-1 pb-16 md:16">{children}</main> {/* Adjusted padding for mobile header */}
-                <Footer /> {/* Global Footer */}
-                <TabBar /> {/* Global Tab Bar */}
+                <SafeArea>
+                  <Header /> {/* Global Header */}
+                  <main className="flex-1 pb-16 md:pb-16">{children}</main> {/* Adjusted padding for mobile header */}
+                  <Footer /> {/* Global Footer */}
+                  <TabBar /> {/* Global Tab Bar */}
+                </SafeArea>
               </CartProvider>
             </AuthProvider>
           </CacheProvider>

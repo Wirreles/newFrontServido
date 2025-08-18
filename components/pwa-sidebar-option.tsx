@@ -69,11 +69,11 @@ export function PWASidebarOption() {
       <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
         <div className="flex items-center space-x-2 mb-2">
           <Smartphone className="w-4 h-4 text-purple-600" />
-          <span className="text-sm font-medium text-purple-800">Instalar App</span>
+          <span className="text-sm font-medium text-purple-800">Instalar Aplicación</span>
         </div>
         
         <p className="text-xs text-purple-700 mb-3">
-          Accede más rápido a Servido desde tu pantalla de inicio
+          Descarga la app de Servido en tu dispositivo
         </p>
         
         <div className="flex space-x-2">
@@ -82,7 +82,7 @@ export function PWASidebarOption() {
             className="flex-1 bg-purple-600 text-white text-xs px-3 py-2 rounded-md hover:bg-purple-700 transition-colors"
           >
             <Download className="w-3 h-3 inline mr-1" />
-            Instalar
+            Instalar App
           </button>
           
           <button
